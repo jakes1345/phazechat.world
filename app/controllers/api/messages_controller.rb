@@ -6,6 +6,7 @@ class Api::MessagesController < ApplicationController
     @message = Message.new(message_params);
     @message.user_id = current_user.id
     if @message.save 
+      CreateMessageJob.perform('chat_1', @message);
       render json: @message
     else
       render json: @message, status: 400
