@@ -3,6 +3,7 @@ import { connect } from 'react-redux';
 import ContactsListItem from './ContactsListItem';
 
 
+
 class ContactsListView extends Component {
   constructor(props) {
     super(props);
