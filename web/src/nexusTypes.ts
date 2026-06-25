@@ -1,0 +1,123 @@
+/** Mirrors `NexusMessage` in nexus_server/main.go (JSON field names). */
+
+export interface TurnConfig {
+  url: string
+  urls?: string[]
+  username: string
+  password: string
+}
+
+export interface NexusMessage {
+  type: string
+  sender?: string
+  recipient?: string
+  body?: string
+  status?: string
+  results?: string[]
+  sdp?: string
+  candidate?: string
+  token?: string
+  error?: string
+  email?: string
+  mood?: string
+  display_name?: string
+  convo_id?: string
+  convo_name?: string
+  members?: string[]
+  turn_config?: TurnConfig
+  totp_code?: string
+  totp_uri?: string
+  qr_token?: string
+  qr_data?: string
+  device_info?: string
+  envelopes?: Record<string, string>
+  /** Go JSON encodes []byte as base64 string */
+  public_key?: string | number[]
+  key_fingerprint?: string
+
+  // ---- Servers + Channels ("Spaces") ----
+  server_id?: string
+  channel_id?: string
+  server_name?: string
+  channel_name?: string
+  topic?: string
+  kind?: 'text' | 'voice'
+  role?: 'owner' | 'admin' | 'member'
+  visibility?: 'public' | 'private'
+  invite_code?: string
+  servers?: ServerSummary[]
+  channels?: ChannelInfo[]
+  messages?: ChannelMsg[]
+  history_from?: number
+
+  // Edit / delete / react support — see NexusMessage in nexus_server/main.go.
+  msg_id?: string
+  reaction?: string
+
+  // Durable DM history response (dm_history).
+  dm_history?: DMMessage[]
+
+  // Phone linking
+  phone?: string
+
+  // Referral tracking
+  ref_by?: string
+
+  // PIN-encrypted NaCl keypair backup blob (key_backup_put / key_backup).
+  key_backup?: KeyBackup
+
+  // One-time TOTP recovery codes, returned once on 2FA enable.
+  backup_codes?: string[]
+}
+
+export interface KeyBackup {
+  ciphertext: string
+  salt: string
+  iterations: number
+  created_at?: string
+}
+
+export interface DMMessage {
+  msg_id: string
+  sender: string
+  recipient: string
+  body: string
+  edited?: boolean
+  deleted?: boolean
+  created_at: string
+  reactions?: Record<string, string[]>
+}
+
+export interface ServerSummary {
+  id: string
+  name: string
+  description?: string
+  icon?: string
+  owner: string
+  visibility: 'public' | 'private'
+  role: 'owner' | 'admin' | 'member'
+  invite_code?: string
+  member_count?: number
+  is_member?: boolean
+}
+
+export interface ChannelInfo {
+  id: string
+  server_id: string
+  name: string
+  topic?: string
+  kind: 'text' | 'voice'
+  position: number
+}
+
+export interface ChannelMsg {
+  id: number
+  channel_id: string
+  sender: string
+  body: string
+  created_at: string
+  edited?: boolean
+  deleted?: boolean
+  pinned?: boolean
+  reactions?: Record<string, string[]>
+}

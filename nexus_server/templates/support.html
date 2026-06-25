@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phaze Support — Help Center</title>
+    <meta name="description" content="Get help with Phaze. Troubleshoot issues, contact support, and find answers about encrypted chat, calls, and group spaces.">
+    <link rel="canonical" href="https://phazechat.world/support">
+    <link rel="icon" type="image/svg+xml" href="/web/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/web/favicon-32.png">
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #863bff;
+            --text-dark: #0a0a0a;
+            --text-light: #6b6b75;
+            --bg-light: #fafafa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text-dark); background: #fff; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+
+        .navbar { background: #fff; border-bottom: 1px solid #e8e8e8; height: 60px; display: flex; align-items: center; }
+        .nav-brand { font-size: 1.4rem; font-weight: 700; color: var(--brand); display: flex; align-items: center; gap: 8px; }
+
+        .search-hero { background: var(--bg-light); padding: 80px 0; text-align: center; }
+        .search-hero h1 { font-size: 2.2rem; font-weight: 300; margin-bottom: 30px; }
+        .search-box { max-width: 600px; margin: 0 auto; display: flex; gap: 10px; }
+        .search-box input { flex: 1; padding: 12px 20px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        .search-box button { background: var(--brand); color: #fff; border: none; padding: 0 30px; border-radius: 4px; font-weight: 700; }
+
+        .support-grid { padding: 60px 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+        .support-card { border: 1px solid #eee; padding: 30px; border-radius: 8px; text-align: center; }
+        .support-card:hover { border-color: var(--brand); }
+        .support-icon { font-size: 2.5rem; margin-bottom: 15px; display: block; }
+        .support-card h3 { margin-bottom: 10px; }
+        .support-card a { font-size: 0.9rem; font-weight: 600; }
+
+        .footer { background: #1a1a1a; color: #999; padding: 40px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="nav-brand">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15" fill="#863bff"/><text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-weight="700" font-family="sans-serif">P</text></svg>
+                Phaze Support
+            </a>
+        </div>
+    </nav>
+
+    <section class="search-hero">
+        <div class="container">
+            <h1>What do you need help with?</h1>
+            <div class="search-box">
+                <input type="text" id="support-search" placeholder="Search for help articles..." onkeydown="if(event.key==='Enter')doSearch()">
+                <button onclick="doSearch()">Search</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="container">
+        <div class="support-grid">
+            <div class="support-card">
+                <span class="support-icon">🔑</span>
+                <h3>Account & Profile</h3>
+                <p>Manage your Phaze Name, password and security settings.</p>
+                <a href="https://github.com/jakes1345/skype7-reborn/issues/new?labels=bug&template=01_bug_report.yml" target="_blank" rel="noopener">Open an issue →</a>
+            </div>
+            <div class="support-card">
+                <span class="support-icon">📹</span>
+                <h3>Calling & Video</h3>
+                <p>Troubleshoot audio/video issues and learn about group calls.</p>
+                <a href="https://github.com/jakes1345/skype7-reborn/issues/new?labels=bug&template=01_bug_report.yml" target="_blank" rel="noopener">Open an issue →</a>
+            </div>
+            <div class="support-card">
+                <span class="support-icon">💾</span>
+                <h3>Multi-device &amp; Recovery</h3>
+                <p>Set a Recovery PIN, link a new device with a code, restore your encrypted history.</p>
+                <a href="https://github.com/jakes1345/skype7-reborn/issues/new?labels=bug&template=01_bug_report.yml" target="_blank" rel="noopener">Open an issue →</a>
+            </div>
+            <div class="support-card">
+                <span class="support-icon">🖥️</span>
+                <h3>Install &amp; Updates</h3>
+                <p>Download for Linux or Android. Web client works on everything else.</p>
+                <a href="/download">Download →</a>
+            </div>
+            <div class="support-card">
+                <span class="support-icon">🛡️</span>
+                <h3>Security & Privacy</h3>
+                <p>How encryption works, what we store, and how to report a vulnerability.</p>
+                <a href="/about">Read more →</a>
+            </div>
+            <div class="support-card">
+                <span class="support-icon">👥</span>
+                <h3>Community</h3>
+                <p>Find other Phaze users, share feedback, or just hang out.</p>
+                <a href="https://github.com/jakes1345/skype7-reborn" target="_blank" rel="noopener">GitHub →</a>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        function doSearch() {
+            var q = document.getElementById('support-search').value.trim();
+            if (!q) return;
+            window.open('https://github.com/jakes1345/skype7-reborn/issues?q=' + encodeURIComponent(q), '_blank');
+        }
+    </script>
+    <footer class="footer">
+        <div class="container">
+            <p>© 2024–2026 Phaze.</p>
+        </div>
+    </footer>
+</body>
+</html>

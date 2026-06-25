@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Phaze — Free Encrypted Chat & Video Calls</title>
+    <meta name="description" content="Phaze for Windows, Linux, Android, and Web. Free encrypted video calls, voice calls, group spaces, and instant messaging. No ads, no tracking.">
+    <meta name="theme-color" content="#863bff">
+    <link rel="canonical" href="https://phazechat.world/download">
+    <link rel="icon" type="image/svg+xml" href="/web/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/web/favicon-32.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/web/icon-192.png">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Download Phaze — Free Encrypted Chat & Calls">
+    <meta property="og:description" content="Phaze for Windows, macOS, Linux, Android, and Web. Free encrypted video calls, voice calls, and messaging.">
+    <meta property="og:url" content="https://phazechat.world/download">
+    <meta property="og:image" content="https://phazechat.world/web/icon-512.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Download Phaze">
+    <meta name="twitter:description" content="Free encrypted chat, voice, video calls. Windows, macOS, Linux, Android, and Web.">
+    <meta name="twitter:image" content="https://phazechat.world/web/icon-512.png">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Phaze",
+      "url": "https://phazechat.world/download",
+      "applicationCategory": "CommunicationApplication",
+      "operatingSystem": "Windows, macOS, Linux, Android, Web",
+      "description": "Free encrypted chat, voice calls, video calls, group spaces, and livestreams.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "downloadUrl": "https://phazechat.world/download"
+    }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #863bff;
+            --brand-dark: #6f1ee0;
+            --text-dark: #0a0a0a;
+            --text-light: #6b6b75;
+            --bg-light: #fafafa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text-dark); background: #fff; }
+        a { color: var(--brand); text-decoration: none; }
+        .container { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
+
+        .navbar { background: #fff; border-bottom: 1px solid #e8e8e8; position: sticky; top: 0; z-index: 1000; }
+        .navbar .container { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+        .nav-brand { display: flex; align-items: center; gap: 8px; font-size: 1.4rem; font-weight: 700; color: var(--brand); }
+        .nav-brand svg { width: 32px; height: 32px; }
+        .nav-links { display: flex; list-style: none; height: 100%; }
+        .nav-links a { display: flex; align-items: center; height: 100%; padding: 0 18px; color: var(--text-dark); font-size: 0.9rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--brand); border-bottom-color: var(--brand); }
+        .nav-right { display: flex; align-items: center; gap: 16px; }
+        .nav-get-btn { background: var(--brand); color: #fff !important; padding: 8px 24px; border-radius: 4px; font-weight: 600; }
+
+        .dl-hero {
+            background: #863bff;
+            color: #fff; padding: 60px 0 80px; text-align: center;
+        }
+        .dl-hero h1 { font-size: 2.5rem; font-weight: 300; margin-bottom: 12px; }
+        .dl-hero h1 strong { font-weight: 700; }
+        .dl-hero p { font-size: 1.1rem; opacity: 0.9; max-width: 580px; margin: 0 auto; }
+
+        .platform-section { padding: 60px 0; }
+        .platform-section h2 { text-align: center; font-size: 1.6rem; font-weight: 400; margin-bottom: 12px; color: var(--text-dark); }
+        .platform-section .subtitle { text-align: center; color: var(--text-light); font-size: 0.9rem; max-width: 640px; margin: 0 auto 44px; }
+
+        .platform-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1060px; margin: 0 auto;
+        }
+        .platform-card {
+            background: #fff; border: 2px solid #e8e8e8; border-radius: 16px; padding: 36px 24px;
+            text-align: center; transition: all 0.3s; position: relative;
+        }
+        .platform-card:hover { border-color: var(--brand); box-shadow: 0 8px 32px rgba(134,59,255,0.12); transform: translateY(-3px); }
+        .platform-card.recommended { border-color: var(--brand); }
+        .platform-card.recommended::before {
+            content: 'Recommended'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+            background: var(--brand); color: #fff; padding: 4px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+        }
+        .platform-icon { font-size: 2.8rem; margin-bottom: 14px; display: block; }
+        .platform-name { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; }
+        .platform-detail { color: var(--text-light); font-size: 0.82rem; margin-bottom: 22px; line-height: 1.5; min-height: 36px; }
+        .platform-btn {
+            display: inline-block; background: var(--brand); color: #fff; padding: 11px 28px;
+            border-radius: 6px; font-weight: 600; font-size: 0.9rem; transition: all 0.2s;
+        }
+        .platform-btn:hover { background: var(--brand-dark); transform: translateY(-1px); }
+        .platform-btn.loading { background: #b89eff; pointer-events: none; cursor: wait; }
+
+        .req-section { padding: 40px 0 80px; background: var(--bg-light); }
+        .req-section h3 { text-align: center; font-size: 1.2rem; margin-bottom: 30px; color: var(--text-dark); }
+        .req-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1060px; margin: 0 auto; }
+        .req-card { background: #fff; border-radius: 12px; padding: 24px; border: 1px solid #eee; }
+        .req-card h4 { font-size: 0.95rem; margin-bottom: 12px; color: var(--text-dark); }
+        .req-card ul { list-style: none; }
+        .req-card li { font-size: 0.83rem; color: var(--text-light); margin-bottom: 6px; padding-left: 16px; position: relative; }
+        .req-card li::before { content: '•'; position: absolute; left: 0; color: var(--brand); }
+
+        .footer { background: #1a1a1a; color: #999; padding: 30px 0; text-align: center; font-size: 0.8rem; }
+        .footer a { color: #bbb; }
+
+        @media (max-width: 900px) {
+            .platform-grid, .req-grid { grid-template-columns: repeat(2, 1fr); max-width: 640px; }
+        }
+        @media (max-width: 600px) {
+            .platform-grid, .req-grid { grid-template-columns: 1fr; max-width: 360px; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="nav-brand">
+                <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15" fill="#863bff"/><text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-weight="700" font-family="sans-serif">P</text></svg>
+                Phaze
+            </a>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/features">Features</a></li>
+                <li><a href="/download" class="active">Downloads</a></li>
+                <li><a href="/rates">Rates</a></li>
+                <li><a href="/about">About</a></li>
+            </ul>
+            <div class="nav-right">
+                <a href="/web/" class="nav-get-btn">Open Phaze</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="dl-hero">
+        <div class="container">
+            <h1><strong>Get Phaze</strong> — free on every platform</h1>
+            <p>Download the desktop app, grab it on Android, or just open the web client right now — no install needed.</p>
+        </div>
+    </section>
+
+    <section class="platform-section">
+        <div class="container">
+            <h2>Pick your platform</h2>
+            <p class="subtitle">Every version has the same features: DMs, group Spaces, voice &amp; video calls, screen share, and end-to-end encryption. Free forever.</p>
+            <div class="platform-grid" id="platforms">
+
+                <div class="platform-card" id="card-web">
+                    <span class="platform-icon">🌐</span>
+                    <div class="platform-name">Web</div>
+                    <div class="platform-detail">Any browser · works on iPhone &amp; Mac too · installable as an app</div>
+                    <a href="/web/" class="platform-btn">Open in browser</a>
+                </div>
+
+                <div class="platform-card" id="card-windows">
+                    <span class="platform-icon">🪟</span>
+                    <div class="platform-name">Windows</div>
+                    <div class="platform-detail">Windows 10 / 11 · 64-bit · native desktop app</div>
+                    <a href="#" class="platform-btn loading" data-dl="windows">Download</a>
+                </div>
+
+                <div class="platform-card" id="card-macos">
+                    <span class="platform-icon">🍎</span>
+                    <div class="platform-name">macOS</div>
+                    <div class="platform-detail">macOS 12+ · Apple Silicon &amp; Intel · native desktop app</div>
+                    <a href="#" class="platform-btn loading" data-dl="macos">Download</a>
+                </div>
+
+                <div class="platform-card" id="card-linux">
+                    <span class="platform-icon">🐧</span>
+                    <div class="platform-name">Linux</div>
+                    <div class="platform-detail">x86-64 &amp; ARM64 · tar.gz archive · any modern distro</div>
+                    <a href="#" class="platform-btn loading" data-dl="linux">Download</a>
+                </div>
+
+                <div class="platform-card" id="card-android">
+                    <span class="platform-icon">📱</span>
+                    <div class="platform-name">Android</div>
+                    <div class="platform-detail">Android 8.0+ · push notifications · screen share</div>
+                    <a href="https://play.google.com/store/apps/details?id=world.phazechat.app" target="_blank" rel="noopener" class="platform-btn" data-dl="android">Get on Google Play</a>
+                    <p style="font-size:0.75rem;color:var(--text-light);margin-top:10px;">Can't use the Play Store? <a href="/downloads/Phaze.apk" download="Phaze.apk" style="color:var(--brand);">Direct APK download</a></p>
+                </div>
+
+                <div class="platform-card" id="card-ios">
+                    <span class="platform-icon">📲</span>
+                    <div class="platform-name">iPhone / iPad</div>
+                    <div class="platform-detail">Use the web client — open phazechat.world in Safari, then tap Share → Add to Home Screen</div>
+                    <a href="/web/" class="platform-btn">Open in Safari</a>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <section class="req-section">
+        <div class="container">
+            <h3>System Requirements</h3>
+            <div class="req-grid">
+                <div class="req-card">
+                    <h4>Windows &amp; Linux desktop</h4>
+                    <ul>
+                        <li>Windows 10 (64-bit) or Windows 11</li>
+                        <li>Any modern 64-bit Linux distro</li>
+                        <li>Camera &amp; mic for calls</li>
+                        <li>~100 MB disk space</li>
+                    </ul>
+                </div>
+                <div class="req-card">
+                    <h4>Android</h4>
+                    <ul>
+                        <li>Android 8.0 (API 26) or later</li>
+                        <li>ARM64 architecture</li>
+                        <li>100 MB disk space</li>
+                        <li>Camera &amp; mic permissions for calls</li>
+                    </ul>
+                </div>
+                <div class="req-card">
+                    <h4>Web (any platform)</h4>
+                    <ul>
+                        <li>Chrome, Safari, Firefox, or Edge</li>
+                        <li>Works on any OS including iPhone &amp; Mac</li>
+                        <li>Installable as a PWA — no app store needed</li>
+                        <li>Camera &amp; mic permissions for calls</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            © 2024–2026 Phaze · <a href="/legal">Terms</a> · <a href="/privacy">Privacy</a> · Not affiliated with Microsoft.
+        </div>
+    </footer>
+
+    <script>
+        (function () {
+            const REPO = 'jakes1345/skype7-reborn';
+            const API_LATEST = 'https://api.github.com/repos/' + REPO + '/releases/latest';
+            const RELEASES_PAGE = 'https://github.com/' + REPO + '/releases/latest';
+
+            // Fallbacks if the API call fails.
+            // macOS has no native binary yet — null triggers "Coming soon".
+            const fallback = {
+                windows: RELEASES_PAGE,
+                linux: RELEASES_PAGE,
+                android: '/downloads/Phaze.apk',
+                macos: null
+            };
+
+            function pick(assets, pred) {
+                for (var i = 0; i < assets.length; i++) {
+                    if (pred(assets[i])) return assets[i].browser_download_url;
+                }
+                return null;
+            }
+
+            function resolveUrls(assets, ua) {
+                var win =
+                    pick(assets, function (x) { return /^Phaze_windows_amd64\.zip$/i.test(x.name); }) ||
+                    pick(assets, function (x) { return /\.exe$/i.test(x.name); }) ||
+                    pick(assets, function (x) { return /windows/i.test(x.name) && /\.zip$/i.test(x.name); });
+
+                var linuxArm = pick(assets, function (x) { return /^Phaze_linux_arm64\.tar\.gz$/i.test(x.name); });
+                var linuxAmd = pick(assets, function (x) { return /^Phaze_linux_amd64\.tar\.gz$/i.test(x.name) || /^Phaze\.linux$/i.test(x.name); });
+                var linux;
+                if ((/\baarch64\b|\barm64\b/).test(ua) && /linux/.test(ua) && !/android/.test(ua)) {
+                    linux = linuxArm || linuxAmd;
+                } else {
+                    linux = linuxAmd || linuxArm;
+                }
+
+                var macArm = pick(assets, function (x) { return /^Phaze-macos-arm64\.tar\.gz$/i.test(x.name); });
+                var macAmd = pick(assets, function (x) { return /^Phaze-macos-amd64\.tar\.gz$/i.test(x.name); });
+                var mac;
+                if ((/intel|i686|x86_64|amd64/).test(ua) && (/mac|darwin/).test(ua)) {
+                    mac = macAmd || macArm;
+                } else {
+                    mac = macArm || macAmd;
+                }
+
+                var apk =
+                    pick(assets, function (x) { return /^Phaze\.apk$/i.test(x.name); }) ||
+                    pick(assets, function (x) { return /\.apk$/i.test(x.name); });
+
+                return { windows: win, linux: linux, macos: mac || null, android: apk };
+            }
+
+            function wireButton(cardId, url, fb, labelMacHint) {
+                var card = document.getElementById(cardId);
+                if (!card) return;
+                var a = card.querySelector('a.platform-btn[data-dl]');
+                if (!a) return;
+                var finalUrl = url || fb;
+                a.classList.remove('loading');
+                if (!finalUrl) {
+                    a.textContent = 'Coming soon';
+                    a.style.background = '#bbb';
+                    a.style.pointerEvents = 'none';
+                    return;
+                }
+                a.href = finalUrl;
+                if (finalUrl.indexOf('http') === 0) {
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.removeAttribute('download');
+                }
+                if (a.textContent === 'Download' || a.classList.contains('loading')) {
+                    a.textContent = 'Download';
+                }
+                if (labelMacHint && cardId === 'card-macos' && url) {
+                    a.textContent = /arm64/.test(url) ? 'Download (Apple Silicon)' : 'Download (Intel)';
+                }
+            }
+
+            function markRecommended(ua) {
+                // Remove default recommended class first
+                var web = document.getElementById('card-web');
+                if (web) web.classList.remove('recommended');
+                var card;
+                if (ua.indexOf('win') !== -1 && ua.indexOf('android') === -1) card = document.getElementById('card-windows');
+                else if (ua.indexOf('mac') !== -1 || ua.indexOf('darwin') !== -1) card = document.getElementById('card-macos');
+                else if (ua.indexOf('linux') !== -1 && ua.indexOf('android') === -1) card = document.getElementById('card-linux');
+                else if (ua.indexOf('android') !== -1) card = document.getElementById('card-android');
+                else if (ua.indexOf('iphone') !== -1 || ua.indexOf('ipad') !== -1) card = document.getElementById('card-ios');
+                if (card) {
+                    card.classList.add('recommended');
+                } else if (web) {
+                    web.classList.add('recommended');
+                }
+            }
+
+            var ua = navigator.userAgent.toLowerCase();
+            markRecommended(ua);
+
+            fetch(API_LATEST)
+                .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('fetch')); })
+                .then(function (rel) {
+                    var assets = rel.assets || [];
+                    var u = resolveUrls(assets, ua);
+                    wireButton('card-windows', u.windows, fallback.windows);
+                    wireButton('card-linux', u.linux, fallback.linux);
+                    wireButton('card-android', u.android, fallback.android);
+                    wireButton('card-macos', u.macos, fallback.macos, true);
+                })
+                .catch(function () {
+                    wireButton('card-windows', null, fallback.windows);
+                    wireButton('card-linux', null, fallback.linux);
+                    wireButton('card-android', null, fallback.android);
+                    wireButton('card-macos', null, fallback.macos);
+                });
+        })();
+    </script>
+</body>
+</html>

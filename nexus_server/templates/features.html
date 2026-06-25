@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phaze Features — Encrypted Chat, Video, Voice, Spaces & Livestreams</title>
+    <meta name="description" content="Explore Phaze features: end-to-end encrypted messaging, HD video and voice calls, group spaces, livestreams, file sharing, stories, and more. Free forever.">
+    <meta name="theme-color" content="#863bff">
+    <link rel="canonical" href="https://phazechat.world/features">
+    <link rel="icon" type="image/svg+xml" href="/web/favicon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="/web/favicon-32.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/web/icon-192.png">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Phaze Features — Chat, Video, Voice, Spaces & Livestreams">
+    <meta property="og:description" content="End-to-end encrypted messaging, HD video calls, group spaces, livestreams, and more. Free forever.">
+    <meta property="og:url" content="https://phazechat.world/features">
+    <meta property="og:image" content="https://phazechat.world/web/icon-512.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Phaze Features">
+    <meta name="twitter:description" content="Encrypted chat, video, voice, spaces, livestreams. Free forever.">
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #863bff;
+            --brand-dark: #6f1ee0;
+            --text-dark: #0a0a0a;
+            --text-light: #6b6b75;
+            --bg-light: #fafafa;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text-dark); background: #fff; line-height: 1.6; }
+        a { color: var(--brand); text-decoration: none; }
+        .container { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
+
+        .navbar { background: #fff; border-bottom: 1px solid #e8e8e8; height: 60px; display: flex; align-items: center; }
+        .navbar .container { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+        .nav-brand { font-size: 1.4rem; font-weight: 700; color: var(--brand); display: flex; align-items: center; gap: 8px; }
+
+        .hero { background: #863bff; color: #fff; padding: 60px 0; text-align: center; }
+        .hero h1 { font-size: 2.5rem; font-weight: 300; }
+
+        .feature-grid { padding: 80px 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 60px; }
+        .feature-item { display: flex; gap: 24px; }
+        .feature-icon { font-size: 3rem; color: var(--brand); flex-shrink: 0; }
+        .feature-text h3 { font-size: 1.4rem; margin-bottom: 12px; }
+        .feature-text p { color: var(--text-light); }
+
+        .cta-section { background: var(--bg-light); padding: 60px 0; text-align: center; }
+        .btn { display: inline-block; background: var(--brand); color: #fff; padding: 12px 30px; border-radius: 4px; font-weight: 700; margin-top: 20px; }
+
+        .footer { background: #1a1a1a; color: #999; padding: 40px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="nav-brand">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15" fill="#863bff"/><text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-weight="700" font-family="sans-serif">P</text></svg>
+                Phaze
+            </a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <h1>What's actually <strong>in</strong> Phaze</h1>
+            <p style="color: var(--text-light); margin-top: 12px; font-size: 1.05rem;">No empty marketing. Just the features we actually ship today.</p>
+        </div>
+    </section>
+
+    <section class="container">
+        <div class="feature-grid">
+            <div class="feature-item">
+                <span class="feature-icon">🔒</span>
+                <div class="feature-text">
+                    <h3>End-to-end encrypted DMs</h3>
+                    <p>Every direct message is encrypted on your device with NaCl (Curve25519 + XSalsa20-Poly1305). The server stores the ciphertext but cannot read it.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">📞</span>
+                <div class="feature-text">
+                    <h3>Voice &amp; video calls</h3>
+                    <p>WebRTC P2P calls with automatic TURN fallback so connections work even behind symmetric NAT and corporate firewalls.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🎙️</span>
+                <div class="feature-text">
+                    <h3>Voice messages</h3>
+                    <p>Tap to record on the web client, send a quick voice note when typing won't cut it. Inline playback right in the chat.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">💾</span>
+                <div class="feature-text">
+                    <h3>Cross-device history</h3>
+                    <p>Sign in on a new browser or device and your encrypted chat history follows you — protected by a Recovery PIN only you know.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">✨</span>
+                <div class="feature-text">
+                    <h3>Modern chat UX</h3>
+                    <p>Reactions, message edits, deletes, @mentions with autocomplete, pinned messages, in-chat search, ⌘K command palette, slash commands.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">📎</span>
+                <div class="feature-text">
+                    <h3>File &amp; image sharing</h3>
+                    <p>Send images, audio, video, PDFs, archives — up to 25MB each. URLs are encrypted in the message body so only the recipient can fetch.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🌗</span>
+                <div class="feature-text">
+                    <h3>Dark mode &amp; multi-platform</h3>
+                    <p>First-class light and dark themes. Web, Windows, macOS, Linux, and Android — sign in on every device with one Recovery PIN.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🖥</span>
+                <div class="feature-text">
+                    <h3>Screen sharing</h3>
+                    <p>Share your screen in any call or voice channel. Present, collaborate, or just show your friends what you're working on.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🌐</span>
+                <div class="feature-text">
+                    <h3>Spaces</h3>
+                    <p>Public or private community servers with text and voice channels. @mentions, search, pinned messages, inline editing — like Discord but encrypted.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">📸</span>
+                <div class="feature-text">
+                    <h3>Stories</h3>
+                    <p>Share photos and short videos that disappear after 24 hours. Your friends see them in a ring at the top of the chat list.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🔴</span>
+                <div class="feature-text">
+                    <h3>Livestreaming</h3>
+                    <p>Go live with your camera or share your screen to anyone on Phaze. Viewers join with one click — no accounts required to watch.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🖱️</span>
+                <div class="feature-text">
+                    <h3>Remote control</h3>
+                    <p>Share your screen and let a friend take control — encrypted, peer-to-peer, built right in. Like TeamViewer but no extra app needed.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🛠️</span>
+                <div class="feature-text">
+                    <h3>Self-hostable</h3>
+                    <p>Don't trust phazechat.world? Run your own Nexus server with one Docker command. Your community, your servers, your rules.</p>
+                </div>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🚫</span>
+                <div class="feature-text">
+                    <h3>No ads, no tracking</h3>
+                    <p>No third-party analytics, no behavioral profiling, no data sold to anyone. You can delete your account and export every byte we have on you.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <div class="container">
+            <h2>Ready to start talking?</h2>
+            <a href="/download" class="btn">Get Phaze — Web, Android, Desktop</a>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2024–2026 Phaze. Not affiliated with Microsoft.</p>
+        </div>
+    </footer>
+</body>
+</html>
