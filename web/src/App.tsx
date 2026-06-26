@@ -2371,8 +2371,8 @@ export default function App() {
               <div className="hub-sidebar">
                 <div className="hub-add-friend">
                   <div className="form">
-                    <input placeholder="Add friend by username…" value={addFriend} onChange={(e) => setAddFriend(e.target.value)} />
-                    <button type="button" onClick={() => { sendFriendRequest(addFriend.trim()); setAddFriend('') }}>Add</button>
+                    <input placeholder="Search or add contact…" value={addFriend} onChange={(e) => setAddFriend(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && addFriend.trim()) { sendFriendRequest(addFriend.trim()); setAddFriend('') } }} />
+                    {addFriend.trim() && <button type="button" onClick={() => { sendFriendRequest(addFriend.trim()); setAddFriend('') }}>+</button>}
                   </div>
                 </div>
                 <div className="hub-friends">
@@ -2448,9 +2448,14 @@ export default function App() {
                         <button type="button" className="chat-back-btn" onClick={() => setSelected(null)} title="Back to hub">
                           ← Back
                         </button>
-                        <span className="status-dot" style={{ background: statusColor(friends[selected] ?? 'Offline') }} />
-                        <span className="chat-peer-name clickable" onClick={() => setProfileUser(selected)}>{selected}</span>
-                        <span className="chat-peer-status muted small">{friends[selected] ?? 'Offline'}</span>
+                        <span className="avatar chat-peer-avatar" style={{ background: avatarColor(selected) }}>
+                          {selected[0]?.toUpperCase()}
+                          <span className="avatar-dot" style={{ background: statusColor(friends[selected] ?? 'Offline') }} />
+                        </span>
+                        <span className="chat-peer-info">
+                          <span className="chat-peer-name clickable" onClick={() => setProfileUser(selected)}>{selected}</span>
+                          <span className="chat-peer-status">{friends[selected] ?? 'Offline'}</span>
+                        </span>
                         <div className="chat-call-btns">
                           <button
                             type="button"

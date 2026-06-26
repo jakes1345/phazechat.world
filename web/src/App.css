@@ -2886,14 +2886,18 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   background: #0095CC;
   color: #fff;
   border: none;
-  border-radius: 4px;
-  font-size: 11px;
-  padding: 0 10px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 400;
+  width: 28px;
   height: 28px;
-  font-weight: 600;
+  padding: 0;
   cursor: pointer;
-  white-space: nowrap;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 .app.theme-skype7 .hub-add-friend button:hover { background: #00AFF0; }
 
@@ -3006,14 +3010,7 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
 }
 
 /* ── Section labels ──────────────────────────────────────────── */
-.app.theme-skype7 .sidebar-section-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 8px 12px 3px;
-}
+.app.theme-skype7 .sidebar-section-label { display: none; }
 
 /* ── Me bar (bottom of sidebar) ──────────────────────────────── */
 .hub-me-bar {
@@ -3093,26 +3090,43 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   min-width: 38px;
   font-size: 0.85rem;
 }
+.app.theme-skype7 .chat-peer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
 .app.theme-skype7 .chat-peer-name {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 0;
 }
 .app.theme-skype7 .chat-peer-status {
   font-size: 11px;
   color: var(--muted);
+  margin-right: 0;
 }
-.app.theme-skype7 .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.app.theme-skype7 .chat-peer-avatar {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  font-size: 0.85rem;
   flex-shrink: 0;
 }
+.app.theme-skype7 .chat-peer-avatar .avatar-dot {
+  border-color: #EBF3FA;
+}
+.app.theme-skype7 .status-dot { display: none; }
 
 /* Call buttons in header: Skype-style icon buttons */
 .app.theme-skype7 .chat-call-btns {
-  margin-left: auto;
+  margin-left: 0;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -3168,6 +3182,28 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   background: var(--chat-bg-2);
   flex: 1;
   overflow-y: auto;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Bubble row layout ───────────────────────────────────────── */
+.app.theme-skype7 .bubble-row {
+  padding: 1px 12px;
+  gap: 8px;
+}
+.app.theme-skype7 .bubble-avatar,
+.app.theme-skype7 .bubble-avatar-spacer {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.app.theme-skype7 .bubble-avatar {
+  font-size: 0.78rem;
+  font-weight: 700;
+  box-shadow: none;
 }
 
 /* ── Message bubbles ─────────────────────────────────────────── */
