@@ -563,7 +563,7 @@ export default function App() {
     { icon: '✨', title: 'Redesigned', desc: 'True-black dark mode, premium glass effects, and a brand-new landing page. Phaze looks like it feels — premium.', color: '#a855f7' },
   ]
   const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
-  const [theme, setTheme] = useState<'light' | 'dark' | 'skype7'>(() => (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'skype7') || 'dark')
+  const [theme, setTheme] = useState<'light' | 'dark' | 'skype7'>(() => (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'skype7') || 'skype7')
   const [snow, setSnow] = useState<boolean>(() => localStorage.getItem(SNOW_KEY) === '1')
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [emojiOpen, setEmojiOpen] = useState(false)

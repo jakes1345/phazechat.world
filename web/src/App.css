@@ -3300,3 +3300,20 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
 .app:not(.theme-skype7) .bubble.me {
   background: linear-gradient(135deg, var(--bubble-out), #9b5de5);
 }
+
+/* ── Hide chrome that doesn't belong in Skype7 ───────────────── */
+.app.theme-skype7 .foot                { display: none !important; }
+.app.theme-skype7 .support-fab { display: none !important; }
+
+/* ── Welcome screen: blue logo instead of purple ────────────── */
+.app.theme-skype7 .hub-home-hero-logo {
+  background: #00AFF0 !important;
+  box-shadow: 0 2px 12px rgba(0,175,240,0.3) !important;
+  filter: none !important;
+}
+.app.theme-skype7 .hub-home-hero h3 {
+  color: #2B2B30;
+  font-weight: 400;
+  font-size: 18px;
+}
+.app.theme-skype7 .hub-home-hero p { color: var(--muted); font-size: 13px; }
