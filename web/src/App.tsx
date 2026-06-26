@@ -2423,6 +2423,20 @@ export default function App() {
                     </>
                   )}
                 </div>
+                {/* ── Skype 7 me-bar at sidebar bottom ──────────── */}
+                {me && (
+                  <div className="hub-me-bar">
+                    <span className="avatar hub-me-avatar" style={{ background: avatarColor(me) }}>
+                      {me[0]?.toUpperCase()}
+                      <span className="avatar-dot" data-online="" style={{ background: '#a7d131' }} />
+                    </span>
+                    <span className="hub-me-info">
+                      <span className="hub-me-name">{me}</span>
+                      <span className="hub-me-status">Online</span>
+                    </span>
+                    <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
+                  </div>
+                )}
               </div>
 
               {/* ── Chat view ─────────────────────────────────────── */}
