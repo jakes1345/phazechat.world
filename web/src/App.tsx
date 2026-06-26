@@ -662,6 +662,7 @@ export default function App() {
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
   const incomingCallSdpRef = useRef<string | null>(null)
+  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([])
   const screenStreamRef = useRef<MediaStream | null>(null)
   const cameraTrackRef = useRef<MediaStreamTrack | null>(null)
   const ingestDMHistoryRef = useRef<(peer: string, rows: import('./nexusTypes').DMMessage[]) => void>(() => {})
@@ -809,6 +810,7 @@ export default function App() {
     screenStreamRef.current = null
     cameraTrackRef.current = null
     incomingCallSdpRef.current = null
+    pendingIceCandidatesRef.current = []
     setSharingScreen(false)
     setCallSeconds(0)
     setCallMuted(false)
@@ -977,6 +979,10 @@ export default function App() {
       }
     }
     await pc.setRemoteDescription({ type: 'offer', sdp })
+    for (const c of pendingIceCandidatesRef.current) {
+      try { await pc.addIceCandidate(c) } catch { /* stale */ }
+    }
+    pendingIceCandidatesRef.current = []
     const answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
     sendRef.current({ type: 'call_answer', recipient: cs.peer, sdp: answer.sdp })
@@ -1282,8 +1288,12 @@ export default function App() {
           break
 
         case 'ice_candidate':
-          if (msg.candidate && pcRef.current) {
-            try { void pcRef.current.addIceCandidate(JSON.parse(msg.candidate)) } catch { /* stale candidate */ }
+          if (msg.candidate) {
+            if (pcRef.current) {
+              try { void pcRef.current.addIceCandidate(JSON.parse(msg.candidate)) } catch { /* stale candidate */ }
+            } else {
+              pendingIceCandidatesRef.current.push(JSON.parse(msg.candidate) as RTCIceCandidateInit)
+            }
           }
           break
 
