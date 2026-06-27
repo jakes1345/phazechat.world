@@ -3238,6 +3238,9 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
 .app.theme-skype7 .bubble .who {
   font-size: 10px;
   font-weight: 700;
+  color: #0095CC;
+  display: block;
+  margin-bottom: 2px;
 }
 .app.theme-skype7 .bubble-row {
   animation: none;
@@ -3301,6 +3304,41 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   box-shadow: none;
 }
 
+/* ── Send toolbar icon buttons ───────────────────────────────── */
+.app.theme-skype7 .row.send .emoji-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  color: #6E8EA8;
+  padding: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  transition: background 80ms;
+}
+.app.theme-skype7 .row.send .emoji-btn:hover {
+  background: rgba(0,149,204,0.1);
+  color: #0095CC;
+}
+.app.theme-skype7 .row.send .emoji-btn.recording {
+  color: #DC2626;
+}
+
+/* ── Edit / recording banners ────────────────────────────────── */
+.app.theme-skype7 .edit-banner {
+  background: #EEF5FB;
+  border-top: 1px solid #C8D9E6;
+  font-size: 11px;
+  color: #4A6070;
+  padding: 4px 14px;
+}
+
 /* ── Home/welcome screen ─────────────────────────────────────── */
 .app.theme-skype7 .hub-home-hero { background: var(--chat-bg-2); }
 .app.theme-skype7 .hub-home-hero h2 { color: #00AFF0; }
@@ -3353,6 +3391,74 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   font-size: 18px;
 }
 .app.theme-skype7 .hub-home-hero p { color: var(--muted); font-size: 13px; }
+
+/* ── Date separator ──────────────────────────────────────────── */
+.app.theme-skype7 .date-sep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 12px 2px;
+  color: #8EA8BE;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  user-select: none;
+}
+.app.theme-skype7 .date-sep::before,
+.app.theme-skype7 .date-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #C8D9E6;
+}
+
+/* ── Message timestamps: only on row hover ───────────────────── */
+.app.theme-skype7 .bubble-ts {
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.app.theme-skype7 .bubble-row:hover .bubble-ts {
+  opacity: 1;
+}
+
+/* ── Header: hide clutter, keep only search + audio + video ──── */
+.app.theme-skype7 .chat-call-btn[title*="Block"],
+.app.theme-skype7 .chat-call-btn[title*="Report"],
+.app.theme-skype7 .chat-call-btn[title*="Group call"],
+.app.theme-skype7 .chat-call-btn[title*="pinned"],
+.app.theme-skype7 .chat-call-btn[title*="No pinned"],
+.app.theme-skype7 .chat-call-btn[title*="notifications"] {
+  display: none !important;
+}
+
+/* ── Back button: desktop only hide ─────────────────────────── */
+@media (min-width: 960px) {
+  .app.theme-skype7 .chat-back-btn { display: none !important; }
+}
+
+/* ── Typing indicator: skype-style ──────────────────────────── */
+.app.theme-skype7 .typing-indicator {
+  padding: 2px 12px 4px 54px;
+  font-size: 11px;
+  color: #8EA8BE;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.app.theme-skype7 .typing-indicator .typing-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8EA8BE;
+  display: inline-block;
+}
+
+/* ── Send button: play/arrow look ───────────────────────────── */
+.app.theme-skype7 .send-btn {
+  font-size: 1.1rem !important;
+}
 
 /* ── Chat empty state ────────────────────────────────────────── */
 .app.theme-skype7 .chat-empty-art {

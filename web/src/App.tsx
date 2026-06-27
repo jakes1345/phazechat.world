@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react'
+import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react'
 import faviconUrl from '/icon-192.png'
 import jsQR from 'jsqr'
 import type { NexusMessage, TurnConfig } from './nexusTypes'
@@ -218,6 +218,15 @@ function fmtBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function dateSepLabel(ts: number): string {
+  const d = new Date(ts)
+  const today = new Date()
+  const yest = new Date(); yest.setDate(today.getDate() - 1)
+  if (d.toDateString() === today.toDateString()) return 'Today'
+  if (d.toDateString() === yest.toDateString()) return 'Yesterday'
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+}
+
 const REACTION_EMOJIS = ['👍','❤️','😂','😮','😢','🔥']
 
 interface SlashCmd {
@@ -259,6 +268,7 @@ function lastLineFor(me: string | null, peer: string): { text: string; ts: numbe
     let text = last.text || ''
     if (last.deleted) text = '[deleted]'
     else if (last.file?.name) text = `📎 ${last.file.name}`
+    else if (text.startsWith('phaze-file{')) text = '📎 File'
     if (last.me) text = `You: ${text}`
     return { text, ts: last.ts }
   } catch { return null }
@@ -2582,7 +2592,7 @@ export default function App() {
                       <div className="skype-history-section">
                         <div className="skype-history-header">
                           <span className="skype-history-icon">💬</span>
-                          <span>Skype history · {skypeHistory.length} messages</span>
+                          <span>Import history · {skypeHistory.length} messages</span>
                         </div>
                         {skypeHistory.map((m, i) => {
                           const isMe = m.sender === me
@@ -2606,10 +2616,13 @@ export default function App() {
                       return view.map((line, i) => {
                       const prev = view[i - 1]
                       const showGap = !prev || (line.ts - prev.ts) > 5 * 60 * 1000 || prev.me !== line.me
+                      const showDateSep = !prev || new Date(prev.ts).toDateString() !== new Date(line.ts).toDateString()
                       const isPinned = pinnedIds.includes(line.id)
                       const mentionsMe = !!me && containsMention(line.text, me)
                       return (
-                        <div key={line.id} data-msg-id={line.id} className={`bubble-row ${line.me ? 'me' : ''}`}>
+                        <React.Fragment key={line.id}>
+                        {showDateSep && <div className="date-sep"><span>{dateSepLabel(line.ts)}</span></div>}
+                        <div data-msg-id={line.id} className={`bubble-row ${line.me ? 'me' : ''}`}>
                           {!line.me && showGap && (
                             <span className="bubble-avatar" style={{ background: avatarColor(line.from) }}>
                               {line.from[0]?.toUpperCase()}
@@ -2675,6 +2688,7 @@ export default function App() {
                             {isPinned && <span className="pin-indicator" title="Pinned">📌</span>}
                           </div>
                         </div>
+                        </React.Fragment>
                       )
                     })
                     })()}
@@ -2803,7 +2817,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <button type="button" onClick={sendChat} disabled={conn !== 'open'} title={conn !== 'open' ? 'Reconnecting…' : undefined}>{editingId ? 'Save' : 'Send'}</button>
+                      <button type="button" className="send-btn" onClick={sendChat} disabled={conn !== 'open'} title={conn !== 'open' ? 'Reconnecting…' : undefined}>{editingId ? 'Save' : '▶'}</button>
                     </div>
                   )}
                 </section>
