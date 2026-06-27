@@ -3,40 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phaze — Encrypted Chat, Calls & Spaces. Free, Forever.</title>
-  <meta name="description" content="Phaze is the privacy-first messaging platform with end-to-end encrypted chat, HD voice &amp; video calls, group Spaces, and stories. Free forever. No ads. No data mining." />
-  <meta name="theme-color" content="#863bff" />
+  <title>Phaze — Encrypted Chat, Calls & Spaces. Free.</title>
+  <meta name="description" content="Phaze is free messaging with end-to-end encrypted chat, HD voice and video calls, group Spaces, and stories. No phone number required." />
+  <meta name="theme-color" content="#00AFF0" />
 
-  <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Phaze" />
-  <meta property="og:title" content="Phaze — Encrypted Chat, Calls &amp; Spaces" />
-  <meta property="og:description" content="Privacy-first messaging. End-to-end encrypted. Free forever. No ads. No data mining." />
+  <meta property="og:title" content="Phaze — Chat, Calls &amp; Spaces. Free." />
+  <meta property="og:description" content="Privacy-first messaging. End-to-end encrypted. No phone number, no ads, no BS." />
   <meta property="og:url" content="https://phazechat.world/" />
   <meta property="og:image" content="https://phazechat.world/icon-512.png" />
 
-  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Phaze — Encrypted Chat, Calls &amp; Spaces" />
+  <meta name="twitter:title" content="Phaze — Chat, Calls &amp; Spaces. Free." />
   <meta name="twitter:description" content="Privacy-first messaging. End-to-end encrypted. Free forever." />
   <meta name="twitter:image" content="https://phazechat.world/icon-512.png" />
   <meta name="twitter:site" content="@PhazeChatWorld" />
 
-  <!-- Canonical + robots -->
   <link rel="canonical" href="https://phazechat.world/" />
   <meta name="robots" content="index, follow" />
 
-  <!-- Favicons -->
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
 
-  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
 
-  <!-- Schema.org -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -44,15 +38,9 @@
     "name": "Phaze",
     "url": "https://phazechat.world/",
     "applicationCategory": "CommunicationApplication",
-    "operatingSystem": "Web, Windows, macOS, Linux, Android, iOS",
-    "description": "Privacy-first messaging platform with end-to-end encrypted chat, HD voice and video calls, group Spaces, and stories.",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-    "aggregateRating": { "@type": "AggregateRating", "ratingValue": "5", "ratingCount": "1" },
-    "sameAs": [
-      "https://x.com/PhazeChatWorld",
-      "https://instagram.com/phazechat.world",
-      "https://github.com/jakes1345/skype7-reborn"
-    ]
+    "operatingSystem": "Web, Windows, macOS, Linux, Android",
+    "description": "Free messaging platform with end-to-end encrypted chat, voice and video calls, group Spaces, and stories.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
   }
   </script>
 
@@ -60,291 +48,231 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --brand: #863bff;
-      --brand-light: #a96aff;
-      --brand-dark: #5b21b6;
-      --bg: #09090f;
-      --bg2: #111118;
-      --bg3: #18181f;
-      --surface: rgba(255,255,255,0.04);
-      --surface-hover: rgba(255,255,255,0.08);
-      --border: rgba(255,255,255,0.08);
-      --text: #f0f0f8;
-      --muted: #8888a8;
-      --success: #22c55e;
-      --radius: 16px;
-      --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+      --brand:      #00AFF0;
+      --brand-dark: #0095CC;
+      --brand-deep: #0079A8;
+      --bg:         #ffffff;
+      --bg2:        #F2F7FB;
+      --bg3:        #E6EFF5;
+      --text:       #1B2A33;
+      --muted:      #5A7080;
+      --border:     #D0DCEA;
+      --success:    #019A00;
+      --danger:     #D32F2F;
+      --radius:     12px;
+      --font:       'Inter', system-ui, -apple-system, sans-serif;
     }
 
     html { scroll-behavior: smooth; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
 
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      overflow-x: hidden;
-    }
-
-    /* ── NAV ───────────────────────────────────────────── */
+    /* ── NAV ─────────────────────────────────────── */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 48px;
-      background: rgba(9,9,15,0.85);
-      backdrop-filter: blur(20px);
+      padding: 0 48px; height: 58px;
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--border);
     }
-    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-    .nav-logo img { width: 32px; height: 32px; border-radius: 8px; }
-    .nav-logo span { font-size: 1.25rem; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
-    .nav-links { display: flex; align-items: center; gap: 32px; }
-    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; transition: color .2s; }
+    .nav-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
+    .nav-logo img { width: 30px; height: 30px; border-radius: 7px; }
+    .nav-logo span { font-size: 1.15rem; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.88rem; font-weight: 500; transition: color .15s; }
     .nav-links a:hover { color: var(--text); }
-    .nav-cta { display: flex; gap: 12px; align-items: center; }
-    .btn {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 10px 22px; border-radius: 10px; font-weight: 700;
-      font-size: 0.9rem; text-decoration: none; cursor: pointer;
-      transition: all .2s; border: none; font-family: var(--font);
-    }
-    .btn-primary {
-      background: var(--brand); color: #fff;
-      box-shadow: 0 0 24px rgba(134,59,255,0.4);
-    }
-    .btn-primary:hover {
-      background: var(--brand-light);
-      box-shadow: 0 0 36px rgba(134,59,255,0.6);
-      transform: translateY(-1px);
-    }
-    .btn-outline {
-      background: transparent; color: var(--text);
-      border: 1px solid var(--border);
-    }
-    .btn-outline:hover { background: var(--surface); }
+    .nav-cta { display: flex; gap: 10px; align-items: center; }
 
-    /* ── HERO ──────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 9px 20px; border-radius: 8px; font-weight: 600;
+      font-size: 0.88rem; text-decoration: none; cursor: pointer;
+      transition: all .15s; border: none; font-family: var(--font);
+    }
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-primary:hover { background: var(--brand-dark); transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--bg2); }
+    .btn-lg { font-size: 1rem; padding: 12px 28px; border-radius: 9px; }
+
+    /* ── HERO ────────────────────────────────────── */
     .hero {
       min-height: 100vh;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      text-align: center;
-      padding: 120px 24px 80px;
+      text-align: center; padding: 120px 24px 80px;
+      background: linear-gradient(180deg, #EAF5FC 0%, #ffffff 60%);
       position: relative; overflow: hidden;
     }
-    .hero-glow {
-      position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
-      width: 900px; height: 600px;
-      background: radial-gradient(ellipse at center, rgba(134,59,255,0.22) 0%, transparent 70%);
-      pointer-events: none;
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 5px 14px; border-radius: 100px;
+      background: rgba(0,175,240,0.10); border: 1px solid rgba(0,175,240,0.25);
+      font-size: 0.78rem; font-weight: 600; color: var(--brand-dark);
+      margin-bottom: 28px; letter-spacing: 0.02em;
+      animation: fadeUp .5s ease both;
     }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 6px 16px; border-radius: 100px;
-      background: rgba(134,59,255,0.12); border: 1px solid rgba(134,59,255,0.3);
-      font-size: 0.8rem; font-weight: 600; color: var(--brand-light);
-      margin-bottom: 28px;
-      animation: fadeUp .6s ease both;
-    }
-    .hero-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+    .hero-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
     .hero h1 {
-      font-size: clamp(2.5rem, 7vw, 5.5rem);
-      font-weight: 900; line-height: 1.05;
-      letter-spacing: -2px;
-      background: linear-gradient(135deg, #fff 30%, var(--brand-light));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 24px;
-      animation: fadeUp .7s ease .1s both;
+      font-size: clamp(2.4rem, 6vw, 4.8rem);
+      font-weight: 900; line-height: 1.08; letter-spacing: -2px;
+      color: var(--text); margin-bottom: 22px;
+      animation: fadeUp .6s ease .1s both;
     }
+    .hero h1 span { color: var(--brand-dark); }
     .hero-sub {
-      font-size: clamp(1rem, 2.5vw, 1.3rem);
-      color: var(--muted); max-width: 600px;
-      margin-bottom: 48px;
-      animation: fadeUp .7s ease .2s both;
+      font-size: clamp(1rem, 2vw, 1.2rem); color: var(--muted);
+      max-width: 560px; margin-bottom: 44px; line-height: 1.7;
+      animation: fadeUp .6s ease .2s both;
     }
-    .hero-actions {
-      display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
-      animation: fadeUp .7s ease .3s both;
-    }
-    .hero-actions .btn { font-size: 1.05rem; padding: 14px 32px; }
+    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; animation: fadeUp .6s ease .3s both; }
     .hero-img-wrap {
-      margin-top: 72px; width: 100%; max-width: 960px;
-      border-radius: 24px; overflow: hidden;
+      margin-top: 64px; width: 100%; max-width: 980px;
+      border-radius: 16px; overflow: hidden;
       border: 1px solid var(--border);
-      box-shadow: 0 40px 120px rgba(134,59,255,0.2), 0 0 0 1px rgba(255,255,255,0.04);
-      animation: fadeUp .8s ease .4s both;
-      position: relative;
+      box-shadow: 0 24px 80px rgba(0,149,204,0.14), 0 2px 0 rgba(0,0,0,0.04);
+      animation: fadeUp .7s ease .4s both; position: relative;
     }
     .hero-img-wrap img { width: 100%; display: block; }
-    .hero-img-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(to bottom, transparent 60%, var(--bg) 100%);
-    }
+    .hero-img-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 65%, #ffffff 100%); }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:translateY(0)} }
 
-    /* ── STATS BAR ─────────────────────────────────────── */
+    /* ── STATS ───────────────────────────────────── */
     .stats {
-      display: flex; justify-content: center; gap: 64px; flex-wrap: wrap;
-      padding: 48px 24px;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: center; gap: 56px; flex-wrap: wrap;
+      padding: 44px 24px; background: var(--bg);
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
     }
     .stat { text-align: center; }
-    .stat-n { font-size: 2.2rem; font-weight: 900; color: var(--brand-light); letter-spacing: -1px; }
-    .stat-l { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+    .stat-n { font-size: 2rem; font-weight: 900; color: var(--brand-dark); letter-spacing: -1px; }
+    .stat-l { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
 
-    /* ── FEATURES ──────────────────────────────────────── */
-    .section { padding: 96px 24px; max-width: 1200px; margin: 0 auto; }
+    /* ── SECTIONS ────────────────────────────────── */
+    .section { padding: 88px 24px; max-width: 1200px; margin: 0 auto; }
     .section-tag {
-      display: inline-block; font-size: 0.75rem; font-weight: 700;
+      display: inline-block; font-size: 0.72rem; font-weight: 700;
       letter-spacing: 2px; text-transform: uppercase;
-      color: var(--brand-light); margin-bottom: 16px;
+      color: var(--brand-dark); margin-bottom: 14px;
     }
-    .section-title {
-      font-size: clamp(1.8rem, 4vw, 3rem); font-weight: 900;
-      letter-spacing: -1px; line-height: 1.1; margin-bottom: 16px;
-    }
-    .section-sub { color: var(--muted); max-width: 520px; margin-bottom: 56px; font-size: 1.05rem; }
+    .section-title { font-size: clamp(1.7rem, 3.5vw, 2.8rem); font-weight: 900; letter-spacing: -1px; line-height: 1.12; margin-bottom: 14px; }
+    .section-sub { color: var(--muted); max-width: 500px; margin-bottom: 52px; font-size: 1rem; line-height: 1.7; }
 
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
-    }
+    /* ── FEATURES ────────────────────────────────── */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
     .feature-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px;
-      transition: all .3s;
-      position: relative; overflow: hidden;
-    }
-    .feature-card::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0; height: 2px;
-      background: linear-gradient(90deg, transparent, var(--brand), transparent);
-      opacity: 0; transition: opacity .3s;
-    }
-    .feature-card:hover { transform: translateY(-4px); border-color: rgba(134,59,255,0.3); background: var(--bg3); }
-    .feature-card:hover::before { opacity: 1; }
-    .feature-icon {
-      width: 48px; height: 48px; border-radius: 12px;
-      background: rgba(134,59,255,0.12); border: 1px solid rgba(134,59,255,0.2);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.4rem; margin-bottom: 16px;
-    }
-    .feature-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
-    .feature-desc { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
-
-    /* ── PRIVACY SECTION ───────────────────────────────── */
-    .privacy-split {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center;
-    }
-    @media (max-width: 768px) { .privacy-split { grid-template-columns: 1fr; } }
-    .privacy-visual {
       background: var(--bg2); border: 1px solid var(--border);
-      border-radius: 24px; padding: 40px;
-      display: flex; flex-direction: column; gap: 16px;
+      border-radius: var(--radius); padding: 24px;
+      transition: transform .2s, box-shadow .2s, border-color .2s;
     }
+    .feature-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,149,204,0.10); border-color: rgba(0,175,240,0.35); }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: rgba(0,175,240,0.10); border: 1px solid rgba(0,175,240,0.18);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; margin-bottom: 14px;
+    }
+    .feature-title { font-size: 1rem; font-weight: 700; margin-bottom: 7px; }
+    .feature-desc { color: var(--muted); font-size: 0.88rem; line-height: 1.65; }
+
+    /* ── PRIVACY ─────────────────────────────────── */
+    .section-alt { background: var(--bg2); }
+    .privacy-wrap { max-width: 1200px; margin: 0 auto; padding: 88px 24px; }
+    .privacy-split { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+    @media (max-width: 768px) { .privacy-split { grid-template-columns: 1fr; } }
+    .privacy-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+    .privacy-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.93rem; }
+    .privacy-list .ck { color: var(--success); font-weight: 700; margin-top: 1px; }
+    .privacy-visual { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 10px; }
     .p-row {
       display: flex; align-items: center; gap: 12px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; padding: 14px 18px; font-size: 0.88rem;
-    }
-    .p-row-icon { font-size: 1.2rem; }
-    .p-row-label { font-weight: 600; }
-    .p-row-val { margin-left: auto; color: var(--success); font-weight: 700; font-size: 0.82rem; }
-    .p-row-val.bad { color: #ef4444; }
-
-    /* ── PLATFORMS ─────────────────────────────────────── */
-    .platforms { text-align: center; padding: 96px 24px; }
-    .platform-cards {
-      display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-top: 48px;
-    }
-    .platform-card {
       background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 28px 36px;
-      text-align: center; min-width: 160px;
-      transition: all .3s; cursor: default;
+      border-radius: 8px; padding: 12px 16px; font-size: 0.86rem;
     }
-    .platform-card:hover { border-color: rgba(134,59,255,0.4); transform: translateY(-3px); }
-    .platform-icon { font-size: 2.5rem; margin-bottom: 12px; }
-    .platform-name { font-weight: 700; margin-bottom: 4px; }
-    .platform-sub { color: var(--muted); font-size: 0.82rem; }
+    .p-row-icon { font-size: 1.1rem; }
+    .p-row-label { font-weight: 600; }
+    .p-row-val { margin-left: auto; color: var(--success); font-weight: 700; font-size: 0.8rem; }
+    .p-row-val.no { color: var(--danger); }
 
-    /* ── CTA BOTTOM ────────────────────────────────────── */
-    .cta-section {
-      text-align: center; padding: 120px 24px;
-      background: radial-gradient(ellipse at center, rgba(134,59,255,0.12) 0%, transparent 70%);
-      border-top: 1px solid var(--border);
+    /* ── SKYPE IMPORT ────────────────────────────── */
+    .import-panel {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
+      padding: 52px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
     }
-    .cta-section h2 {
-      font-size: clamp(2rem, 5vw, 3.5rem);
-      font-weight: 900; letter-spacing: -1.5px;
-      background: linear-gradient(135deg, #fff, var(--brand-light));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text; margin-bottom: 16px;
+    @media (max-width: 640px) { .import-panel { grid-template-columns: 1fr; padding: 32px 24px; } }
+    .import-steps { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+    .import-steps li { display: flex; gap: 14px; align-items: flex-start; font-size: 0.92rem; line-height: 1.6; }
+    .step-num {
+      background: var(--brand); color: #fff; font-weight: 800; font-size: 0.75rem;
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
     }
-    .cta-section p { color: var(--muted); max-width: 480px; margin: 0 auto 48px; font-size: 1.05rem; }
-    .cta-actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-    .cta-actions .btn { font-size: 1.05rem; padding: 14px 32px; }
 
-    /* ── FOOTER ────────────────────────────────────────── */
-    footer {
-      background: var(--bg2);
-      border-top: 1px solid var(--border);
-      padding: 48px 48px 32px;
-    }
-    .footer-inner {
-      max-width: 1200px; margin: 0 auto;
-      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px;
-    }
-    @media (max-width: 768px) { .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; } }
-    .footer-brand p { color: var(--muted); font-size: 0.88rem; margin-top: 12px; max-width: 260px; line-height: 1.7; }
-    .footer-col h4 { font-size: 0.8rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
-    .footer-col a { display: block; color: var(--muted); text-decoration: none; font-size: 0.88rem; margin-bottom: 10px; transition: color .2s; }
-    .footer-col a:hover { color: var(--text); }
-    .footer-bottom { max-width: 1200px; margin: 40px auto 0; padding-top: 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: gap; font-size: 0.82rem; color: var(--muted); }
-    .footer-social { display: flex; gap: 16px; }
-    .footer-social a { color: var(--muted); text-decoration: none; transition: color .2s; }
-    .footer-social a:hover { color: var(--text); }
-
-    /* ── COMPARISON TABLE ──────────────────────────────── */
-    .compare-wrap { overflow-x: auto; margin-top: 48px; border-radius: var(--radius); border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; background: var(--bg2); }
-    th { padding: 16px 24px; font-size: 0.82rem; font-weight: 700; color: var(--muted); text-align: left; background: var(--bg3); letter-spacing: 0.5px; }
-    th:first-child { border-radius: var(--radius) 0 0 0; }
-    th:last-child { border-radius: 0 var(--radius) 0 0; }
-    td { padding: 14px 24px; border-top: 1px solid var(--border); font-size: 0.9rem; }
-    .phaze-col { color: var(--brand-light); font-weight: 700; }
+    /* ── COMPARE ─────────────────────────────────── */
+    .compare-wrap { overflow-x: auto; margin-top: 44px; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; background: var(--bg); }
+    th { padding: 14px 22px; font-size: 0.78rem; font-weight: 700; color: var(--muted); text-align: left; background: var(--bg2); letter-spacing: 0.5px; }
+    td { padding: 13px 22px; border-top: 1px solid var(--border); font-size: 0.88rem; }
+    .phaze-col { color: var(--brand-dark); font-weight: 700; }
     .check { color: var(--success); }
-    .cross { color: #ef4444; }
-    .partial { color: #f59e0b; }
+    .cross { color: var(--danger); }
+    .partial { color: #E6920A; }
 
-    /* ── SCROLL ANIMATIONS ─────────────────────────────── */
-    /* Default visible — JS enhances with animation, never hides content */
-    .reveal { opacity: 1; transform: translateY(0); }
-    .reveal.will-animate {
-      opacity: 0; transform: translateY(28px);
-      transition: opacity .6s ease, transform .6s ease;
+    /* ── PLATFORMS ───────────────────────────────── */
+    .platforms { text-align: center; padding: 88px 24px; background: var(--bg2); }
+    .platform-cards { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 44px; }
+    .platform-card {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px 32px;
+      text-align: center; min-width: 150px;
+      transition: transform .2s, border-color .2s, box-shadow .2s; cursor: default; text-decoration: none; color: inherit;
     }
+    .platform-card:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,175,240,0.12); }
+    .platform-icon { font-size: 2.2rem; margin-bottom: 10px; }
+    .platform-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 3px; }
+    .platform-sub { color: var(--muted); font-size: 0.78rem; }
+
+    /* ── CTA ─────────────────────────────────────── */
+    .cta-section {
+      text-align: center; padding: 100px 24px;
+      background: linear-gradient(160deg, #0095CC 0%, #00AFF0 100%);
+    }
+    .cta-section h2 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); font-weight: 900; letter-spacing: -1px; color: #fff; margin-bottom: 14px; }
+    .cta-section p { color: rgba(255,255,255,0.82); max-width: 440px; margin: 0 auto 44px; font-size: 1rem; }
+    .cta-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-white { background: #fff; color: var(--brand-dark); font-weight: 700; }
+    .btn-white:hover { background: #f0f8fc; transform: translateY(-1px); }
+    .btn-ghost { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); }
+    .btn-ghost:hover { background: rgba(255,255,255,0.12); }
+
+    /* ── FOOTER ──────────────────────────────────── */
+    footer { background: #1B2A33; border-top: 1px solid rgba(255,255,255,0.06); padding: 52px 48px 32px; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; }
+    @media (max-width: 768px) { .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; } }
+    .footer-brand p { color: rgba(255,255,255,0.45); font-size: 0.85rem; margin-top: 11px; max-width: 250px; line-height: 1.7; }
+    .footer-logo span { color: #fff; }
+    .footer-col h4 { font-size: 0.72rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 14px; }
+    .footer-col a { display: block; color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.85rem; margin-bottom: 9px; transition: color .15s; }
+    .footer-col a:hover { color: #fff; }
+    .footer-bottom { max-width: 1200px; margin: 36px auto 0; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; color: rgba(255,255,255,0.35); }
+    .footer-social { display: flex; gap: 16px; }
+    .footer-social a { color: rgba(255,255,255,0.4); text-decoration: none; transition: color .15s; }
+    .footer-social a:hover { color: #fff; }
+
+    /* ── SCROLL ANIMATIONS ───────────────────────── */
+    .reveal { opacity: 1; transform: translateY(0); }
+    .reveal.will-animate { opacity: 0; transform: translateY(24px); transition: opacity .55s ease, transform .55s ease; }
     .reveal.will-animate.visible { opacity: 1; transform: translateY(0); }
 
-    /* ── RESPONSIVE ────────────────────────────────────── */
+    /* ── RESPONSIVE ──────────────────────────────── */
     @media (max-width: 768px) {
-      nav { padding: 14px 20px; }
+      nav { padding: 0 20px; }
       .nav-links { display: none; }
       .hero { padding: 100px 20px 60px; }
-      .stats { gap: 32px; }
+      .stats { gap: 28px; }
       .section { padding: 64px 20px; }
-    }
-    @media (max-width: 640px) {
-      .skype-migration-grid { grid-template-columns: 1fr !important; }
+      .privacy-wrap { padding: 64px 20px; }
     }
   </style>
 </head>
@@ -353,7 +281,7 @@
 <!-- NAV -->
 <nav>
   <a class="nav-logo" href="/">
-    <img src="/icon-192.png" alt="Phaze logo" />
+    <img src="/icon-192.png" alt="Phaze" />
     <span>Phaze</span>
   </a>
   <div class="nav-links">
@@ -364,27 +292,26 @@
   </div>
   <div class="nav-cta">
     <a class="btn btn-outline" href="/web">Sign in</a>
-    <a class="btn btn-primary" href="/web">Get started free →</a>
+    <a class="btn btn-primary" href="/web">Get started free</a>
   </div>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-glow"></div>
-  <div class="hero-badge">
-    <span class="hero-badge-dot"></span>
-    Skype shut down May 5 — we've been running since before that
+  <div class="hero-eyebrow">
+    <span class="hero-dot"></span>
+    Servers up · Free forever · No phone number needed
   </div>
-  <h1>Skype is gone.<br/>Your people aren't.</h1>
+  <h1>Chat the way<br/><span>it used to feel.</span></h1>
   <p class="hero-sub">
-    We built Phaze because we wanted Skype back, not Teams. Real calls, real DMs, real encryption — and you can import your old Skype history so nothing feels lost. No phone number, no Microsoft account, no BS.
+    Real DMs, voice and video calls, group Spaces, and end-to-end encryption. No ads, no data selling, no Microsoft account. Just messaging that works.
   </p>
   <div class="hero-actions">
-    <a class="btn btn-primary" href="/web" id="hero-open-app">Switch to Phaze free →</a>
-    <a class="btn btn-outline" href="#skype-switch" id="hero-download">See how it works</a>
+    <a class="btn btn-primary btn-lg" href="/web" id="hero-open">Open Phaze free →</a>
+    <a class="btn btn-outline btn-lg" href="#features">See what's inside</a>
   </div>
   <div class="hero-img-wrap reveal">
-    <img src="/public/hero.png" alt="Phaze messaging app screenshot showing encrypted conversations" loading="lazy" />
+    <img src="/public/hero.png" alt="Phaze chat app" loading="lazy" />
     <div class="hero-img-overlay"></div>
   </div>
 </section>
@@ -392,75 +319,75 @@
 <!-- STATS -->
 <div class="stats">
   <div class="stat">
-    <div class="stat-n">May 5</div>
-    <div class="stat-l">Skype went offline for good</div>
-  </div>
-  <div class="stat">
     <div class="stat-n">E2EE</div>
-    <div class="stat-l">Your DMs, encrypted. We can't read them either</div>
+    <div class="stat-l">Messages encrypted on your device</div>
   </div>
   <div class="stat">
     <div class="stat-n">$0</div>
-    <div class="stat-l">Actually free, not "free until we need money"</div>
+    <div class="stat-l">Free, not "free until we need money"</div>
   </div>
   <div class="stat">
     <div class="stat-n">1 zip</div>
-    <div class="stat-l">Drop in your Skype export, messages show up</div>
+    <div class="stat-l">Drop in your old chat export, done</div>
+  </div>
+  <div class="stat">
+    <div class="stat-n">0 ads</div>
+    <div class="stat-l">No tracking, no profiling, no BS</div>
   </div>
 </div>
 
 <!-- FEATURES -->
 <section id="features" class="section">
   <div class="reveal">
-    <span class="section-tag">What's in it</span>
-    <h2 class="section-title">Everything Skype had.<br/>Plus stuff it never did.</h2>
-    <p class="section-sub">We started building this because we were annoyed Skype was dying. Ended up with something better.</p>
+    <span class="section-tag">What's inside</span>
+    <h2 class="section-title">Everything you need.<br/>Nothing you don't.</h2>
+    <p class="section-sub">DMs, calls, group chat, file sharing, and a classic interface that doesn't require a tutorial.</p>
   </div>
   <div class="features-grid reveal">
     <div class="feature-card">
       <div class="feature-icon">🔒</div>
-      <div class="feature-title">Actually encrypted DMs</div>
-      <div class="feature-desc">Messages are encrypted on your device before they leave. We genuinely cannot read them, not "we pinky promise not to."</div>
+      <div class="feature-title">End-to-End Encrypted DMs</div>
+      <div class="feature-desc">Messages are encrypted on your device before they leave. We genuinely cannot read them — not "we pinky promise not to."</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">📹</div>
       <div class="feature-title">Voice &amp; Video Calls</div>
-      <div class="feature-desc">Call anyone on your friends list, one tap. Works in your browser, on the desktop app, on Android. No account needed on the other end to receive.</div>
+      <div class="feature-desc">Call anyone in one tap. Works in your browser, the desktop app, or on Android. HD quality, no install required on either end.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🏠</div>
       <div class="feature-title">Group Spaces</div>
-      <div class="feature-desc">Like Discord servers but without the bloat. Text channels, voice rooms, invite links. Good for friend groups, communities, whatever you need.</div>
+      <div class="feature-desc">Text channels, voice rooms, invite links. Good for friend groups, communities, teams — whatever you need.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">📖</div>
       <div class="feature-title">Stories</div>
-      <div class="feature-desc">Post photos or short videos that disappear after 24 hours. Your friends see them, then they're gone.</div>
+      <div class="feature-desc">Post photos or short clips that disappear after 24 hours. Your people see them, then they're gone.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🔑</div>
       <div class="feature-title">Key Backup &amp; Recovery</div>
-      <div class="feature-desc">Set a Recovery PIN and your encrypted keys are backed up. Sign into a new device and your whole chat history comes back. We never see the PIN.</div>
+      <div class="feature-desc">Set a Recovery PIN and your encrypted keys are backed up. Switch to a new device and your whole history comes back. We never see the PIN.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">📱</div>
-      <div class="feature-title">Sign in on new devices fast</div>
+      <div class="feature-title">Quick Device Login</div>
       <div class="feature-desc">Already signed in on your phone? Scan the QR code on your laptop and you're in. No password needed.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🔔</div>
       <div class="feature-title">Push Notifications</div>
-      <div class="feature-desc">You get notified when someone messages you. Works even when the app is closed. (Android and web, yes both.)</div>
+      <div class="feature-desc">Get notified when someone messages you — even when the app is closed. Works on Android and web.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🛡️</div>
       <div class="feature-title">Two-Factor Auth</div>
-      <div class="feature-desc">Turn on 2FA if you want. Works with Google Authenticator, Authy, whatever you already use.</div>
+      <div class="feature-desc">Enable 2FA in one tap. Works with any TOTP app — Google Authenticator, Authy, whatever you already use.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">📂</div>
       <div class="feature-title">Files &amp; Voice Messages</div>
-      <div class="feature-desc">Send files, photos, or just hold to record a quick voice message. Up to 25MB per file.</div>
+      <div class="feature-desc">Send files, photos, or hold to record a quick voice message. Up to 25 MB per file.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🖥️</div>
@@ -469,182 +396,154 @@
     </div>
     <div class="feature-card">
       <div class="feature-icon">📥</div>
-      <div class="feature-title">Skype Import</div>
-      <div class="feature-desc">Export your Skype data, upload the zip in settings, and your old messages show up right inside your DMs. It just works.</div>
+      <div class="feature-title">Chat History Import</div>
+      <div class="feature-desc">Export your old chat data, upload the zip in Settings, and your messages show up right inside your DMs. It just works.</div>
     </div>
     <div class="feature-card">
       <div class="feature-icon">🍪</div>
-      <div class="feature-title">Your session can't be stolen</div>
-      <div class="feature-desc">Login tokens are stored in HttpOnly cookies, not localStorage. Scripts injected by attackers can't grab your session. Most apps don't bother with this.</div>
+      <div class="feature-title">Sessions You Can Trust</div>
+      <div class="feature-desc">Login tokens live in HttpOnly cookies, not localStorage. Scripts injected by attackers can't grab your session. Most apps skip this.</div>
     </div>
   </div>
 </section>
 
 <!-- PRIVACY -->
-<section id="privacy" style="padding: 0 24px 96px; max-width: 1200px; margin: 0 auto;">
-  <div class="privacy-split">
-    <div class="reveal">
-      <span class="section-tag">Privacy stuff</span>
-      <h2 class="section-title">We can't read<br/>your messages.<br/>That's the point.</h2>
-      <p style="color:var(--muted); margin-bottom: 32px; font-size: 1.05rem;">Skype stored everything on Microsoft's servers. They could read it, sell it, and eventually just shut it down. Phaze encrypts your DMs on your device. Even if someone breached our server, your messages are unreadable.</p>
-      <ul style="list-style:none; display:flex; flex-direction:column; gap:12px;">
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:0.95rem;">
-          <span style="color:var(--success);font-weight:700;margin-top:2px;">✓</span>
-          <span>NaCl Box encryption — keys never leave your device</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:0.95rem;">
-          <span style="color:var(--success);font-weight:700;margin-top:2px;">✓</span>
-          <span>PBKDF2-SHA256 + AES-256-GCM for key backups</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:0.95rem;">
-          <span style="color:var(--success);font-weight:700;margin-top:2px;">✓</span>
-          <span>No tracking, no ads, no profiling</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:0.95rem;">
-          <span style="color:var(--success);font-weight:700;margin-top:2px;">✓</span>
-          <span>Open source — verify everything yourself</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:0.95rem;">
-          <span style="color:var(--success);font-weight:700;margin-top:2px;">✓</span>
-          <span>GDPR compliant — export or delete your data anytime</span>
-        </li>
-        <li style="display:flex;gap:10px;align-items:flex-start;font-size:0.95rem;">
-          <span style="color:var(--success);font-weight:700;margin-top:2px;">✓</span>
-          <span>HttpOnly cookie sessions — XSS can't steal your login token</span>
-        </li>
-      </ul>
-    </div>
-    <div class="privacy-visual reveal">
-      <div class="p-row"><span class="p-row-icon">🔒</span><span class="p-row-label">Message encryption</span><span class="p-row-val">NaCl E2EE</span></div>
-      <div class="p-row"><span class="p-row-icon">👁️</span><span class="p-row-label">We can read your DMs</span><span class="p-row-val bad">NEVER</span></div>
-      <div class="p-row"><span class="p-row-icon">📊</span><span class="p-row-label">Data sold to third parties</span><span class="p-row-val bad">NO</span></div>
-      <div class="p-row"><span class="p-row-icon">🎯</span><span class="p-row-label">Ad targeting</span><span class="p-row-val bad">NONE</span></div>
-      <div class="p-row"><span class="p-row-icon">🔑</span><span class="p-row-label">2FA support</span><span class="p-row-val">TOTP</span></div>
-      <div class="p-row"><span class="p-row-icon">📜</span><span class="p-row-label">Data export (GDPR Art.20)</span><span class="p-row-val">YES</span></div>
-      <div class="p-row"><span class="p-row-icon">⚙️</span><span class="p-row-label">Open source</span><span class="p-row-val">YES</span></div>
-      <div class="p-row"><span class="p-row-icon">🍪</span><span class="p-row-label">Session token in localStorage</span><span class="p-row-val bad">NEVER</span></div>
+<div class="section-alt">
+  <div class="privacy-wrap">
+    <div class="privacy-split">
+      <div class="reveal">
+        <span class="section-tag">Privacy</span>
+        <h2 class="section-title">We can't read<br/>your messages.<br/>That's the point.</h2>
+        <p style="color:var(--muted);margin-bottom:28px;font-size:0.97rem;line-height:1.75;">Phaze encrypts your DMs on your device. Even if someone breached our server, your messages are unreadable. Not a marketing claim — it's just how the math works.</p>
+        <ul class="privacy-list">
+          <li><span class="ck">✓</span><span>NaCl Box encryption — keys never leave your device</span></li>
+          <li><span class="ck">✓</span><span>PBKDF2-SHA256 + AES-256-GCM for key backups</span></li>
+          <li><span class="ck">✓</span><span>No tracking, no ads, no profiling</span></li>
+          <li><span class="ck">✓</span><span>Open source — verify it yourself on GitHub</span></li>
+          <li><span class="ck">✓</span><span>GDPR compliant — export or delete your data anytime</span></li>
+          <li><span class="ck">✓</span><span>HttpOnly cookie sessions — XSS can't steal your login</span></li>
+        </ul>
+      </div>
+      <div class="privacy-visual reveal">
+        <div class="p-row"><span class="p-row-icon">🔒</span><span class="p-row-label">Message encryption</span><span class="p-row-val">NaCl E2EE</span></div>
+        <div class="p-row"><span class="p-row-icon">👁️</span><span class="p-row-label">We can read your DMs</span><span class="p-row-val no">NEVER</span></div>
+        <div class="p-row"><span class="p-row-icon">📊</span><span class="p-row-label">Data sold to third parties</span><span class="p-row-val no">NO</span></div>
+        <div class="p-row"><span class="p-row-icon">🎯</span><span class="p-row-label">Ad targeting</span><span class="p-row-val no">NONE</span></div>
+        <div class="p-row"><span class="p-row-icon">🔑</span><span class="p-row-label">2FA support</span><span class="p-row-val">TOTP</span></div>
+        <div class="p-row"><span class="p-row-icon">📜</span><span class="p-row-label">Data export (GDPR Art.20)</span><span class="p-row-val">YES</span></div>
+        <div class="p-row"><span class="p-row-icon">⚙️</span><span class="p-row-label">Open source</span><span class="p-row-val">YES</span></div>
+        <div class="p-row"><span class="p-row-icon">🍪</span><span class="p-row-label">Session token in localStorage</span><span class="p-row-val no">NEVER</span></div>
+      </div>
     </div>
   </div>
-</section>
+</div>
 
-<!-- SKYPE TRANSITION -->
-<section id="skype-switch" style="padding: 0 24px 96px; max-width: 1200px; margin: 0 auto;">
-  <div class="reveal skype-migration-grid" style="background:var(--bg2);border:1px solid var(--border);border-radius:24px;padding:56px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;">
+<!-- CHAT IMPORT -->
+<section id="skype-switch" style="padding:0 24px 88px;max-width:1200px;margin:0 auto;">
+  <div class="import-panel reveal">
     <div>
-      <span class="section-tag">Coming from Skype?</span>
-      <h2 class="section-title" style="font-size:clamp(1.6rem,3.5vw,2.4rem);">Bring your history.<br/>Don't start over.</h2>
-      <p style="color:var(--muted);font-size:1rem;margin-bottom:28px;line-height:1.7;">Microsoft shut Skype down and pointed everyone at Teams. We're not Teams. You can pull your old Skype data and have it sitting in your Phaze DMs before the end of the day.</p>
-      <ol style="list-style:none;display:flex;flex-direction:column;gap:14px;">
-        <li style="display:flex;gap:14px;align-items:flex-start;">
-          <span style="background:var(--brand);color:#fff;font-weight:800;font-size:0.8rem;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">1</span>
-          <span style="font-size:0.95rem;">Go to <strong>go.skype.com/export</strong> and request your data. Skype emails you a zip in a few minutes.</span>
-        </li>
-        <li style="display:flex;gap:14px;align-items:flex-start;">
-          <span style="background:var(--brand);color:#fff;font-weight:800;font-size:0.8rem;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">2</span>
-          <span style="font-size:0.95rem;">Make a Phaze account. Just username + password, no phone number, no email required.</span>
-        </li>
-        <li style="display:flex;gap:14px;align-items:flex-start;">
-          <span style="background:var(--brand);color:#fff;font-weight:800;font-size:0.8rem;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">3</span>
-          <span style="font-size:0.95rem;">In Settings, go to Skype Import and upload the zip. Your messages show up in your DMs.</span>
-        </li>
-        <li style="display:flex;gap:14px;align-items:flex-start;">
-          <span style="background:var(--brand);color:#fff;font-weight:800;font-size:0.8rem;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;">4</span>
-          <span style="font-size:0.95rem;">Share your invite link with the people you want to bring over. That's it.</span>
-        </li>
+      <span class="section-tag">Bring your history</span>
+      <h2 class="section-title" style="font-size:clamp(1.5rem,3vw,2.2rem);">Don't start over.<br/>Pick up where you left off.</h2>
+      <p style="color:var(--muted);font-size:0.95rem;margin-bottom:28px;line-height:1.75;">Already have years of messages somewhere else? Export them, drop in the zip, and they appear in your Phaze DMs before the end of the day.</p>
+      <ol class="import-steps">
+        <li><span class="step-num">1</span><span>Request your data export from your old app. Most send you a zip in a few minutes.</span></li>
+        <li><span class="step-num">2</span><span>Create a Phaze account — just username + password, no phone number, no email required.</span></li>
+        <li><span class="step-num">3</span><span>In Settings, go to <strong>Chat Import</strong> and upload the zip. Messages show up in your DMs.</span></li>
+        <li><span class="step-num">4</span><span>Share your invite link with the people you want to bring over. Done.</span></li>
       </ol>
-      <a class="btn btn-primary" href="/web" style="margin-top:32px;display:inline-flex;">Switch to Phaze free →</a>
+      <a class="btn btn-primary btn-lg" href="/web" style="margin-top:28px;display:inline-flex;">Switch to Phaze free →</a>
     </div>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="p-row" style="border-color:rgba(134,59,255,0.3);"><span class="p-row-icon">💬</span><span class="p-row-label">Message history</span><span class="p-row-val">Imported</span></div>
-      <div class="p-row" style="border-color:rgba(134,59,255,0.3);"><span class="p-row-icon">👥</span><span class="p-row-label">Contacts &amp; friends</span><span class="p-row-val">Bridged</span></div>
-      <div class="p-row" style="border-color:rgba(134,59,255,0.3);"><span class="p-row-icon">📞</span><span class="p-row-label">Voice &amp; video calls</span><span class="p-row-val">Better</span></div>
-      <div class="p-row" style="border-color:rgba(134,59,255,0.3);"><span class="p-row-icon">🔒</span><span class="p-row-label">Encryption</span><span class="p-row-val">Real E2EE</span></div>
-      <div class="p-row" style="border-color:rgba(134,59,255,0.3);"><span class="p-row-icon">💰</span><span class="p-row-label">Price</span><span class="p-row-val">Free forever</span></div>
-      <div class="p-row" style="border-color:rgba(134,59,255,0.3);"><span class="p-row-icon">📱</span><span class="p-row-label">Platforms</span><span class="p-row-val">Web/Desktop/Android</span></div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="p-row"><span class="p-row-icon">💬</span><span class="p-row-label">Message history</span><span class="p-row-val">Imported</span></div>
+      <div class="p-row"><span class="p-row-icon">👥</span><span class="p-row-label">Contacts &amp; friends</span><span class="p-row-val">Bridged</span></div>
+      <div class="p-row"><span class="p-row-icon">📞</span><span class="p-row-label">Voice &amp; video calls</span><span class="p-row-val">Better</span></div>
+      <div class="p-row"><span class="p-row-icon">🔒</span><span class="p-row-label">Encryption</span><span class="p-row-val">Real E2EE</span></div>
+      <div class="p-row"><span class="p-row-icon">💰</span><span class="p-row-label">Price</span><span class="p-row-val">Free forever</span></div>
+      <div class="p-row"><span class="p-row-icon">📱</span><span class="p-row-label">Platforms</span><span class="p-row-val">Web · Desktop · Android</span></div>
     </div>
   </div>
 </section>
 
 <!-- COMPARE -->
-<section id="compare" style="padding: 0 24px 96px; max-width: 1200px; margin: 0 auto;">
-  <div class="reveal" style="text-align:center;margin-bottom:0;">
-    <span class="section-tag">How we compare</span>
-    <h2 class="section-title">We're not the only option.<br/>Here's the honest breakdown.</h2>
-    <p class="section-sub" style="margin:0 auto 0;">Skype is gone, Teams is for work meetings, and everything else has tradeoffs. Here's what's actually true.</p>
-  </div>
-  <div class="compare-wrap reveal">
-    <table>
-      <thead>
-        <tr>
-          <th>Feature</th>
-          <th style="color:var(--brand-light)">Phaze</th>
-          <th>Skype / Teams</th>
-          <th>WhatsApp</th>
-          <th>Discord</th>
-          <th>Telegram</th>
-          <th>Signal</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>E2EE by default</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="partial">~</td><td class="check">✓</td></tr>
-        <tr><td>No ads ever</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>Group Spaces / Servers</td><td class="phaze-col check">✓</td><td class="partial">~</td><td class="partial">~</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td></tr>
-        <tr><td>Voice &amp; Video calls</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>Stories</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td></tr>
-        <tr><td>Phone number NOT required</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
-        <tr><td>Import Skype history</td><td class="phaze-col check">✓</td><td class="cross">N/A</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
-        <tr><td>Open source</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="partial">~</td><td class="check">✓</td></tr>
-        <tr><td>Still alive &amp; maintained</td><td class="phaze-col check">✓</td><td class="cross" style="color:#ef4444;font-weight:700;">Dead (May 2025)</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
-        <tr><td>Owned by Meta/Microsoft</td><td class="phaze-col" style="color:var(--success);font-weight:700;">No</td><td class="cross">Yes (Microsoft)</td><td class="cross">Yes (Meta)</td><td class="cross">Yes (VC)</td><td class="check">No</td><td class="check">No</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
+<div class="section-alt">
+  <section id="compare" style="padding:88px 24px;max-width:1200px;margin:0 auto;">
+    <div class="reveal" style="text-align:center;margin-bottom:0;">
+      <span class="section-tag">Comparison</span>
+      <h2 class="section-title">We're not the only option.<br/>Here's the honest breakdown.</h2>
+      <p class="section-sub" style="margin:0 auto;">A lot of good apps out there. Here's where each one actually lands.</p>
+    </div>
+    <div class="compare-wrap reveal">
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th style="color:var(--brand-dark)">Phaze</th>
+            <th>WhatsApp</th>
+            <th>Discord</th>
+            <th>Telegram</th>
+            <th>Signal</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>E2EE by default</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="partial">~</td><td class="check">✓</td></tr>
+          <tr><td>No ads ever</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>Group Spaces / Servers</td><td class="phaze-col check">✓</td><td class="partial">~</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td></tr>
+          <tr><td>Voice &amp; Video calls</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
+          <tr><td>Stories</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td></tr>
+          <tr><td>Phone number NOT required</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>Chat history import</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
+          <tr><td>Open source</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="partial">~</td><td class="check">✓</td></tr>
+          <tr><td>Owned by Meta/VC</td><td class="phaze-col check" style="color:var(--success);font-weight:700;">No</td><td class="cross">Yes (Meta)</td><td class="cross">Yes (VC)</td><td class="check">No</td><td class="check">No</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
 
-<!-- PLATFORMS / DOWNLOAD -->
+<!-- PLATFORMS -->
 <section id="download" class="platforms">
   <div class="reveal">
     <span class="section-tag">Platforms</span>
-    <h2 class="section-title">Use it wherever</h2>
-    <p style="color:var(--muted);max-width:480px;margin:0 auto;font-size:1.05rem;">Same account on all your devices. Web, Windows, Mac, Linux, Android. Pick up where you left off.</p>
+    <h2 class="section-title">Use it everywhere</h2>
+    <p style="color:var(--muted);max-width:440px;margin:0 auto;font-size:0.97rem;">Same account across all your devices. Pick up right where you left off.</p>
   </div>
   <div class="platform-cards reveal">
-    <a class="platform-card" href="/web" id="dl-web" style="text-decoration:none;color:inherit;">
+    <a class="platform-card" href="/web" id="dl-web">
       <div class="platform-icon">🌐</div>
       <div class="platform-name">Web App</div>
       <div class="platform-sub">No install needed</div>
     </a>
-    <a class="platform-card" href="https://github.com/jakes1345/skype7-reborn/releases/latest" id="dl-windows" style="text-decoration:none;color:inherit;">
+    <a class="platform-card" href="https://github.com/jakes1345/skype7-reborn/releases/latest" id="dl-windows">
       <div class="platform-icon">🪟</div>
       <div class="platform-name">Windows</div>
       <div class="platform-sub">Desktop app</div>
     </a>
-    <a class="platform-card" href="https://github.com/jakes1345/skype7-reborn/releases/latest" id="dl-macos" style="text-decoration:none;color:inherit;">
+    <a class="platform-card" href="https://github.com/jakes1345/skype7-reborn/releases/latest" id="dl-macos">
       <div class="platform-icon">🍎</div>
       <div class="platform-name">macOS</div>
       <div class="platform-sub">Desktop app</div>
     </a>
-    <a class="platform-card" href="/download" id="dl-linux" style="text-decoration:none;color:inherit;">
+    <a class="platform-card" href="/download" id="dl-linux">
       <div class="platform-icon">🐧</div>
       <div class="platform-name">Linux</div>
-      <div class="platform-sub">.deb · APT repo available</div>
+      <div class="platform-sub">.deb · APT repo</div>
     </a>
-    <a class="platform-card" href="https://play.google.com/store/apps/details?id=world.phazechat.app" id="dl-android" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">
+    <a class="platform-card" href="https://play.google.com/store/apps/details?id=world.phazechat.app" id="dl-android" target="_blank" rel="noopener">
       <div class="platform-icon">🤖</div>
       <div class="platform-name">Android</div>
-      <div class="platform-sub">Google Play Store</div>
+      <div class="platform-sub">Google Play</div>
     </a>
   </div>
 </section>
 
-<!-- CTA BOTTOM -->
+<!-- CTA -->
 <section class="cta-section">
   <div class="reveal">
-    <h2>Just try it.<br/>Takes 2 minutes.</h2>
-    <p>Free, open source, running right now. No phone number, no credit card, no Microsoft account. If you hate it you've lost nothing.</p>
+    <h2>Try it. Takes 2 minutes.</h2>
+    <p>Free, open source, running right now. No phone number, no credit card. If you hate it, you've lost nothing.</p>
     <div class="cta-actions">
-      <a class="btn btn-primary" href="/web" id="cta-start">Switch to Phaze free →</a>
-      <a class="btn btn-outline" href="https://github.com/jakes1345/skype7-reborn" id="cta-github">View source on GitHub</a>
+      <a class="btn btn-lg btn-white" href="/web" id="cta-start">Open Phaze free →</a>
+      <a class="btn btn-lg btn-ghost" href="https://github.com/jakes1345/skype7-reborn" id="cta-github">View source on GitHub</a>
     </div>
   </div>
 </section>
@@ -653,11 +552,11 @@
 <footer>
   <div class="footer-inner">
     <div class="footer-brand">
-      <a class="nav-logo" href="/" style="text-decoration:none;">
+      <a class="nav-logo footer-logo" href="/" style="text-decoration:none;">
         <img src="/icon-192.png" alt="Phaze" style="width:28px;height:28px;border-radius:7px;" />
-        <span style="font-size:1.1rem;font-weight:800;color:var(--text);">Phaze</span>
+        <span style="font-size:1.05rem;font-weight:800;">Phaze</span>
       </a>
-      <p>Made by a small team who wanted Skype back. Free, open source, no ads.</p>
+      <p>Free, open source messaging. No ads, no tracking, no drama.</p>
     </div>
     <div class="footer-col">
       <h4>Product</h4>
@@ -690,30 +589,22 @@
 </footer>
 
 <script>
-  // Scroll reveal — mark elements for animation only if JS is running,
-  // so content is never hidden from crawlers or users with slow JS.
   const revealEls = document.querySelectorAll('.reveal')
   revealEls.forEach(el => el.classList.add('will-animate'))
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target) } })
-  }, { threshold: 0.08, rootMargin: '0px 0px -20px 0px' })
+  }, { threshold: 0.07, rootMargin: '0px 0px -20px 0px' })
   revealEls.forEach(el => {
-    if (el.getBoundingClientRect().top < window.innerHeight) {
-      el.classList.add('visible') // already in viewport on load
-    } else {
-      observer.observe(el)
-    }
+    if (el.getBoundingClientRect().top < window.innerHeight) { el.classList.add('visible') }
+    else { observer.observe(el) }
   })
 
-  // Smooth nav link highlighting
   const sections = document.querySelectorAll('section[id]')
   const navLinks = document.querySelectorAll('.nav-links a')
   window.addEventListener('scroll', () => {
     let cur = ''
     sections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) cur = s.id })
-    navLinks.forEach(a => {
-      a.style.color = a.getAttribute('href') === `#${cur}` ? 'var(--text)' : ''
-    })
+    navLinks.forEach(a => { a.style.color = a.getAttribute('href') === `#${cur}` ? 'var(--text)' : '' })
   }, { passive: true })
 </script>
 
