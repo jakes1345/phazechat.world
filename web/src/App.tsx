@@ -407,6 +407,9 @@ export default function App() {
   const [loginTotp, setLoginTotp] = useState('')
   const [needsTotp, setNeedsTotp] = useState(false)
   const [addFriend, setAddFriend] = useState('')
+  const [addOpen, setAddOpen] = useState(false)
+  const [addStatus, setAddStatus] = useState<string | null>(null)
+  const [contactFilter, setContactFilter] = useState('')
   const [profileUser, setProfileUser] = useState<string | null>(null)
   const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
     try { return localStorage.getItem('phaze_onboarded') !== '1' } catch { return false }
@@ -2377,26 +2380,91 @@ export default function App() {
         {me && (
           <main className="grid">
             <div className={`hub-content ${selected ? 'chat-open' : ''}`}>
-              {/* ── Sidebar: add friend + friends list ────────────── */}
+              {/* ── Sidebar: search + contacts list ───────────────── */}
               <div className="hub-sidebar">
                 <div className="hub-add-friend">
                   <div className="form">
-                    <input placeholder="Search or add contact…" value={addFriend} onChange={(e) => setAddFriend(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && addFriend.trim()) { sendFriendRequest(addFriend.trim()); setAddFriend('') } }} />
-                    {addFriend.trim() && <button type="button" onClick={() => { sendFriendRequest(addFriend.trim()); setAddFriend('') }}>+</button>}
+                    <input
+                      placeholder="Search contacts…"
+                      value={contactFilter}
+                      onChange={(e) => setContactFilter(e.target.value)}
+                    />
+                    <button type="button" title="Add contact" onClick={() => { setAddOpen(true); setAddFriend(''); setAddStatus(null) }}>+</button>
                   </div>
                 </div>
+
+                {/* ── Add contact modal ──────────────────────────────── */}
+                {addOpen && (
+                  <div className="add-modal-overlay" onClick={() => setAddOpen(false)}>
+                    <div className="add-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="add-modal-title">Add contact</div>
+                      <input
+                        className="add-modal-input"
+                        placeholder="Enter their username…"
+                        value={addFriend}
+                        autoFocus
+                        onChange={(e) => setAddFriend(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && addFriend.trim()) {
+                            sendFriendRequest(addFriend.trim())
+                            setAddStatus(`Request sent to ${addFriend.trim()}`)
+                            setAddFriend('')
+                          }
+                          if (e.key === 'Escape') setAddOpen(false)
+                        }}
+                      />
+                      {addStatus && <p className="add-modal-status">{addStatus}</p>}
+                      <div className="add-modal-actions">
+                        <button
+                          type="button"
+                          className="add-modal-send"
+                          disabled={!addFriend.trim()}
+                          onClick={() => {
+                            if (!addFriend.trim()) return
+                            sendFriendRequest(addFriend.trim())
+                            setAddStatus(`Request sent to ${addFriend.trim()}`)
+                            setAddFriend('')
+                          }}
+                        >Send request</button>
+                        <button type="button" className="add-modal-cancel" onClick={() => setAddOpen(false)}>Close</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="hub-friends">
-                  {Object.keys(friends).length === 0 && (
-                    <div className="friends-empty">
-                      <div className="friends-empty-icon">👋</div>
-                      <p><strong>No friends yet</strong></p>
-                      <p className="muted small">Add someone by their username above. Once they accept, you can chat, call, and share.</p>
+                  {/* Incoming requests */}
+                  {pending.length > 0 && (
+                    <div className="pending-section">
+                      {pending.map((u) => (
+                        <div key={u} className="pending-row">
+                          <span className="avatar" style={{ background: avatarColor(u) }}>
+                            {u[0]?.toUpperCase()}
+                          </span>
+                          <span className="pending-info">
+                            <span className="pending-name">{u}</span>
+                            <span className="pending-label">wants to connect</span>
+                          </span>
+                          <button type="button" className="pending-accept" onClick={() => acceptFriend(u)}>Accept</button>
+                        </div>
+                      ))}
                     </div>
                   )}
+
+                  {Object.keys(friends).length === 0 && (
+                    <div className="friends-empty">
+                      <div className="friends-empty-icon">💬</div>
+                      <p className="friends-empty-title">No contacts yet</p>
+                      <p className="friends-empty-sub">Add someone by their username to get started.</p>
+                      <button type="button" className="friends-empty-btn" onClick={() => { setAddOpen(true); setAddFriend(''); setAddStatus(null) }}>Add your first contact</button>
+                    </div>
+                  )}
+
                   {Object.keys(friends).length > 0 && <div className="sidebar-section-label">Messages</div>}
                   <ul className="list">
                     {Object.entries(friends)
                       .map(([u, st]) => ({ u, st, last: lastLineFor(me, u) }))
+                      .filter(({ u }) => !contactFilter.trim() || u.toLowerCase().includes(contactFilter.toLowerCase()))
                       .sort((a, b) => (b.last?.ts ?? 0) - (a.last?.ts ?? 0))
                       .map(({ u, st, last }) => (
                       <li key={u}>
@@ -2420,18 +2488,11 @@ export default function App() {
                         </button>
                       </li>
                     ))}
+                    {Object.keys(friends).length > 0 && contactFilter.trim() &&
+                      Object.keys(friends).filter(u => u.toLowerCase().includes(contactFilter.toLowerCase())).length === 0 && (
+                      <li className="no-filter-match">No contacts match "{contactFilter}"</li>
+                    )}
                   </ul>
-                  {pending.length > 0 && (
-                    <>
-                      <h3>Requests</h3>
-                      {pending.map((u) => (
-                        <div key={u} className="row">
-                          <span>{u}</span>
-                          <button type="button" onClick={() => acceptFriend(u)}>Accept</button>
-                        </div>
-                      ))}
-                    </>
-                  )}
                 </div>
                 {/* ── Skype 7 me-bar at sidebar bottom ──────────── */}
                 {me && (
@@ -2782,7 +2843,7 @@ export default function App() {
                             if (e.key === 'Enter' && conn === 'open') sendChat()
                             else if (e.key === 'Escape' && editingId) cancelEdit()
                           }}
-                          placeholder={editingId ? 'Edit message…' : (e2eReady ? 'Message  ·  / for commands  ·  @ to mention' : 'Message')}
+                          placeholder={editingId ? 'Edit message…' : (e2eReady ? 'Write a message… 🔒' : 'Write a message…')}
                         />
                         {slashMatches.length > 0 && (
                           <div className="mention-pop slash-pop" role="dialog" aria-label="Slash commands">

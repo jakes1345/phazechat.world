@@ -3009,6 +3009,125 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   animation: none;
 }
 
+/* ── Add contact modal ───────────────────────────────────────── */
+.add-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+}
+.add-modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.add-modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1B2733;
+}
+.add-modal-input {
+  width: 100%;
+  border: 1px solid #C8D9E6;
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1B2733;
+  outline: none;
+}
+.add-modal-input:focus { border-color: #0095CC; box-shadow: 0 0 0 2px rgba(0,149,204,0.15); }
+.add-modal-status { font-size: 12px; color: #019A00; margin: 0; }
+.add-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.add-modal-send {
+  background: #0095CC;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.add-modal-send:disabled { background: #A0C8E0; cursor: default; }
+.add-modal-send:not(:disabled):hover { background: #00AFF0; }
+.add-modal-cancel {
+  background: transparent;
+  border: 1px solid #C8D9E6;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: #4A6070;
+  cursor: pointer;
+}
+.add-modal-cancel:hover { background: #EEF5FB; }
+
+/* ── Incoming request rows ───────────────────────────────────── */
+.pending-section {
+  border-bottom: 1px solid var(--separator);
+  padding: 4px 0;
+}
+.pending-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+}
+.app.theme-skype7 .pending-row .avatar {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  font-size: 0.8rem;
+}
+.pending-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pending-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.pending-label { font-size: 11px; color: var(--muted); }
+.pending-accept {
+  background: #019A00;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pending-accept:hover { background: #02B800; }
+
+/* ── Friends empty state with CTA ────────────────────────────── */
+.app.theme-skype7 .friends-empty { text-align: center; padding: 32px 16px 24px; }
+.friends-empty-title { font-size: 14px; font-weight: 600; color: var(--text); margin: 8px 0 4px; }
+.friends-empty-sub { font-size: 12px; color: var(--muted); margin: 0 0 16px; }
+.friends-empty-btn {
+  background: #0095CC;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.friends-empty-btn:hover { background: #00AFF0; }
+
+/* ── No filter match ─────────────────────────────────────────── */
+.no-filter-match {
+  list-style: none;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
 /* ── Section labels ──────────────────────────────────────────── */
 .app.theme-skype7 .sidebar-section-label { display: none; }
 
