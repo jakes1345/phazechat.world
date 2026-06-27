@@ -81,7 +81,7 @@ fun CallScreen(
                     modifier = Modifier
                         .size(120.dp)
                         .clip(CircleShape)
-                        .background(PhazeBrand),
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(peer.firstOrNull()?.uppercase() ?: "?", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -119,13 +119,13 @@ fun CallScreen(
                     horizontalArrangement = Arrangement.spacedBy(20.dp),
                     modifier = Modifier.padding(bottom = 48.dp),
                 ) {
-                    CallButton(text = if (isMuted) "Unmute" else "Mute", color = if (isMuted) PhazeBrandDark else Color.DarkGray) { onToggleMute() }
-                    CallButton(text = if (speakerOn) "Earpiece" else "Speaker", color = if (speakerOn) PhazeBrandDark else Color.DarkGray) {
+                    CallButton(text = if (isMuted) "Unmute" else "Mute", color = if (isMuted) Color(0xFF0095CC) else Color.DarkGray) { onToggleMute() }
+                    CallButton(text = if (speakerOn) "Earpiece" else "Speaker", color = if (speakerOn) Color(0xFF0095CC) else Color.DarkGray) {
                         speakerOn = onToggleSpeakerphone()
                     }
                     if (isVideo) {
-                        CallButton(text = if (isCameraOn) "Cam Off" else "Cam On", color = if (isCameraOn) PhazeBrandDark else Color.DarkGray) { onToggleCamera() }
-                        CallButton(text = if (isScreenSharing) "Stop Share" else "Share", color = if (isScreenSharing) PhazeBrand else Color.DarkGray) { onToggleScreenShare() }
+                        CallButton(text = if (isCameraOn) "Cam Off" else "Cam On", color = if (isCameraOn) Color(0xFF0095CC) else Color.DarkGray) { onToggleCamera() }
+                        CallButton(text = if (isScreenSharing) "Stop Share" else "Share", color = if (isScreenSharing) Color(0xFF00AFF0) else Color.DarkGray) { onToggleScreenShare() }
                     }
                     CallButton(text = "End", color = PhazeDanger) { onHangUp() }
                 }

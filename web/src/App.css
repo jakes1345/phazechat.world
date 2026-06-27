@@ -3353,3 +3353,23 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   font-size: 18px;
 }
 .app.theme-skype7 .hub-home-hero p { color: var(--muted); font-size: 13px; }
+
+/* ── Chat empty state ────────────────────────────────────────── */
+.app.theme-skype7 .chat-empty-art {
+  background: rgba(0,175,240,0.1);
+  box-shadow: 0 0 40px rgba(0,175,240,0.12);
+}
+.app.theme-skype7 .chat-empty-art img { display: none; }
+.app.theme-skype7 .chat-empty-art::after {
+  content: '💬';
+  font-size: 2.6rem;
+  line-height: 1;
+}
+.app.theme-skype7 .chat-empty h3 { color: #1B2733; font-weight: 600; font-size: 1.1rem; }
+.app.theme-skype7 .chat-empty p { color: #6E7E8A; font-size: 0.83rem; }
+.app.theme-skype7 .chat-empty-hints { display: none; }
+
+/* ── Auth hero logo: blue tint ───────────────────────────────── */
+.app.theme-skype7 .auth-hero-logo {
+  filter: hue-rotate(-75deg) saturate(1.4) brightness(1.05);
+}

@@ -55,7 +55,7 @@ fun StoriesRow(
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = PhazeBrandDark)
+                    Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text("Your story", fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
@@ -70,11 +70,11 @@ fun StoriesRow(
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape)
-                        .border(2.dp, PhazeBrand, CircleShape)
+                        .border(2.dp, MaterialTheme.colorScheme.primary, CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(author.firstOrNull()?.uppercase() ?: "?", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = PhazeBrandDark)
+                    Text(author.firstOrNull()?.uppercase() ?: "?", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(if (author == me) "You" else author, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)

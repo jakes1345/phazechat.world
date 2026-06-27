@@ -149,7 +149,7 @@ fun SpacesScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Box(
-                            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(PhazeBrand),
+                            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.primary),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(space.name.firstOrNull()?.uppercase() ?: "?", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -190,7 +190,7 @@ fun SpacesScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Box(
-                                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(PhazeBrand),
+                                    modifier = Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.primary),
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(sp.name.firstOrNull()?.uppercase() ?: "?", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
@@ -346,7 +346,7 @@ fun ChannelChatScreen(
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
                     if (!isMe) {
                         Box(
-                            modifier = Modifier.size(28.dp).clip(CircleShape).background(PhazeBrand),
+                            modifier = Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary),
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(m.sender.firstOrNull()?.uppercase() ?: "?", color = MaterialTheme.colorScheme.onPrimary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -354,7 +354,7 @@ fun ChannelChatScreen(
                         Spacer(Modifier.width(8.dp))
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        if (!isMe) Text(m.sender, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PhazeBrandDark)
+                        if (!isMe) Text(m.sender, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         Text(
                             if (m.deleted) "[deleted]" else m.body,
                             fontSize = 14.sp,
