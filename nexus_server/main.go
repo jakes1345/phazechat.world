@@ -416,6 +416,13 @@ func (s *NexusServer) initDB() {
 			username TEXT NOT NULL,
 			PRIMARY KEY (convo_id, username)
 		)`,
+		`CREATE TABLE IF NOT EXISTS convo_messages (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			convo_id TEXT NOT NULL,
+			sender TEXT NOT NULL,
+			body TEXT NOT NULL,
+			sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
 		`CREATE TABLE IF NOT EXISTS blocks (
 			blocker TEXT NOT NULL,
 			blocked TEXT NOT NULL,

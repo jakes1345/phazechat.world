@@ -1316,6 +1316,8 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if !senderInConvo {
 				continue
 			}
+			_, _ = s.DB.Exec(`INSERT INTO convo_messages (convo_id, sender, body) VALUES (?, ?, ?)`,
+				msg.ConvoID, username, msg.Body)
 			var convoName string
 			_ = s.DB.QueryRow(`SELECT name FROM conversations WHERE id = ?`, msg.ConvoID).Scan(&convoName)
 			pushTitle := username
@@ -1378,6 +1380,36 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				}
 			}
 			s.Mu.RUnlock()
+
+		case "convo_history":
+			if username == "" || msg.ConvoID == "" {
+				continue
+			}
+			var isMember int
+			s.DB.QueryRow(`SELECT 1 FROM conversation_members WHERE convo_id=? AND username=?`,
+				msg.ConvoID, username).Scan(&isMember)
+			if isMember == 0 {
+				continue
+			}
+			rows2, err2 := s.DB.Query(`SELECT sender, body, sent_at FROM convo_messages
+				WHERE convo_id = ? ORDER BY id DESC LIMIT 100`, msg.ConvoID)
+			if err2 != nil {
+				continue
+			}
+			var hist []DMMessage
+			for rows2.Next() {
+				var dm DMMessage
+				var t string
+				if err3 := rows2.Scan(&dm.Sender, &dm.Body, &t); err3 == nil {
+					dm.CreatedAt = t
+					hist = append(hist, dm)
+				}
+			}
+			rows2.Close()
+			for i, j := 0, len(hist)-1; i < j; i, j = i+1, j-1 {
+				hist[i], hist[j] = hist[j], hist[i]
+			}
+			client.Send(NexusMessage{Type: "convo_history", ConvoID: msg.ConvoID, DMHistory: hist})
 
 		case "read_receipt":
 			if username == "" {
