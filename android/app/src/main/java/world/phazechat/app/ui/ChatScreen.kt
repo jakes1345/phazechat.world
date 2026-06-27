@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -91,29 +92,33 @@ fun ChatScreen(
                     }
                 },
                 title = {
-                    Column {
-                        Text(peer, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                        Text(
-                            if (typing) "typing…" else peerStatus,
-                            fontSize = 12.sp,
-                            color = if (typing) PhazeBrandDark else MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontStyle = if (typing) FontStyle.Italic else FontStyle.Normal,
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Avatar(peer, 34, peerStatus)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(peer, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color.White)
+                            Text(
+                                if (typing) "typing…" else peerStatus,
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = if (typing) 0.9f else 0.75f),
+                                fontStyle = if (typing) FontStyle.Italic else FontStyle.Normal,
+                            )
+                        }
                     }
                 },
                 actions = {
                     if (onCall != null) {
                         IconButton(onClick = onCall) {
-                            Icon(Icons.Default.Call, "Voice call", tint = PhazeBrandDark)
+                            Icon(Icons.Default.Call, "Voice call", tint = Color.White)
                         }
                     }
                     if (onVideoCall != null) {
                         IconButton(onClick = onVideoCall) {
-                            Icon(Icons.Default.PlayArrow, "Video call", tint = PhazeBrandDark)
+                            Icon(Icons.Default.PlayArrow, "Video call", tint = Color.White)
                         }
                     }
                     IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, "More")
+                        Icon(Icons.Default.MoreVert, "More", tint = Color.White)
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
@@ -126,7 +131,10 @@ fun ChatScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    navigationIconContentColor = Color.White,
+                ),
             )
         },
         bottomBar = {
@@ -215,8 +223,8 @@ fun MessageBubble(
     onReact: (String) -> Unit = {},
 ) {
     val align = if (line.me) Arrangement.End else Arrangement.Start
-    val bubbleColor = if (line.me) PhazeBrand else MaterialTheme.colorScheme.surfaceVariant
-    val textColor = if (line.me) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val bubbleColor = if (line.me) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val textColor = if (line.me) Color.White else MaterialTheme.colorScheme.onSurface
     val uriHandler = LocalUriHandler.current
     var menuOpen by remember { mutableStateOf(false) }
 
@@ -237,7 +245,7 @@ fun MessageBubble(
                     .padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
                 if (!line.me) {
-                    Text(line.from, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PhazeBrandDark)
+                    Text(line.from, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.height(2.dp))
                 }
                 if (line.deleted) {

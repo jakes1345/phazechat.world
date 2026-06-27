@@ -262,7 +262,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     val discoverSpaces = _discoverSpaces.asStateFlow()
 
     // Theme pack: "dark" (default), "light", or "skype7". Persisted locally.
-    private val _theme = MutableStateFlow(prefs.getString("theme", "dark") ?: "dark")
+    private val _theme = MutableStateFlow(prefs.getString("theme", "skype7") ?: "skype7")
     val theme = _theme.asStateFlow()
     fun setTheme(t: String) {
         _theme.value = t

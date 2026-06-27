@@ -51,18 +51,22 @@ private val LightColors = lightColorScheme(
     error = PhazeDanger,
 )
 
-// "Skype 7" theme pack — classic white + Skype-blue retro look.
 val SkypeBlue = Color(0xFF00AFF0)
+val SkypeBlueDark = Color(0xFF0095CC)
 private val Skype7Colors = lightColorScheme(
     primary = SkypeBlue,
     onPrimary = Color.White,
+    primaryContainer = SkypeBlueDark,
+    onPrimaryContainer = Color.White,
+    secondary = SkypeBlueDark,
+    onSecondary = Color.White,
     surface = Color.White,
     onSurface = Color(0xFF1B2733),
-    background = Color(0xFFE8EEF3),
+    background = Color(0xFFD4E2F2),
     onBackground = Color(0xFF1B2733),
-    surfaceVariant = Color(0xFFE3E9EE),
-    onSurfaceVariant = Color(0xFF7A8A99),
-    outline = Color(0xFFCFD8E0),
+    surfaceVariant = Color(0xFFE5F7FD),
+    onSurfaceVariant = Color(0xFF1B2733),
+    outline = Color(0xFFB2C8D8),
     error = PhazeDanger,
 )
 
