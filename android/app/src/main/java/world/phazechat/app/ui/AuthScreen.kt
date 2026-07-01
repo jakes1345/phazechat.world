@@ -93,7 +93,7 @@ fun AuthScreen(
     ) {
         Spacer(Modifier.weight(1f))
 
-        Text("Phaze", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = PhazeBrandDark)
+        Text("Phaze", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(4.dp))
         Text("Encrypted chat for everyone", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         Spacer(Modifier.height(32.dp))

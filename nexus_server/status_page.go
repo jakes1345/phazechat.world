@@ -77,8 +77,12 @@ func (s *NexusServer) startStatusProber() {
 	go func() {
 		t := time.NewTicker(60 * time.Second)
 		defer t.Stop()
-		var lastOK = true
+		// First probe fires before the listener has finished binding —
+		// record it without logging so boot doesn't look like a false alert.
+		lastOK := s.probeSelf()
+		recordHealth(lastOK)
 		for {
+			<-t.C
 			ok := s.probeSelf()
 			recordHealth(ok)
 			if ok != lastOK {
@@ -89,7 +93,6 @@ func (s *NexusServer) startStatusProber() {
 				}
 				lastOK = ok
 			}
-			<-t.C
 		}
 	}()
 }

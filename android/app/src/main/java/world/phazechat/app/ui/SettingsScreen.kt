@@ -524,7 +524,7 @@ fun SettingsScreen(
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(c.displayName, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                                if (c.onPhaze) Text("@${c.phazeUsername}", fontSize = 11.sp, color = PhazeBrandDark)
+                                if (c.onPhaze) Text("@${c.phazeUsername}", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                             }
                             if (c.onPhaze) {
                                 Button(

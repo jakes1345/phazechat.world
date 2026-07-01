@@ -232,6 +232,8 @@
     .platform-icon { font-size: 2.2rem; margin-bottom: 10px; }
     .platform-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 3px; }
     .platform-sub { color: var(--muted); font-size: 0.78rem; }
+    .platform-card.disabled { cursor: default; opacity: 0.55; }
+    .platform-card.disabled:hover { border-color: var(--border); transform: none; box-shadow: none; }
 
     /* ── CTA ─────────────────────────────────────── */
     .cta-section {
@@ -513,16 +515,16 @@
       <div class="platform-name">Web App</div>
       <div class="platform-sub">No install needed</div>
     </a>
-    <a class="platform-card" href="https://github.com/jakes1345/skype7-reborn/releases/latest" id="dl-windows">
+    <a class="platform-card" href="https://github.com/jakes1345/phaze/releases/latest" id="dl-windows">
       <div class="platform-icon">🪟</div>
       <div class="platform-name">Windows</div>
       <div class="platform-sub">Desktop app</div>
     </a>
-    <a class="platform-card" href="https://github.com/jakes1345/skype7-reborn/releases/latest" id="dl-macos">
+    <div class="platform-card disabled" id="dl-macos" title="No macOS build yet — vote for it on GitHub">
       <div class="platform-icon">🍎</div>
       <div class="platform-name">macOS</div>
-      <div class="platform-sub">Desktop app</div>
-    </a>
+      <div class="platform-sub">Coming soon</div>
+    </div>
     <a class="platform-card" href="/download" id="dl-linux">
       <div class="platform-icon">🐧</div>
       <div class="platform-name">Linux</div>
@@ -543,7 +545,7 @@
     <p>Free, open source, running right now. No phone number, no credit card. If you hate it, you've lost nothing.</p>
     <div class="cta-actions">
       <a class="btn btn-lg btn-white" href="/web" id="cta-start">Open Phaze free →</a>
-      <a class="btn btn-lg btn-ghost" href="https://github.com/jakes1345/skype7-reborn" id="cta-github">View source on GitHub</a>
+      <a class="btn btn-lg btn-ghost" href="https://github.com/jakes1345/phaze" id="cta-github">View source on GitHub</a>
     </div>
   </div>
 </section>
@@ -573,7 +575,7 @@
     </div>
     <div class="footer-col">
       <h4>Community</h4>
-      <a href="https://github.com/jakes1345/skype7-reborn" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/jakes1345/phaze" target="_blank" rel="noopener">GitHub</a>
       <a href="https://x.com/PhazeChatWorld" target="_blank" rel="noopener">X / Twitter</a>
       <a href="https://instagram.com/phazechat.world" target="_blank" rel="noopener">Instagram</a>
     </div>
@@ -583,7 +585,7 @@
     <div class="footer-social">
       <a href="https://x.com/PhazeChatWorld" target="_blank" rel="noopener" aria-label="Phaze on X">𝕏</a>
       <a href="https://instagram.com/phazechat.world" target="_blank" rel="noopener" aria-label="Phaze on Instagram">📷</a>
-      <a href="https://github.com/jakes1345/skype7-reborn" target="_blank" rel="noopener" aria-label="Phaze on GitHub">⌨️</a>
+      <a href="https://github.com/jakes1345/phaze" target="_blank" rel="noopener" aria-label="Phaze on GitHub">⌨️</a>
     </div>
   </div>
 </footer>
@@ -594,10 +596,11 @@
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target) } })
   }, { threshold: 0.07, rootMargin: '0px 0px -20px 0px' })
-  revealEls.forEach(el => {
-    if (el.getBoundingClientRect().top < window.innerHeight) { el.classList.add('visible') }
-    else { observer.observe(el) }
-  })
+  // Always go through the observer rather than checking getBoundingClientRect
+  // synchronously — on direct navigation to a #hash the browser's anchor
+  // scroll can land before or after this runs, and the observer's first
+  // callback reports the true current intersection state either way.
+  revealEls.forEach(el => observer.observe(el))
 
   const sections = document.querySelectorAll('section[id]')
   const navLinks = document.querySelectorAll('.nav-links a')
