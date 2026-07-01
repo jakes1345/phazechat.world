@@ -442,22 +442,22 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
               <div className="invite-share-row">
                 <a
                   className="settings-btn invite-share-btn"
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Join me on Phaze — encrypted chat, calls & more 🔒 ${inviteLink}`)}`}
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`come chat with me on Phaze ${inviteLink}`)}`}
                   target="_blank" rel="noreferrer"
                 >Twitter / X</a>
                 <a
                   className="settings-btn invite-share-btn"
-                  href={`https://wa.me/?text=${encodeURIComponent(`Join me on Phaze — encrypted chat & calls! ${inviteLink}`)}`}
+                  href={`https://wa.me/?text=${encodeURIComponent(`come chat with me on Phaze ${inviteLink}`)}`}
                   target="_blank" rel="noreferrer"
                 >WhatsApp</a>
                 <a
                   className="settings-btn invite-share-btn"
-                  href={`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(`Join me on Phaze — encrypted chat & calls!`)}`}
+                  href={`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(`come chat with me on Phaze`)}`}
                   target="_blank" rel="noreferrer"
                 >Telegram</a>
                 {typeof navigator.share === 'function' && (
                   <button className="settings-btn invite-share-btn" onClick={async () => {
-                    try { await navigator.share({ title: 'Join me on Phaze', text: 'Encrypted chat, calls, and more!', url: inviteLink }) }
+                    try { await navigator.share({ title: 'Phaze', text: 'come chat with me on Phaze', url: inviteLink }) }
                     catch { /* user cancelled */ }
                   }}>More</button>
                 )}

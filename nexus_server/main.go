@@ -53,6 +53,7 @@ type NexusMessage struct {
 	Results     []string    `json:"results"`
 	SDP         string      `json:"sdp"`
 	Candidate   string      `json:"candidate"`
+	RoomID      string      `json:"room_id,omitempty"`
 	Token       string      `json:"token"`
 	Error       string      `json:"error"`
 	Email       string      `json:"email,omitempty"`
@@ -195,13 +196,15 @@ type Client struct {
 	// established, a single authed client could otherwise flood the read
 	// loop unbounded.
 	msgLimiter *rate.Limiter
-	// InCall is true while the client has an active WebRTC call session.
+	// InCall is true while the client has an active call session.
 	// Used to send call_busy back to new callers instead of letting them wait.
 	InCall bool
 	// CallPartner is the username of the other party in the current call.
 	// Set on call_answer, cleared on call_end/call_reject/disconnect.
 	// Used to send call_end to the partner if this client drops mid-call.
 	CallPartner string
+	// PendingCallRoom is the Jitsi room ID generated on call_offer, consumed on call_answer.
+	PendingCallRoom string
 }
 
 // Send locks the per-connection write mutex and emits a JSON message.
@@ -3606,7 +3609,7 @@ func refreshUpdateManifest(repo string) UpdateManifest {
 func (s *NexusServer) versionHandler(w http.ResponseWriter, r *http.Request) {
 	repo := strings.TrimSpace(os.Getenv("PHAZE_RELEASE_REPO"))
 	if repo == "" {
-		repo = "jakes1345/skype7-reborn"
+		repo = "jakes1345/phaze"
 	}
 
 	updates.mu.RLock()

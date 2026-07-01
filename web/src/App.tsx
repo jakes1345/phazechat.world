@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react'
 import faviconUrl from '/icon-192.png'
 import jsQR from 'jsqr'
-import type { NexusMessage, TurnConfig } from './nexusTypes'
+import type { NexusMessage } from './nexusTypes'
 import {
   decryptFromPeer,
   decodePublicKeyField,
@@ -68,7 +68,7 @@ const SNOW_FLAKES = Array.from({ length: 40 }, (_, i) => ({
   size: 0.6 + Math.random() * 1.1,
 }))
 
-/** Pure-CSS seasonal snow overlay (zero deps). */
+/** Seasonal snow overlay. */
 function Snowflakes() {
   return (
     <div className="snow-layer" aria-hidden="true">
@@ -342,6 +342,20 @@ type CallState = {
   direction: 'outgoing' | 'incoming'
 }
 
+type ConvoLine = {
+  id: string
+  sender: string
+  body: string
+  ts: number
+  me: boolean
+}
+
+type Convo = {
+  id: string
+  name: string
+  members: string[]
+}
+
 function defaultWsUrl(): string {
   const u = import.meta.env.VITE_NEXUS_WS as string | undefined
   if (u) return u
@@ -393,12 +407,11 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [pending, setPending] = useState<string[]>([])
   const [draft, setDraft] = useState('')
-  const [turn, setTurn] = useState<TurnConfig | null>(null)
   const [e2eReady, setE2eReady] = useState(false)
   const [typingPeers, setTypingPeers] = useState<Set<string>>(new Set())
   const [callState, setCallState] = useState<CallState | null>(null)
   const [callSeconds, setCallSeconds] = useState(0)
-  const [callMuted, setCallMuted] = useState(false)
+  const [jitsiRoom, setJitsiRoom] = useState<string | null>(null)
   const callTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Auth + registration UI state hoisted above WS handler (ESLint no-use-before-define)
@@ -567,13 +580,13 @@ export default function App() {
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [changelogSlide, setChangelogSlide] = useState(0)
   const changelogFeatures = [
-    { icon: '🖥', title: 'Remote Control', desc: 'Share your screen and let friends take control — like TeamViewer, but encrypted and built right into Phaze. No extra apps needed.', color: '#7c3aed' },
-    { icon: '👥', title: 'Group Calls', desc: 'Start a group voice or video call with multiple friends at once. Just click the group call button in any chat.', color: '#2563eb' },
-    { icon: '🌐', title: 'Spaces Upgrade', desc: '@mentions with autocomplete, in-channel search, pinned messages, and inline editing. Spaces just got serious.', color: '#059669' },
-    { icon: '🔴', title: 'Live Streaming', desc: 'Go live with your camera or broadcast your screen. Anyone on Phaze can tune in and watch.', color: '#dc2626' },
-    { icon: '🎁', title: 'Invite Friends', desc: 'Share your personal invite link or send branded email invitations. The more friends you bring, the better Phaze gets.', color: '#d97706' },
-    { icon: '📞', title: 'Better Calls', desc: 'Screen sharing in any call, self-hosted TURN server for reliable connections, and improved audio quality.', color: '#0891b2' },
-    { icon: '✨', title: 'Redesigned', desc: 'True-black dark mode, premium glass effects, and a brand-new landing page. Phaze looks like it feels — premium.', color: '#a855f7' },
+    { icon: '🖥', title: 'Remote Control', desc: 'Share your screen and let a friend take over — fully encrypted, no third-party apps.', color: '#7c3aed' },
+    { icon: '👥', title: 'Group Calls', desc: 'Voice or video with multiple people at once. Hit the group call button in any chat.', color: '#2563eb' },
+    { icon: '🌐', title: 'Spaces', desc: '@mentions, in-channel search, pinned messages, and inline message editing.', color: '#059669' },
+    { icon: '🔴', title: 'Live', desc: 'Broadcast your camera or screen. Anyone on Phaze can watch.', color: '#dc2626' },
+    { icon: '🎁', title: 'Invite Links', desc: 'Share your invite link and see who signs up from it.', color: '#d97706' },
+    { icon: '📞', title: 'Calls', desc: 'Screen sharing mid-call, self-hosted TURN relay, better audio.', color: '#0891b2' },
+    { icon: '🎨', title: 'Skype 7 theme', desc: 'Classic blue Skype skin is now the default. Dark and light themes still available.', color: '#a855f7' },
   ]
   const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
   const [theme, setTheme] = useState<'light' | 'dark' | 'skype7'>(() => (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'skype7') || 'skype7')
@@ -609,6 +622,16 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [skypeHistory, setSkypeHistory] = useState<{ sender: string; body: string; sent_at: string }[]>([])
   const skypeHistoryCache = useRef<Record<string, { sender: string; body: string; sent_at: string }[]>>({})
+
+  const [convos, setConvos] = useState<Convo[]>([])
+  const [selectedConvo, setSelectedConvo] = useState<string | null>(null)
+  const [convoLogs, setConvoLogs] = useState<Record<string, ConvoLine[]>>({})
+  const [convoDraft, setConvoDraft] = useState('')
+  const [newGroupOpen, setNewGroupOpen] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupMembers, setNewGroupMembers] = useState<string[]>([])
+  const selectedConvoRef = useRef<string | null>(null)
+  useLayoutEffect(() => { selectedConvoRef.current = selectedConvo }, [selectedConvo])
 
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme)
@@ -665,23 +688,11 @@ export default function App() {
   const selectedRef = useRef<string | null>(null)
   const sendRef = useRef<(m: NexusMessage) => void>(() => {})
   const callStateRef = useRef<CallState | null>(null)
-  const turnRef = useRef<TurnConfig | null>(null)
   const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const outTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // WebRTC refs
   const ringTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ringingAudioRef = useRef<HTMLAudioElement | null>(null)
-  const pcRef = useRef<RTCPeerConnection | null>(null)
-  const localStreamRef = useRef<MediaStream | null>(null)
-  const incomingCallSdpRef = useRef<string | null>(null)
-  const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([])
-  const screenStreamRef = useRef<MediaStream | null>(null)
-  const cameraTrackRef = useRef<MediaStreamTrack | null>(null)
   const ingestDMHistoryRef = useRef<(peer: string, rows: import('./nexusTypes').DMMessage[]) => void>(() => {})
-  const localVideoRef = useRef<HTMLVideoElement>(null)
-  const remoteVideoRef = useRef<HTMLVideoElement>(null)
-  const remoteAudioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
     meRef.current = me
@@ -707,7 +718,6 @@ export default function App() {
     }).catch(() => setSkypeHistory([]))
   }, [selected, me])
   useEffect(() => { callStateRef.current = callState }, [callState])
-  useEffect(() => { turnRef.current = turn }, [turn])
 
   const appendLog = useCallback((from: string, text: string, isMe: boolean, opts?: { id?: string; file?: FileAttachment }) => {
     const id = opts?.id || newMsgId()
@@ -789,8 +799,6 @@ export default function App() {
     return out
   }, [])
 
-  const [sharingScreen, setSharingScreen] = useState(false)
-
   const stopRinger = useCallback(() => {
     if (ringingAudioRef.current) {
       ringingAudioRef.current.pause()
@@ -815,72 +823,10 @@ export default function App() {
     if (callStateRef.current) playPhazeSound('CallEnd.wav')
     if (ringTimerRef.current) { clearTimeout(ringTimerRef.current); ringTimerRef.current = null }
     if (callTimerRef.current) { clearInterval(callTimerRef.current); callTimerRef.current = null }
-    pcRef.current?.close()
-    pcRef.current = null
-    localStreamRef.current?.getTracks().forEach((t) => t.stop())
-    localStreamRef.current = null
-    screenStreamRef.current?.getTracks().forEach((t) => t.stop())
-    screenStreamRef.current = null
-    cameraTrackRef.current = null
-    incomingCallSdpRef.current = null
-    pendingIceCandidatesRef.current = []
-    setSharingScreen(false)
     setCallSeconds(0)
-    setCallMuted(false)
+    setJitsiRoom(null)
     setCallState(null)
   }, [stopRinger])
-
-  const toggleScreenShareRef = useRef<() => void>(() => {})
-  const toggleScreenShare = useCallback(async () => {
-    const pc = pcRef.current
-    if (!pc) return
-
-    if (screenStreamRef.current) {
-      const videoSender = pc.getSenders().find((s) => s.track?.kind === 'video')
-      const cam = cameraTrackRef.current
-      if (videoSender && cam) await videoSender.replaceTrack(cam)
-      else if (videoSender) pc.removeTrack(videoSender)
-      screenStreamRef.current.getTracks().forEach((t) => t.stop())
-      screenStreamRef.current = null
-      if (localVideoRef.current && localStreamRef.current) {
-        localVideoRef.current.srcObject = localStreamRef.current
-      }
-      setSharingScreen(false)
-      return
-    }
-
-    let display: MediaStream
-    try {
-      display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
-    } catch {
-      return
-    }
-    const screenTrack = display.getVideoTracks()[0]
-    if (!screenTrack) return
-
-    const videoSender = pc.getSenders().find((s) => s.track?.kind === 'video')
-    if (videoSender) {
-      cameraTrackRef.current = videoSender.track ?? null
-      await videoSender.replaceTrack(screenTrack)
-    } else {
-      cameraTrackRef.current = null
-      pc.addTrack(screenTrack, display)
-    }
-    screenStreamRef.current = display
-    if (localVideoRef.current) localVideoRef.current.srcObject = display
-    screenTrack.onended = () => { toggleScreenShareRef.current() }
-    setSharingScreen(true)
-  }, [])
-  useEffect(() => { toggleScreenShareRef.current = () => { void toggleScreenShare() } }, [toggleScreenShare])
-
-  const toggleMute = useCallback(() => {
-    const stream = localStreamRef.current
-    if (!stream) return
-    const audio = stream.getAudioTracks()[0]
-    if (!audio) return
-    audio.enabled = !audio.enabled
-    setCallMuted(!audio.enabled)
-  }, [])
 
   const hangUp = useCallback(() => {
     const cs = callStateRef.current
@@ -891,119 +837,27 @@ export default function App() {
     tearDownCall()
   }, [tearDownCall])
 
-  const makePC = useCallback((recipient: string): RTCPeerConnection => {
-    const stunServers: RTCIceServer[] = [
-      { urls: 'stun:stun.l.google.com:19302' },
-    ]
-    const iceServers: RTCIceServer[] = turnRef.current
-      ? [
-          ...stunServers,
-          ...[turnRef.current.url, ...(turnRef.current.urls ?? [])].map(u => ({
-            urls: u, username: turnRef.current!.username, credential: turnRef.current!.password,
-          })),
-        ]
-      : stunServers
-    const pc = new RTCPeerConnection({ iceServers })
-    pc.ontrack = (e) => {
-      const stream = e.streams[0]
-      if (!stream) return
-      if (remoteAudioRef.current) remoteAudioRef.current.srcObject = stream
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream
-    }
-    pc.onicecandidate = (e) => {
-      if (e.candidate) {
-        sendRef.current({ type: 'ice_candidate', recipient, candidate: JSON.stringify(e.candidate) })
-      }
-    }
-    return pc
-  }, [])
 
-  const startCall = useCallback(async (type: 'audio' | 'video') => {
+  const startCall = useCallback((type: 'audio' | 'video') => {
     const recipient = selectedRef.current
     if (!recipient || !meRef.current) return
-    let stream: MediaStream
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: type === 'video' })
-    } catch {
-      setErr('Microphone/camera access denied — click the lock icon in the address bar, reset the permission, and try again.')
-      return
-    }
-    const pc = makePC(recipient)
-    pcRef.current = pc
-    localStreamRef.current = stream
-    stream.getTracks().forEach((t) => pc.addTrack(t, stream))
-    if (localVideoRef.current && type === 'video') localVideoRef.current.srcObject = stream
-    // Prefer Opus codec for high-quality voice
-    if ('getCapabilities' in RTCRtpSender) {
-      const caps = RTCRtpSender.getCapabilities('audio')
-      if (caps) {
-        const opus = caps.codecs.filter(c => c.mimeType === 'audio/opus')
-        const rest = caps.codecs.filter(c => c.mimeType !== 'audio/opus')
-        try {
-          pc.getTransceivers().forEach(t => {
-            if (t.sender.track?.kind === 'audio') t.setCodecPreferences([...opus, ...rest])
-          })
-        } catch { /* not supported */ }
-      }
-    }
-    const offer = await pc.createOffer()
-    await pc.setLocalDescription(offer)
-    sendRef.current({ type: 'call_offer', recipient, sdp: offer.sdp, body: type })
+    sendRef.current({ type: 'call_offer', recipient, body: type })
     setCallState({ peer: recipient, type, status: 'ringing', direction: 'outgoing' })
     startRinger('CallOutgoing.wav')
-    // Ring timeout — auto-hangup after 60 seconds if unanswered
     ringTimerRef.current = setTimeout(() => {
       if (callStateRef.current?.status === 'ringing') {
         hangUp()
         setErr('No answer')
       }
     }, 60000)
-  }, [makePC, hangUp, startRinger])
+  }, [hangUp, startRinger])
 
-  const acceptCall = useCallback(async () => {
+  const acceptCall = useCallback(() => {
     const cs = callStateRef.current
-    const sdp = incomingCallSdpRef.current
-    if (!cs || !sdp) return
+    if (!cs) return
     stopRinger()
-    let stream: MediaStream
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: cs.type === 'video' })
-    } catch {
-      setErr('Microphone/camera access denied — click the lock icon in the address bar, reset the permission, and try again.')
-      hangUp()
-      return
-    }
-    const pc = makePC(cs.peer)
-    pcRef.current = pc
-    localStreamRef.current = stream
-    stream.getTracks().forEach((t) => pc.addTrack(t, stream))
-    if (localVideoRef.current && cs.type === 'video') localVideoRef.current.srcObject = stream
-    // Prefer Opus codec for high-quality voice
-    if ('getCapabilities' in RTCRtpSender) {
-      const caps = RTCRtpSender.getCapabilities('audio')
-      if (caps) {
-        const opus = caps.codecs.filter(c => c.mimeType === 'audio/opus')
-        const rest = caps.codecs.filter(c => c.mimeType !== 'audio/opus')
-        try {
-          pc.getTransceivers().forEach(t => {
-            if (t.sender.track?.kind === 'audio') t.setCodecPreferences([...opus, ...rest])
-          })
-        } catch { /* not supported */ }
-      }
-    }
-    await pc.setRemoteDescription({ type: 'offer', sdp })
-    for (const c of pendingIceCandidatesRef.current) {
-      try { await pc.addIceCandidate(c) } catch { /* stale */ }
-    }
-    pendingIceCandidatesRef.current = []
-    const answer = await pc.createAnswer()
-    await pc.setLocalDescription(answer)
-    sendRef.current({ type: 'call_answer', recipient: cs.peer, sdp: answer.sdp })
-    incomingCallSdpRef.current = null
-    setCallState({ ...cs, status: 'active' })
-    setCallSeconds(0)
-    callTimerRef.current = setInterval(() => setCallSeconds((s) => s + 1), 1000)
-  }, [makePC, hangUp, stopRinger])
+    sendRef.current({ type: 'call_answer', recipient: cs.peer, body: cs.type })
+  }, [stopRinger])
 
   const onMessageRef = useRef<(raw: NexusMessage) => void>(() => {})
 
@@ -1032,7 +886,6 @@ export default function App() {
             const wasLoggedIn = !!meRef.current
             setMe(msg.sender ?? null)
             setErr('')
-            if (msg.turn_config) setTurn(msg.turn_config)
             if (!wasLoggedIn) playPhazeSound('Login.wav')
             sendRef.current({
               type: 'presence',
@@ -1185,6 +1038,70 @@ export default function App() {
           }
           break
 
+        case 'convo_info':
+          if (msg.convo_id) {
+            setConvos((prev) => {
+              if (prev.some((c) => c.id === msg.convo_id)) return prev
+              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [] }]
+            })
+            sendRef.current({ type: 'convo_history', convo_id: msg.convo_id })
+          }
+          break
+
+        case 'convo_created':
+          if (msg.convo_id) {
+            setConvos((prev) => {
+              if (prev.some((c) => c.id === msg.convo_id)) return prev
+              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [] }]
+            })
+            sendRef.current({ type: 'convo_history', convo_id: msg.convo_id })
+            setSelectedConvo(msg.convo_id!)
+            setSelected(null)
+          }
+          break
+
+        case 'convo_msg':
+          if (msg.convo_id && msg.sender && msg.body !== undefined) {
+            const gline: ConvoLine = {
+              id: `${msg.convo_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              sender: msg.sender,
+              body: msg.body,
+              ts: Date.now(),
+              me: msg.sender === meRef.current,
+            }
+            setConvoLogs((prev) => ({
+              ...prev,
+              [msg.convo_id!]: [...(prev[msg.convo_id!] ?? []), gline],
+            }))
+            if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id) {
+              playPhazeSound('MessageReceived.wav')
+            }
+          }
+          break
+
+        case 'convo_history':
+          if (msg.convo_id && msg.dm_history) {
+            const hlines: ConvoLine[] = msg.dm_history.map((h, i) => ({
+              id: `${msg.convo_id}-h-${i}`,
+              sender: h.sender,
+              body: h.body,
+              ts: h.created_at ? new Date(h.created_at).getTime() : Date.now() - (msg.dm_history!.length - i) * 1000,
+              me: h.sender === meRef.current,
+            }))
+            setConvoLogs((prev) => ({ ...prev, [msg.convo_id!]: hlines }))
+          }
+          break
+
+        case 'convo_left':
+          if (msg.convo_id && msg.sender) {
+            setConvos((prev) => prev.map((c) =>
+              c.id === msg.convo_id
+                ? { ...c, members: c.members.filter((m) => m !== msg.sender) }
+                : c
+            ))
+          }
+          break
+
         case 'link_check':
           if (msg.status === 'approved' && msg.qr_token) {
             // Server returned a fresh session token for the linked device.
@@ -1274,8 +1191,7 @@ export default function App() {
           break
 
         case 'call_offer':
-          if (msg.sender && msg.sdp) {
-            incomingCallSdpRef.current = msg.sdp
+          if (msg.sender) {
             setCallState({ peer: msg.sender, type: (msg.body as 'audio' | 'video') || 'audio', status: 'ringing', direction: 'incoming' })
             startRinger('CallIncoming.wav')
             if (Notification.permission === 'granted') {
@@ -1288,25 +1204,15 @@ export default function App() {
           }
           break
 
-        case 'call_answer':
-          if (msg.sdp && pcRef.current && pcRef.current.signalingState === 'have-local-offer') {
+        case 'call_jitsi':
+          if (msg.room_id) {
             stopRinger()
             if (ringTimerRef.current) { clearTimeout(ringTimerRef.current); ringTimerRef.current = null }
-            pcRef.current.setRemoteDescription({ type: 'answer', sdp: msg.sdp }).catch((e: unknown) => setErr('Call setup failed: ' + String(e)))
+            setJitsiRoom(msg.room_id)
             setCallState((prev) => prev ? { ...prev, status: 'active' } : null)
             setCallSeconds(0)
             if (callTimerRef.current) clearInterval(callTimerRef.current)
             callTimerRef.current = setInterval(() => setCallSeconds((s) => s + 1), 1000)
-          }
-          break
-
-        case 'ice_candidate':
-          if (msg.candidate) {
-            if (pcRef.current) {
-              try { void pcRef.current.addIceCandidate(JSON.parse(msg.candidate)) } catch { /* stale candidate */ }
-            } else {
-              pendingIceCandidatesRef.current.push(JSON.parse(msg.candidate) as RTCIceCandidateInit)
-            }
           }
           break
 
@@ -1973,7 +1879,7 @@ export default function App() {
           me={me}
           send={send}
           subscribe={subscribe}
-          turn={turn}
+          turn={null}
           onClose={() => setRemoteOpen(false)}
         />
         </Suspense>
@@ -2110,13 +2016,13 @@ export default function App() {
       {/* ── Call overlay ─────────────────────────────────────────── */}
       {callState && (
         <div className="call-overlay">
-          {/* Always-present audio element so remote audio plays in audio-only calls */}
-          <audio ref={remoteAudioRef} autoPlay style={{ display: 'none' }} />
-          {callState.type === 'video' && (
-            <div className="call-videos">
-              <video ref={remoteVideoRef} autoPlay playsInline className="call-remote" />
-              <video ref={localVideoRef} autoPlay playsInline muted className="call-local" />
-            </div>
+          {callState.status === 'active' && jitsiRoom && (
+            <iframe
+              src={`https://meet.jit.si/${jitsiRoom}`}
+              allow="camera; microphone; display-capture; fullscreen"
+              style={{ width: '100%', flex: 1, border: 'none', minHeight: 0 }}
+              title="Call"
+            />
           )}
           <div className="call-card">
             <div className="call-avatar">{callState.peer[0].toUpperCase()}</div>
@@ -2129,21 +2035,11 @@ export default function App() {
             <div className="call-controls">
               {callState.direction === 'incoming' && callState.status === 'ringing' ? (
                 <>
-                  <button className="call-btn-accept" onClick={() => void acceptCall()}>Accept</button>
+                  <button className="call-btn-accept" onClick={acceptCall}>Accept</button>
                   <button className="call-btn-decline" onClick={hangUp}>Decline</button>
                 </>
               ) : (
-                <>
-                  <button className={`call-btn-mute ${callMuted ? 'active' : ''}`} onClick={toggleMute} title={callMuted ? 'Unmute' : 'Mute'}>
-                    {callMuted ? '🔇 Unmute' : '🎤 Mute'}
-                  </button>
-                  {callState.status === 'active' && (
-                    <button className="call-btn-share" onClick={() => void toggleScreenShare()} title={sharingScreen ? 'Stop sharing' : 'Share screen'}>
-                      {sharingScreen ? '🛑 Stop sharing' : '🖥 Share screen'}
-                    </button>
-                  )}
-                  <button className="call-btn-end" onClick={hangUp}>End call</button>
-                </>
+                <button className="call-btn-end" onClick={hangUp}>End call</button>
               )}
             </div>
           </div>
@@ -2166,7 +2062,7 @@ export default function App() {
       {me && !changelogSeen && !changelogOpen && (
         <div className="wn-banner" onClick={() => setChangelogOpen(true)}>
           <span className="wn-banner-icon">🎉</span>
-          <span className="wn-banner-text"><strong>New features dropped!</strong> Tap to see what's new.</span>
+          <span className="wn-banner-text"><strong>What's new</strong> — tap to see what changed.</span>
           <button type="button" className="wn-banner-dismiss" onClick={(e) => { e.stopPropagation(); setChangelogSeen(true); localStorage.setItem('phaze_changelog_v', '2025-05-25') }}>✕</button>
         </div>
       )}
@@ -2178,7 +2074,7 @@ export default function App() {
             <div className="wn-header">
               <img src={faviconUrl} alt="" className="wn-logo" />
               <h2>What's New</h2>
-              <p>Here's what's been added since your last visit.</p>
+              <p>Here's what changed.</p>
             </div>
             <div className="wn-card" style={{ borderColor: changelogFeatures[changelogSlide].color + '33' }}>
               <div className="wn-card-icon" style={{ background: changelogFeatures[changelogSlide].color + '18', color: changelogFeatures[changelogSlide].color }}>
@@ -2229,7 +2125,7 @@ export default function App() {
             channelName="Group Call"
             send={send}
             subscribe={subscribe}
-            turn={turn}
+            turn={null}
           />
           </Suspense>
           <button
@@ -2276,25 +2172,7 @@ export default function App() {
               <div className="auth-hero">
                 <img src={faviconUrl} alt="Phaze" className="auth-hero-logo" />
                 <h2 className="auth-hero-title">Phaze</h2>
-                <p className="auth-hero-sub">Encrypted chat for everyone. Private by default.</p>
-                <div className="auth-features">
-                  <div className="auth-feature">
-                    <span className="auth-feature-icon">🔒</span>
-                    <span className="auth-feature-label">End-to-end encrypted</span>
-                  </div>
-                  <div className="auth-feature">
-                    <span className="auth-feature-icon">📞</span>
-                    <span className="auth-feature-label">Voice & video calls</span>
-                  </div>
-                  <div className="auth-feature">
-                    <span className="auth-feature-icon">🌐</span>
-                    <span className="auth-feature-label">Public Spaces</span>
-                  </div>
-                  <div className="auth-feature">
-                    <span className="auth-feature-icon">🎙️</span>
-                    <span className="auth-feature-label">Voice messages</span>
-                  </div>
-                </div>
+                <p className="auth-hero-sub">Chat, calls, and spaces. End-to-end encrypted.</p>
               </div>
               <section className="panel">
                 <h2>Sign in to Phaze</h2>
@@ -2382,6 +2260,17 @@ export default function App() {
             <div className={`hub-content ${selected ? 'chat-open' : ''}`}>
               {/* ── Sidebar: search + contacts list ───────────────── */}
               <div className="hub-sidebar">
+                <div className="sidebar-tabs">
+                  <button type="button" title="Home" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}>💬</button>
+                  <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
+                  <button type="button" title="Live" className={view === 'live' ? 'on' : ''} onClick={() => setView('live')}>🔴</button>
+                  <button
+                    type="button"
+                    className="sidebar-tabs-theme"
+                    title={`Theme: ${theme} — click to cycle (dark · light · Skype 7)`}
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'skype7' : 'dark')}
+                  >💙</button>
+                </div>
                 <div className="hub-add-friend">
                   <div className="form">
                     <input
@@ -2427,6 +2316,60 @@ export default function App() {
                           }}
                         >Send request</button>
                         <button type="button" className="add-modal-cancel" onClick={() => setAddOpen(false)}>Close</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── New group dialog ───────────────────────────────── */}
+                {newGroupOpen && (
+                  <div className="add-modal-overlay" onClick={() => setNewGroupOpen(false)}>
+                    <div className="add-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="add-modal-title">New group chat</div>
+                      <input
+                        className="add-modal-input"
+                        placeholder="Group name…"
+                        value={newGroupName}
+                        autoFocus
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Escape') setNewGroupOpen(false) }}
+                      />
+                      <div className="group-member-list">
+                        {Object.keys(friends).length === 0 && (
+                          <p style={{ fontSize: 13, color: '#888', margin: '8px 0' }}>Add contacts first to include them in a group.</p>
+                        )}
+                        {Object.keys(friends).map((f) => (
+                          <label key={f} className="group-member-row">
+                            <input
+                              type="checkbox"
+                              checked={newGroupMembers.includes(f)}
+                              onChange={() => setNewGroupMembers((prev) =>
+                                prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
+                              )}
+                            />
+                            <span className="avatar" style={{ background: avatarColor(f), width: 22, height: 22, fontSize: 11, lineHeight: '22px' }}>{f[0]?.toUpperCase()}</span>
+                            <span>{f}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="add-modal-actions">
+                        <button
+                          type="button"
+                          className="add-modal-send"
+                          disabled={!newGroupName.trim() || newGroupMembers.length === 0}
+                          onClick={() => {
+                            if (!newGroupName.trim() || newGroupMembers.length === 0 || !me) return
+                            const id = `${me}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+                            sendRef.current({
+                              type: 'convo_create',
+                              convo_id: id,
+                              convo_name: newGroupName.trim(),
+                              members: [me, ...newGroupMembers],
+                            })
+                            setNewGroupOpen(false)
+                          }}
+                        >Create</button>
+                        <button type="button" className="add-modal-cancel" onClick={() => setNewGroupOpen(false)}>Cancel</button>
                       </div>
                     </div>
                   </div>
@@ -2493,6 +2436,33 @@ export default function App() {
                       <li className="no-filter-match">No contacts match "{contactFilter}"</li>
                     )}
                   </ul>
+
+                  {/* Group chats section */}
+                  {convos.length > 0 && <div className="sidebar-section-label">Group chats</div>}
+                  <ul className="list">
+                    {convos.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          className={`friend-row ${selectedConvo === c.id ? 'sel' : ''}`}
+                          onClick={() => { setSelectedConvo(c.id); setSelected(null) }}
+                        >
+                          <span className="avatar group-avatar">
+                            {c.name[0]?.toUpperCase()}
+                          </span>
+                          <span className="friend-meta">
+                            <span className="friend-line">
+                              <span className="friend-name">{c.name}</span>
+                            </span>
+                            <span className="friend-line">
+                              <span className="friend-preview">{c.members.length} people</span>
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <button type="button" className="new-group-btn" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>+ New group</button>
                 </div>
                 {/* ── Skype 7 me-bar at sidebar bottom ──────────── */}
                 {me && (
@@ -2903,7 +2873,7 @@ export default function App() {
             <span className="foot-dot" />
             <a href="https://github.com/nickshouse/Phaze" target="_blank" rel="noopener noreferrer">GitHub</a>
           </div>
-          <span className="foot-copy">Phaze — encrypted chat for everyone</span>
+          <span className="foot-copy">Phaze</span>
         </div>
       </footer>
     </div>

@@ -16,6 +16,7 @@ export interface NexusMessage {
   results?: string[]
   sdp?: string
   candidate?: string
+  room_id?: string
   token?: string
   error?: string
   email?: string

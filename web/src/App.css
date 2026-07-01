@@ -691,6 +691,7 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
 .danger-btn:disabled { filter: grayscale(0.6) brightness(1.1); cursor: not-allowed; opacity: 0.65; }
 .danger-btn:active:not(:disabled) { transform: translateY(1px); }
 
+button.link-btn,
 .link-btn {
   background: none;
   border: none;
@@ -703,8 +704,10 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
   box-shadow: none;
   font-weight: 600;
   font-family: inherit;
+  transform: none !important;
 }
-.link-btn:hover { color: var(--brand-hover); text-decoration: underline; }
+button.link-btn:hover,
+.link-btn:hover { color: var(--brand-hover); text-decoration: underline; background: none; }
 
 /* ── Status dots ──────────────────────────────────────────────── */
 .status-dot {
@@ -2817,6 +2820,46 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
 .app.theme-skype7 .floating-nav { display: none !important; }
 .app.theme-skype7 .banner       { margin: 0; border-radius: 0; }
 
+/* ── Sidebar tab row (Skymu-style Contacts/Groups/Recent strip) ──
+   Real Skype 7 chrome has no floating pill nav or glass top bar —
+   Spaces/Live/theme switching move into a flat icon-tab row inline
+   in the sidebar instead, matching the Skymu reference. Hidden on
+   other themes since they use the floating pill nav for this. */
+.sidebar-tabs { display: none; }
+.app.theme-skype7 .sidebar-tabs {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  background: var(--shell);
+  border-bottom: 1px solid #B2C8D8;
+  flex-shrink: 0;
+}
+.app.theme-skype7 .sidebar-tabs button {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  height: 100%;
+  padding: 0 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app.theme-skype7 .sidebar-tabs button:hover { background: rgba(0,0,0,0.04); }
+.app.theme-skype7 .sidebar-tabs button.on {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  font-weight: 700;
+}
+.app.theme-skype7 .sidebar-tabs-theme {
+  margin-left: auto;
+  font-size: 0.8rem !important;
+  opacity: 0.7;
+}
+.app.theme-skype7 .sidebar-tabs-theme:hover { opacity: 1; }
+
 /* ── Full-height layout without top-bar offset ───────────────── */
 .app.theme-skype7 .grid {
   padding-bottom: 0;
@@ -3597,4 +3640,58 @@ code, .mono { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo
 /* ── Auth hero logo: blue tint ───────────────────────────────── */
 .app.theme-skype7 .auth-hero-logo {
   filter: hue-rotate(-75deg) saturate(1.4) brightness(1.05);
+}
+
+/* ── New group button ────────────────────────────────────────── */
+.app.theme-skype7 .new-group-btn {
+  display: block;
+  width: calc(100% - 20px);
+  margin: 6px 10px 8px;
+  background: transparent;
+  border: 1px solid #B2C8D8;
+  border-radius: 4px;
+  color: #0095CC;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 5px 0;
+  cursor: pointer;
+  text-align: center;
+  transition: background 80ms;
+}
+.app.theme-skype7 .new-group-btn:hover {
+  background: rgba(0,149,204,0.08);
+  border-color: #0095CC;
+}
+
+/* ── Link-btn in skype7: plain text link, no purple ────────────── */
+.app.theme-skype7 .link-btn {
+  color: #0095CC;
+  font-size: 0.78rem;
+}
+.app.theme-skype7 .link-btn:hover {
+  color: #00AFF0;
+}
+
+/* ── Auth form buttons: skype-style ───────────────────────────── */
+.app.theme-skype7 .hub-auth .panel button:not(.link-btn) {
+  background: #0095CC;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 20px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 100ms;
+  width: 100%;
+  text-align: center;
+}
+.app.theme-skype7 .hub-auth .panel button:not(.link-btn):hover {
+  background: #00AFF0;
+}
+.app.theme-skype7 .hub-auth .panel button:not(.link-btn):disabled {
+  background: #A0C8E0;
+  cursor: default;
 }

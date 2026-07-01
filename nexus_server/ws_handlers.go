@@ -1449,49 +1449,68 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			s.Mu.RUnlock()
 
-		case "call_offer", "call_answer", "ice_candidate":
+		case "call_offer":
 			if username == "" {
 				continue
 			}
-			// Always authoritative — prevent caller impersonation via spoofed msg.Sender.
 			msg.Sender = username
-			// call_offer requires friendship: prevents ringing strangers as a harassment vector.
-			if msg.Type == "call_offer" && !s.areFriends(username, msg.Recipient) {
+			if !s.areFriends(username, msg.Recipient) {
 				client.Send(NexusMessage{Type: "call_error", Error: "You can only call friends"})
 				continue
 			}
-			log.Printf("Signal [%s] from %s to %s", msg.Type, username, msg.Recipient)
 			s.Mu.Lock()
-			if msg.Type == "call_offer" {
-				if recipientClient, ok := s.Clients[msg.Recipient]; ok && recipientClient.InCall {
-					s.Mu.Unlock()
-					client.Send(NexusMessage{Type: "call_busy", Sender: msg.Recipient})
-					continue
-				}
-			} else if msg.Type == "call_answer" {
-				// Mark both parties as in-call and record the partner so we
-				// can send call_end to the other side if one drops mid-call.
-				if c, ok := s.Clients[username]; ok {
-					c.InCall = true
-					c.CallPartner = msg.Recipient
-				}
-				if c, ok := s.Clients[msg.Recipient]; ok {
-					c.InCall = true
-					c.CallPartner = username
-				}
+			recipientClient, online := s.Clients[msg.Recipient]
+			if online && recipientClient.InCall {
+				s.Mu.Unlock()
+				client.Send(NexusMessage{Type: "call_busy", Sender: msg.Recipient})
+				continue
 			}
-			if recipientClient, ok := s.Clients[msg.Recipient]; ok {
+			roomID, err := randHex(12)
+			if err != nil {
+				s.Mu.Unlock()
+				client.Send(NexusMessage{Type: "call_error", Error: "server error"})
+				continue
+			}
+			roomID = "phaze-" + roomID
+			if callerClient, ok := s.Clients[username]; ok {
+				callerClient.PendingCallRoom = roomID
+			}
+			msg.RoomID = roomID
+			if online {
 				recipientClient.Send(msg)
 			} else {
 				s.Mu.Unlock()
-				client.Send(NexusMessage{
-					Type:  "call_error",
-					Body:  "User is offline",
-					Error: msg.Recipient + " is not available",
-				})
+				client.Send(NexusMessage{Type: "call_error", Error: msg.Recipient + " is not available"})
 				continue
 			}
 			s.Mu.Unlock()
+
+		case "call_answer":
+			if username == "" {
+				continue
+			}
+			msg.Sender = username
+			s.Mu.Lock()
+			var roomID string
+			if callerClient, ok := s.Clients[msg.Recipient]; ok {
+				roomID = callerClient.PendingCallRoom
+				callerClient.PendingCallRoom = ""
+				callerClient.InCall = true
+				callerClient.CallPartner = username
+			}
+			if c, ok := s.Clients[username]; ok {
+				c.InCall = true
+				c.CallPartner = msg.Recipient
+			}
+			jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: msg.Body}
+			if callerClient, ok := s.Clients[msg.Recipient]; ok {
+				callerClient.Send(jitsiMsg)
+			}
+			client.Send(jitsiMsg)
+			s.Mu.Unlock()
+
+		case "ice_candidate":
+			// No-op: WebRTC ICE negotiation replaced by Jitsi.
 
 		case "call_reject", "call_end":
 			if username == "" {

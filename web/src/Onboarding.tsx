@@ -60,7 +60,7 @@ export default function Onboarding({ me, sessionToken, onAddFriend, onJump, onCl
       <div className="onboard-card">
         <header className="onboard-head">
           <h2>Welcome to Phaze, @{me}</h2>
-          <p className="onboard-sub">Three steps. Takes a minute. Skip any.</p>
+          <p className="onboard-sub">Three quick steps — skip anything.</p>
         </header>
 
         <div className="onboard-progress">
@@ -114,8 +114,8 @@ export default function Onboarding({ me, sessionToken, onAddFriend, onJump, onCl
 
         {step === 3 && (
           <section className="onboard-step">
-            <h3>✨ Post your first story</h3>
-            <p className="muted">Share a photo or short video — disappears in 24 hours.</p>
+            <h3>📸 Post a story</h3>
+            <p className="muted">Share a photo or short video — gone after 24 hours.</p>
             <p className="muted small">
               The story ring is at the top of your friends list. Tap the <strong>＋</strong> to upload.
             </p>

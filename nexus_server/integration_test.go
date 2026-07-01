@@ -149,38 +149,32 @@ func TestSmoke_RegisterAuthMessageSignaling(t *testing.T) {
 		t.Fatalf("body mutated in transit: got %q want %q", got.Body, cipherBody)
 	}
 
-	// --- Signaling round-trip (call_offer → call_answer → ice_candidate) ---
+	// --- Signaling round-trip (call_offer → call_answer → call_jitsi room handoff) ---
 	if err := alice.WriteJSON(NexusMessage{
-		Type: "call_offer", Sender: "alice", Recipient: "bob",
-		SDP: "v=0\r\no=alice 0 0 IN IP4 127.0.0.1\r\n",
+		Type: "call_offer", Sender: "alice", Recipient: "bob", Body: "audio",
 	}); err != nil {
 		t.Fatalf("alice send call_offer: %v", err)
 	}
 	offer := readUntil(t, bob, func(m NexusMessage) bool { return m.Type == "call_offer" })
-	if !strings.HasPrefix(offer.SDP, "v=0") {
-		t.Fatalf("call_offer SDP corrupted: %q", offer.SDP)
+	if offer.Sender != "alice" {
+		t.Fatalf("call_offer sender forged: got %q want %q", offer.Sender, "alice")
+	}
+	if !strings.HasPrefix(offer.RoomID, "phaze-") {
+		t.Fatalf("call_offer missing room id: %q", offer.RoomID)
 	}
 
 	if err := bob.WriteJSON(NexusMessage{
 		Type: "call_answer", Sender: "bob", Recipient: "alice",
-		SDP: "v=0\r\no=bob 0 0 IN IP4 127.0.0.1\r\n",
 	}); err != nil {
 		t.Fatalf("bob send call_answer: %v", err)
 	}
-	answer := readUntil(t, alice, func(m NexusMessage) bool { return m.Type == "call_answer" })
-	if !strings.HasPrefix(answer.SDP, "v=0") {
-		t.Fatalf("call_answer SDP corrupted: %q", answer.SDP)
+	aliceJitsi := readUntil(t, alice, func(m NexusMessage) bool { return m.Type == "call_jitsi" })
+	bobJitsi := readUntil(t, bob, func(m NexusMessage) bool { return m.Type == "call_jitsi" })
+	if aliceJitsi.RoomID != offer.RoomID {
+		t.Fatalf("call_jitsi room mismatch for alice: got %q want %q", aliceJitsi.RoomID, offer.RoomID)
 	}
-
-	if err := alice.WriteJSON(NexusMessage{
-		Type: "ice_candidate", Sender: "alice", Recipient: "bob",
-		Candidate: "candidate:1 1 UDP 2130706431 127.0.0.1 54321 typ host",
-	}); err != nil {
-		t.Fatalf("alice send ice_candidate: %v", err)
-	}
-	cand := readUntil(t, bob, func(m NexusMessage) bool { return m.Type == "ice_candidate" })
-	if !strings.Contains(cand.Candidate, "127.0.0.1") {
-		t.Fatalf("ice_candidate corrupted: %q", cand.Candidate)
+	if bobJitsi.RoomID != offer.RoomID {
+		t.Fatalf("call_jitsi room mismatch for bob: got %q want %q", bobJitsi.RoomID, offer.RoomID)
 	}
 }
 
