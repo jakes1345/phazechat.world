@@ -49,8 +49,10 @@ fun ChatScreen(
     onDelete: (String) -> Unit = {},
     onReact: (String, String) -> Unit = { _, _ -> },
     canSend: Boolean = true,
+    skype7: Boolean = false,
 ) {
     var draft by remember { mutableStateOf("") }
+    var pickerOpen by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
@@ -139,11 +141,14 @@ fun ChatScreen(
         },
         bottomBar = {
             Surface(tonalElevation = 2.dp) {
+                Column(Modifier.imePadding()) {
+                if (pickerOpen) {
+                    EmoticonPickerPanel(onPick = { draft += "$it "; pickerOpen = false })
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp)
-                        .imePadding(),
+                        .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (onAttachFile != null) {
@@ -156,6 +161,9 @@ fun ChatScreen(
                             Text("🎙", fontSize = 18.sp)
                         }
                     }
+                    IconButton(onClick = { pickerOpen = !pickerOpen }, modifier = Modifier.size(40.dp)) {
+                        EmoticonGlyph("smile", 22.dp)
+                    }
                     OutlinedTextField(
                         value = draft,
                         onValueChange = { draft = it; onTyping() },
@@ -166,20 +174,32 @@ fun ChatScreen(
                         shape = RoundedCornerShape(24.dp),
                     )
                     Spacer(Modifier.width(8.dp))
-                    FilledIconButton(
-                        onClick = {
-                            if (draft.isNotBlank() && canSend) {
-                                onSend(draft.trim())
-                                draft = ""
-                                scope.launch {
-                                    if (messages.isNotEmpty()) listState.animateScrollToItem(0)
-                                }
+                    val doSend = {
+                        if (draft.isNotBlank() && canSend) {
+                            onSend(draft.trim())
+                            draft = ""
+                            scope.launch {
+                                if (messages.isNotEmpty()) listState.animateScrollToItem(0)
                             }
-                        },
-                        enabled = draft.isNotBlank() && canSend,
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.Send, "Send")
+                        }
                     }
+                    if (skype7) {
+                        Button(
+                            onClick = { doSend() },
+                            enabled = draft.isNotBlank() && canSend,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00AFF0)),
+                        ) {
+                            Text("Send message", fontSize = 13.sp)
+                        }
+                    } else {
+                        FilledIconButton(
+                            onClick = { doSend() },
+                            enabled = draft.isNotBlank() && canSend,
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Send, "Send")
+                        }
+                    }
+                }
                 }
             }
         },
@@ -288,7 +308,7 @@ fun MessageBubble(
                             }
                         }
                     } else {
-                        Text(line.text, color = textColor, fontSize = 15.sp, lineHeight = 20.sp)
+                        EmoticonText(line.text, color = textColor, fontSize = 15.sp, lineHeight = 20.sp)
                     }
                     if (line.edited) {
                         Text("edited", color = textColor.copy(alpha = 0.6f), fontSize = 10.sp, fontStyle = FontStyle.Italic)

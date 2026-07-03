@@ -85,6 +85,8 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
+    val themePack by vm.theme.collectAsState()
+    val skype7Shell = themePack == "skype7"
     val me by vm.me.collectAsState()
     val authError by vm.authError.collectAsState()
     val pendingVerification by vm.pendingVerification.collectAsState()
@@ -416,7 +418,7 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                 onBack = { stopVoiceRecord(false); vm.selectChat("") },
                 onSend = { vm.sendMessage(it) },
                 onCall = { requestCallWithPermission(peer) },
-                canSend = isConnected,
+                canSend = isConnected, skype7 = skype7Shell,
             )
             VoiceRecordingOverlay(
                 onSend = { stopVoiceRecord(true) },
@@ -438,15 +440,13 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                 onEdit = { id, text -> vm.editMessage(id, text) },
                 onDelete = { id -> vm.deleteMessage(id) },
                 onReact = { id, emoji -> vm.reactMessage(id, emoji) },
-                canSend = isConnected,
+                canSend = isConnected, skype7 = skype7Shell,
             )
         }
         return
     }
 
     var page by remember { mutableStateOf("chats") }
-    val themePack by vm.theme.collectAsState()
-    val skype7Shell = themePack == "skype7"
     var showStatusSheet by remember { mutableStateOf(false) }
     var showMoodDialog by remember { mutableStateOf(false) }
     val myStatusNow by vm.myStatus.collectAsState()

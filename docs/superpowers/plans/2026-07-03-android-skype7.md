@@ -623,7 +623,7 @@ git commit -m "feat: contacts tab, date bands and presence on recent rows"
 - Consumes: `EMOTICONS`, `tokenize` (Task 2).
 - Produces: `@Composable fun EmoticonText(text: String, modifier: Modifier = Modifier)`; `@Composable fun EmoticonPickerPanel(onPick: (String) -> Unit)`.
 
-- [ ] **Step 1: EmoticonUi.kt**
+- [x] **Step 1: EmoticonUi.kt**
 
 ```kotlin
 // android/app/src/main/java/world/phazechat/app/ui/EmoticonUi.kt
@@ -775,13 +775,13 @@ fun EmoticonPickerPanel(onPick: (String) -> Unit) {
 }
 ```
 
-- [ ] **Step 2: Wire ChatScreen**
+- [x] **Step 2: Wire ChatScreen**
 
 1. Message bubbles: find where message body text renders (grep `Text(` around the bubble composable) and replace the plain `Text(body)` with `EmoticonText(body)` — only for the display path; input and wire stay plain.
 2. Compose bar (~:150): add a smiley `IconButton` (drawn `EmoticonGlyph("smile", 22.dp)`) toggling `var pickerOpen`; when open render `EmoticonPickerPanel(onPick = { draft += "$it " ; pickerOpen = false })` above the input row.
 3. Send button: when `theme == "skype7"` (pass `theme: String` into ChatScreen or read from a CompositionLocal — follow how Theme.kt currently exposes it; a plain parameter matching existing style is fine) render a blue pill `Button(colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00AFF0))) { Text("Send message", fontSize = 13.sp) }` instead of the arrow `Icon`.
 
-- [ ] **Step 3: Build, test, commit**
+- [x] **Step 3: Build, test, commit**
 
 Run: `cd android && ./gradlew assembleDebug testDebugUnitTest` — Expected: green.
 
