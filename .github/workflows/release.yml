@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'beta*'
+  release:
+    types: [published, prereleased]
+
+permissions:
+  contents: write
+
+jobs:
+  # Android (Kotlin/Compose) — the Google Play client. Builds a signed APK
+  # (uploaded as Phaze.apk for the website's stable URL) and a release AAB
+  # (for Play Store upload).
+  android:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Write google-services.json from secret
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Write keystore from secret
+        run: echo '${{ secrets.ANDROID_KEYSTORE_B64 }}' | base64 -d > android/app/phaze-release.keystore
+
+      - name: Write local.properties (SDK path + signing secrets)
+        run: |
+          cat > android/local.properties <<EOF
+          sdk.dir=$ANDROID_SDK_ROOT
+          KEYSTORE_PATH=app/phaze-release.keystore
+          KEYSTORE_PASS=${{ secrets.ANDROID_KEYSTORE_PASS }}
+          KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS=${{ secrets.ANDROID_KEY_PASS }}
+          EOF
+
+      - name: Build signed APK + AAB
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../Phaze.apk
+          cp app/build/outputs/bundle/release/app-release.aab ../Phaze.aab
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release upload "$TAG" Phaze.apk Phaze.aab --clobber
+
+  # Windows desktop — Wails app with WebView2, packaged as an NSIS installer.
+  # The installer is what gets submitted to winget.
+  desktop-windows:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install NSIS
+        run: choco install nsis --yes
+
+      - name: Build web frontend
+        working-directory: web
+        env:
+          VITE_BASE: /
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy dist to desktop
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force desktop/dist -ErrorAction SilentlyContinue
+          Copy-Item -Recurse web/dist desktop/dist
+
+      - name: Build Wails Windows installer
+        working-directory: desktop
+        run: wails build -platform windows/amd64 -nsis
+
+      - name: Find and upload installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $TAG = $env:GITHUB_REF -replace 'refs/tags/', ''
+          $installer = Get-ChildItem desktop/build/bin -Recurse -Include "*.exe","*.nsis" | Select-Object -First 1
+          if ($installer) {
+            Copy-Item $installer.FullName Phaze-windows-setup.exe
+          } else {
+            Copy-Item desktop/build/bin/Phaze.exe Phaze-windows-setup.exe
+          }
+          gh release upload $TAG Phaze-windows-setup.exe --clobber
+
+  # Linux desktop — Wails app using WebKit2GTK 4.1.
+  desktop-linux:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build desktop app
+        working-directory: desktop
+        run: bash build.sh
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          cp desktop/build/bin/Phaze Phaze-linux-amd64
+          gh release upload "$TAG" Phaze-linux-amd64 --clobber
+          # Also update the stable download URL used by the website
+          cp Phaze-linux-amd64 nexus_server/public/downloads/Phaze.linux || true

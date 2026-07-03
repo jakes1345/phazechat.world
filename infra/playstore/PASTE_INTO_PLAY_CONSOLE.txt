@@ -1,0 +1,102 @@
+=====================================================
+PLAY CONSOLE — COPY-PASTE CHEAT SHEET
+=====================================================
+
+STEP 1: Create a new release (Production or Closed testing).
+
+STEP 2: Upload bin/Phaze-v1.4.0-release.aab (versionCode 17, ~27 MB)
+
+STEP 3: Fill in these fields:
+
+-----------------------------------------------------
+RELEASE NAME:
+-----------------------------------------------------
+1.4.0 (17)
+
+-----------------------------------------------------
+RELEASE NOTES (paste inside the <en-US> tags):
+-----------------------------------------------------
+Welcome to Phaze — private, encrypted chat & calls.
+
+• End-to-end encrypted messaging (NaCl/libsodium)
+• Voice & video calls + screen sharing (WebRTC)
+• Spaces — group channels, now with public Discover
+• Themes: Dark, Light & classic "Skype 7" — plus snowflakes
+• Stories, file sharing, voice messages
+• Two-factor auth (TOTP), QR device linking, encrypted key backup
+• Push notifications
+
+No ads. No tracking. Your messages stay yours.
+
+-----------------------------------------------------
+⚠ REVIEWER TEST ACCOUNT (App access page — REQUIRED)
+-----------------------------------------------------
+The app is login-gated, so Google's reviewer needs working credentials
+or it gets rejected. Create a verified account, then under
+"App access" → "All or some functionality is restricted" add:
+  Username: <your test account>
+  Password: <your test password>
+Instructions: "All functionality is available after signing in with
+the provided account. Email verification is already completed for this
+reviewer account."
+
+-----------------------------------------------------
+IF IT ASKS ABOUT READ_MEDIA_IMAGES / READ_MEDIA_VIDEO:
+-----------------------------------------------------
+Users pick images/videos from their gallery to send as encrypted
+attachments and to post Stories — only on explicit user action via the
+attachment button. (These are also declared tools:node="remove"; if the
+final build doesn't request them, this prompt won't appear.)
+
+-----------------------------------------------------
+IF IT ASKS ABOUT FOREGROUND SERVICE / MEDIA PROJECTION:
+-----------------------------------------------------
+Use case: SCREEN SHARING during an active video call.
+FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION starts only after the user taps
+"Share screen" in a call AND grants the system screen-capture prompt. It
+stops when sharing ends or the call ends. No background/silent capture.
+
+CAMERA — video calls + the QR-code device-linking scanner.
+RECORD_AUDIO — voice/video calls + voice messages.
+
+=====================================================
+STORE LISTING (separate page)
+=====================================================
+
+-----------------------------------------------------
+SHORT DESCRIPTION (80 char max):
+-----------------------------------------------------
+Encrypted, private messaging and voice calls — your keys, your conversations.
+
+-----------------------------------------------------
+FULL DESCRIPTION:
+-----------------------------------------------------
+Phaze is an end-to-end encrypted messenger built for privacy-first communication. Your messages are encrypted on your device using NaCl (libsodium) box encryption before they ever leave your phone — even we can't read them.
+
+🔐 TRUE END-TO-END ENCRYPTION
+• NaCl public-key encryption for all direct messages
+• Cryptographic key fingerprints you can verify with contacts
+• Optional encrypted key backup protected by a PIN only you know
+• No ads. No tracking. No data mining.
+
+💬 EVERYTHING YOU NEED
+• 1-on-1 encrypted chat with file and voice message support
+• Voice and video calls + screen sharing over WebRTC
+• Spaces — group channels with a public Discover directory
+• Stories — share photos and short videos with your contacts
+• Themes — Dark, Light, and a classic "Skype 7" look (plus snowflakes)
+• Two-factor authentication (TOTP) for extra account security
+• QR code device linking — sign in on a new device without a password
+
+📱 BUILT FOR ANDROID
+• Clean, modern Material design
+• Push notifications via Firebase so you never miss a message
+• Works great on Android 8.0 and above
+• Prefer your browser? Phaze also runs as a full web app at phazechat.world — on any phone, tablet, or computer
+
+🌐 OPEN & INDEPENDENT
+• Open-source on GitHub
+• Self-hostable — run your own Phaze relay server
+• No vendor lock-in; your data stays under your control
+
+Phaze is currently in beta. Core features are fully functional. Feedback welcome via GitHub Issues.

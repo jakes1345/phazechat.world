@@ -1,0 +1,54 @@
+Categories:
+  - Internet
+  - Connectivity
+
+License: MIT
+
+AuthorName: jakes1345
+SourceCode: https://github.com/jakes1345/skype7-reborn
+IssueTracker: https://github.com/jakes1345/skype7-reborn/issues
+Changelog: https://github.com/jakes1345/skype7-reborn/releases
+
+AutoName: Phaze
+
+Description: |-
+  Phaze is an encrypted messaging app built as a Skype replacement.
+
+  Messages are end-to-end encrypted on your device before they're sent — the
+  server stores ciphertext and cannot read them. Voice and video calls use
+  WebRTC peer-to-peer with TURN fallback so they work behind NAT.
+
+  Features:
+  * End-to-end encrypted direct messages (NaCl/libsodium)
+  * Voice and video calls with screen share
+  * Group Spaces — text channels and voice rooms
+  * Stories (24h photo/video posts)
+  * File sharing up to 25MB
+  * Push notifications
+  * Cross-device sync with a Recovery PIN
+  * Skype history import — upload your Skype export zip and messages appear in your DMs
+  * 2FA / TOTP support
+  * No ads, no tracking, no phone number required
+
+  The server is open source and self-hostable with one Docker command. You
+  don't have to trust phazechat.world — run your own relay.
+
+AntiFeatures:
+  NonFreeNet:
+    - Uses Firebase Cloud Messaging (FCM) for push notifications
+
+RepoType: git
+Repo: https://github.com/jakes1345/skype7-reborn
+
+Builds:
+  - versionName: '1.6.0'
+    versionCode: 29
+    commit: v1.6.0
+    subdir: android
+    gradle:
+      - release
+    prebuild: cp app/phaze-release.keystore.example app/phaze-release.keystore ||
+      true
+
+CurrentVersion: '1.6.0'
+CurrentVersionCode: 29
