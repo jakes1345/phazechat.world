@@ -96,14 +96,14 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				Sender:     username,
 				TurnConfig: s.generateMediaToken(username),
 			})
-			s.broadcastPresence(username, "Online")
+			s.announcePresence(username)
 			s.deliverOfflineMessages(username)
 			friends := s.getFriends(username)
 			for _, f := range friends {
 				status := "Offline"
 				s.Mu.RLock()
 				if c, ok := s.Clients[f]; ok {
-					status = c.Status
+					status = publicStatus(c.Status)
 				}
 				s.Mu.RUnlock()
 				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status})
@@ -269,12 +269,18 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 
 		case "status_update":
+			if !validStatus(msg.Body) {
+				client.Send(NexusMessage{Type: "status_result", Error: "Unknown status"})
+				continue
+			}
+			s.DB.Exec("UPDATE users SET status = ? WHERE username = ?", msg.Body, username)
 			s.Mu.Lock()
-			if client, ok := s.Clients[username]; ok {
-				client.Status = msg.Body
-				log.Printf("User %s changed status to %s", username, msg.Body)
+			if c, ok := s.Clients[username]; ok {
+				c.Status = msg.Body
 			}
 			s.Mu.Unlock()
+			log.Printf("User %s changed status to %s", username, msg.Body)
+			client.Send(NexusMessage{Type: "status_result", Status: msg.Body})
 			s.broadcastPresence(username, msg.Body)
 
 		case "request_phone_link":
@@ -414,7 +420,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				TurnConfig: s.generateMediaToken(username),
 			})
 
-			s.broadcastPresence(username, "Online")
+			s.announcePresence(username)
 			s.deliverOfflineMessages(username)
 
 			pending := s.getPendingRequests(username)
@@ -432,7 +438,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				status := "Offline"
 				s.Mu.RLock()
 				if c, ok := s.Clients[f]; ok {
-					status = c.Status
+					status = publicStatus(c.Status)
 				}
 				s.Mu.RUnlock()
 				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status})
@@ -498,7 +504,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				QRToken:    msg.QRToken,
 				TurnConfig: s.generateMediaToken(username),
 			})
-			s.broadcastPresence(username, "Online")
+			s.announcePresence(username)
 			s.deliverOfflineMessages(username)
 
 			// same as the auth path below
@@ -506,7 +512,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				status := "Offline"
 				s.Mu.RLock()
 				if c, ok := s.Clients[f]; ok {
-					status = c.Status
+					status = publicStatus(c.Status)
 				}
 				s.Mu.RUnlock()
 				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status})
@@ -773,7 +779,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				QRToken:    sess,
 				TurnConfig: s.generateMediaToken(username),
 			})
-			s.broadcastPresence(username, "Online")
+			s.announcePresence(username)
 			s.deliverOfflineMessages(username)
 
 		case "msg":

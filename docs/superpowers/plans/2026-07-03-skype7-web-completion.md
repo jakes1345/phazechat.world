@@ -48,7 +48,7 @@
 - Consumes: existing `broadcastPresence`, `Client.Status`, users table.
 - Produces: `validStatus(s string) bool` and `publicStatus(s string) string` in `presence.go`. WS contract: client sends `{type:"status_update", body:"Away"}`; friends receive `{type:"presence", sender, status}` where `Invisible` is always masked to `"Offline"`. Status survives reconnect via `users.status`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```go
 // nexus_server/presence_test.go
@@ -82,12 +82,12 @@ func TestPublicStatus(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 Run: `cd nexus_server && go test -run 'TestValidStatus|TestPublicStatus' ./...`
 Expected: FAIL — `undefined: validStatus`
 
-- [ ] **Step 3: Implement presence.go**
+- [x] **Step 3: Implement presence.go**
 
 ```go
 // nexus_server/presence.go
@@ -119,12 +119,12 @@ func publicStatus(s string) string {
 }
 ```
 
-- [ ] **Step 4: Tests pass**
+- [x] **Step 4: Tests pass**
 
 Run: `cd nexus_server && go test -run 'TestValidStatus|TestPublicStatus' ./...`
 Expected: PASS
 
-- [ ] **Step 5: Wire into server**
+- [x] **Step 5: Wire into server**
 
 1. Migration: append to the `ALTER TABLE users ADD COLUMN` list in main.go (~614):
    ```go
@@ -159,13 +159,13 @@ Expected: PASS
    If the same block repeats at all four sites, extract it as `func (s *NexusServer) announcePresence(username string)` in presence.go and call that.
 5. Initial friend statuses: `grep -n '"Online"\|"Offline"' nexus_server/ws_handlers.go nexus_server/main.go | grep -iv broadcast` — find where the friend list with per-friend status is sent on login (the web reads `msg.status` per friend). Wherever a friend's live status is read from `s.Clients[friend].Status`, wrap it in `publicStatus(...)`.
 
-- [ ] **Step 6: Full server tests + manual check**
+- [x] **Step 6: Full server tests + manual check**
 
 Run: `cd nexus_server && go test ./...`
 Expected: PASS (pre-existing suite untouched).
 Manual: start the server, connect two friended users in two browser tabs, set one to `Invisible` via devtools WS send `{"type":"status_update","body":"Invisible"}` — the other tab's `friends` entry must read `Offline`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add nexus_server/presence.go nexus_server/presence_test.go nexus_server/main.go nexus_server/ws_handlers.go

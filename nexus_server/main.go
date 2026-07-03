@@ -636,6 +636,9 @@ func (s *NexusServer) initDB() {
 		`ALTER TABLE users ADD COLUMN last_login_at DATETIME`,
 		`ALTER TABLE users ADD COLUMN signup_ip TEXT DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN phone_verification_code TEXT`,
+		// Presence: the status the user picked (Online/Away/Do Not Disturb/
+		// Invisible). Friends only ever see it through publicStatus().
+		`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Online'`,
 		// Supporters: a `supporter` flag (with the date it was granted) plus a
 		// queue of opt-in requests captured by the public support form. The
 		// admin matches a request against the actual Buy Me a Coffee payment
@@ -1726,7 +1729,7 @@ func (s *NexusServer) broadcastPresence(username, status string) {
 			client.Send(NexusMessage{
 				Type:      "presence",
 				Sender:    username,
-				Status:    status,
+				Status:    publicStatus(status),
 				Supporter: supporter,
 			})
 		}
