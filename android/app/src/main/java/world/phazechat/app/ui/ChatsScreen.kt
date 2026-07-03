@@ -261,7 +261,7 @@ fun Avatar(name: String, size: Int, status: String? = null) {
                 fontSize = (size / 2.6f).sp,
             )
         }
-        if (status == "Online") {
+        if (status != null && status != "Offline") {
             Box(
                 modifier = Modifier
                     .size(13.dp)
@@ -269,12 +269,7 @@ fun Avatar(name: String, size: Int, status: String? = null) {
                     .background(Color.White),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF019A00))
-                )
+                PresenceBadge(status, 10.dp)
             }
         }
     }

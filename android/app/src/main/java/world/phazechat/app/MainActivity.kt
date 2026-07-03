@@ -468,7 +468,7 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                     onSearch = { vm.searchUsers(it) },
                     onClearSearch = { vm.clearSearch() },
                 )
-                "contacts" -> ContactsPlaceholder()
+                "contacts" -> ContactsTab(friends = friends, onOpen = { vm.selectChat(it) })
                 "spaces" -> {
                     val discoverList by vm.discoverSpaces.collectAsState()
                     SpacesScreen(
@@ -602,14 +602,6 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         ) { padding ->
             Box(modifier = Modifier.padding(padding)) { pageContent() }
         }
-    }
-}
-
-/** Until the real contacts list lands, the tab shows a quiet placeholder. */
-@Composable
-private fun ContactsPlaceholder() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Contacts", color = MaterialTheme.colorScheme.outline)
     }
 }
 

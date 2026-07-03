@@ -508,7 +508,7 @@ git commit -m "feat: classic blue header and tab strip replace bottom nav under 
 - Consumes: `friends: Map<String, FriendInfo>` (`FriendInfo(username, status, mood, supporter)`), `PresenceBadge`, chat-open callback `onSelectChat(String)`.
 - Produces: `@Composable fun ContactsTab(friends: Map<String, FriendInfo>, onOpen: (String) -> Unit)`.
 
-- [ ] **Step 1: ContactsTab**
+- [x] **Step 1: ContactsTab**
 
 ```kotlin
 // android/app/src/main/java/world/phazechat/app/ui/ContactsTab.kt
@@ -570,7 +570,7 @@ fun ContactsTab(friends: Map<String, FriendInfo>, onOpen: (String) -> Unit) {
 
 (If `FriendInfo` lives in `PhazeViewModel.kt` without its own import path, import from `world.phazechat.app.data` as declared — grep the actual package line first.)
 
-- [ ] **Step 2: Recent bands + presence in ChatsScreen**
+- [x] **Step 2: Recent bands + presence in ChatsScreen**
 
 In the friends list rendering: sort rows by last-message time if a timestamp is available on the row model (grep ChatsScreen for how rows order today; if there is no timestamp, group all under one `Today` band — bands only appear when real data exists, do not fake times). Insert a band header composable when the day-bucket changes:
 
@@ -600,7 +600,7 @@ private fun dayLabel(ts: Long): String {
 
 Each row also gets `PresenceBadge(info.status)` on the avatar corner (or leading the row, matching current row layout) and the mood as a subtitle when present.
 
-- [ ] **Step 3: Wire ContactsTab in MainActivity, build, commit**
+- [x] **Step 3: Wire ContactsTab in MainActivity, build, commit**
 
 Replace the Task 4 placeholder: `1 -> ContactsTab(friends = friends, onOpen = { vm.selectChat(it) })`.
 
