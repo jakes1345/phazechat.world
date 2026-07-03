@@ -1143,16 +1143,21 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			// Directed key handoff (native_client replies to key_request with a
-			// presence carrying public_key + recipient = requester).
-			if msg.Recipient != "" && len(msg.PublicKey) == 32 && s.areFriends(username, msg.Recipient) {
-				msg.Sender = username
-				s.Mu.RLock()
-				if peer, ok := s.Clients[msg.Recipient]; ok {
-					if err := peer.Send(msg); err != nil {
-						log.Printf("[presence] key forward to %s: %v", msg.Recipient, err)
+			// presence carrying public_key + recipient = requester). It's not a
+			// status announcement — treating it as one used to reset a user's
+			// Away/DND back to whatever the key reply claimed.
+			if msg.Recipient != "" {
+				if len(msg.PublicKey) == 32 && s.areFriends(username, msg.Recipient) {
+					msg.Sender = username
+					s.Mu.RLock()
+					if peer, ok := s.Clients[msg.Recipient]; ok {
+						if err := peer.Send(msg); err != nil {
+							log.Printf("[presence] key forward to %s: %v", msg.Recipient, err)
+						}
 					}
+					s.Mu.RUnlock()
 				}
-				s.Mu.RUnlock()
+				continue
 			}
 			log.Printf("User %s is now %s", username, msg.Status)
 			s.Mu.Lock()
