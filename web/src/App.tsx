@@ -1099,7 +1099,9 @@ export default function App() {
                   type: 'presence',
                   sender: my,
                   recipient: msg.sender,
-                  status: 'Online',
+                  // Report the real status — a key reply claiming "Online"
+                  // used to walk back Away/DND on the peer's screen.
+                  status: announcedStatusRef.current ?? 'Online',
                   public_key: encodePublicKeyB64(keysRef.current.publicKey),
                   key_fingerprint: fp,
                 })
@@ -1463,6 +1465,13 @@ export default function App() {
     w.onerror = () => {}
 
     return () => {
+      // Detach handlers before closing: a cleanup-initiated close must not
+      // schedule another retry, or every deliberate reconnect (e.g. the
+      // post-login cookie refresh) locks the client into closing a healthy
+      // socket once a second forever.
+      w.onclose = null
+      w.onmessage = null
+      w.onerror = null
       w.close()
       wsRef.current = null
     }
