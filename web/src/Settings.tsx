@@ -889,6 +889,11 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
               >
                 Erase my account
               </button>
+
+              <hr className="settings-divider" />
+              <p className="settings-label" style={{ fontSize: 11, opacity: 0.7 }}>
+                Emoticon art drawn in-house. Fallback emoji rendered by your system font.
+              </p>
             </div>
           )}
         </div>

@@ -662,7 +662,7 @@ git commit -m "feat: emoticon picker, send message pill, emoticons render in cha
 **Interfaces:**
 - Consumes/Produces: `<Emoticon id={string} />` signature unchanged — no caller edits.
 
-- [ ] **Step 1: Draw the classics as animated inline SVGs**
+- [x] **Step 1: Draw the classics as animated inline SVGs**
 
 Replace the glyph map with hand-drawn SVG components for all 20 ids in `EMOTICONS`. House style — 20×20 viewBox, `#FFD764` face circle with `#B98A00` 1px stroke, dark `#5B4300` features, one CSS animation class each. Example for two; draw the rest in the same voice:
 
@@ -706,7 +706,7 @@ export function Emoticon({ id }: { id: string }) {
 }
 ```
 
-- [ ] **Step 2: Animations in App.css**
+- [x] **Step 2: Animations in App.css**
 
 ```css
 .emoticon .emo { width: 20px; height: 20px; vertical-align: -4px; }
@@ -724,11 +724,11 @@ Give each animated id one small keyframe in the same spirit (heart pulses `scale
 @media (prefers-reduced-motion: reduce) { .emoticon * { animation: none !important; } }
 ```
 
-- [ ] **Step 3: Credit line in Settings → About**
+- [x] **Step 3: Credit line in Settings → About**
 
 `grep -n -i 'about\|version' web/src/Settings.tsx` — in the About block add: `Emoticon art drawn in-house. Fallback emoji rendered by your system font.` (No third-party art shipped means no license text needed; if any Twemoji SVG does get bundled later, this line must instead carry `Twemoji — CC-BY 4.0`.)
 
-- [ ] **Step 4: Verify + commit**
+- [x] **Step 4: Verify + commit**
 
 Run: `cd web && npx vitest run && npm run build` — Expected: green.
 Manual: all 20 picker cells show drawn faces (no unicode glyphs); wave waves, heart pulses; OS reduced-motion setting freezes them.
