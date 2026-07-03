@@ -3504,15 +3504,22 @@ button.link-btn:hover,
 .emo-arms { transform-origin: 10px 14px; animation: emo-squeeze 1.6s ease-in-out infinite; }
 @keyframes emo-squeeze { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.92); } }
 @media (prefers-reduced-motion: reduce) { .emoticon * { animation: none !important; } }
-.send-pill {
+.send-pill,
+.app.theme-skype7 .send-pill {
   background: var(--brand, #00aff0);
   color: #fff;
-  font-size: 13px;
+  font-size: 13px !important;
   border: none;
   border-radius: 999px;
   padding: 6px 16px;
   cursor: pointer;
   white-space: nowrap;
+  /* The default send button is a fixed-size circle; the pill must be
+     allowed to size to its label or it clips to "mes…". */
+  width: auto !important;
+  min-width: 0 !important;
+  height: auto !important;
+  flex: 0 0 auto;
 }
 .send-pill:hover { background: var(--brand-hover, #0095cc); }
 .app.theme-skype7 .hub-me-settings {
