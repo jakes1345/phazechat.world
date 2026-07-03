@@ -359,7 +359,7 @@ git commit -m "feat: presence badge + status picker sheet, dnd drops notificatio
 - Consumes: `vm.theme`, `vm.me`, `vm.myStatus`, `vm.myMood` (Task 1), `PresenceBadge`, `StatusPickerSheet` (Task 3).
 - Produces: `@Composable fun Skype7Header(me: String, status: String, mood: String, onStatusClick: () -> Unit, onMoodClick: () -> Unit, onSettings: () -> Unit)`; `@Composable fun Skype7Tabs(selected: Int, onSelect: (Int) -> Unit)` — tab indices: 0 Recent, 1 Contacts, 2 Spaces. Task 5 renders tab content.
 
-- [ ] **Step 1: Skype7Chrome.kt**
+- [x] **Step 1: Skype7Chrome.kt**
 
 ```kotlin
 // android/app/src/main/java/world/phazechat/app/ui/Skype7Chrome.kt
@@ -483,11 +483,11 @@ private fun TabIcon(id: String, active: Boolean) {
 }
 ```
 
-- [ ] **Step 2: Swap the shell in MainActivity**
+- [x] **Step 2: Swap the shell in MainActivity**
 
 At the Scaffold (~:447): when `theme == "skype7"`, drop `bottomBar` and render header + tabs above the content; keep the existing `NavigationBar` Scaffold for other themes. Tab mapping: 0 Recent → existing `ChatsScreen`, 1 Contacts → `ContactsTab` placeholder (`Text("Contacts")` until Task 5), 2 Spaces → existing `SpacesScreen`. Settings opens as it does today from its previous tab — route the header gear to the same destination (grep how `tab == 2` rendered `SettingsScreen` and reuse: keep a `showSettings` boolean that overlays `SettingsScreen`). Wire `StatusPickerSheet` visibility to a `showStatusSheet` boolean; `onPick = vm::setStatus`. Wire `onMoodClick` to a small `AlertDialog` with a `TextField` (140 cap) calling `vm.updateProfile(displayNameCurrent, newMood)` — grep how SettingsScreen calls `updateProfile` for the current display name source.
 
-- [ ] **Step 3: Build + commit**
+- [x] **Step 3: Build + commit**
 
 Run: `cd android && ./gradlew assembleDebug` — Expected: green.
 
