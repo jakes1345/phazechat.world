@@ -20,6 +20,7 @@ import { ContactsView } from './ContactsView'
 import { tokenize as tokenizeEmoticons } from './emoticons'
 import { Emoticon } from './emoticonArt'
 import { EmoticonPicker } from './EmoticonPicker'
+import { CallScreen } from './CallScreen'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -2234,7 +2235,16 @@ export default function App() {
       )}
 
       {/* ── Call overlay ─────────────────────────────────────────── */}
-      {callState && (
+      {callState && theme === 'skype7' && (
+        <CallScreen
+          state={callState}
+          jitsiUrl={callState.status === 'active' && jitsiRoom ? `https://meet.jit.si/${jitsiRoom}` : null}
+          avatarBg={avatarColor(callState.peer)}
+          onAnswer={acceptCall}
+          onHangUp={hangUp}
+        />
+      )}
+      {callState && theme !== 'skype7' && (
         <div className="call-overlay">
           {callState.status === 'active' && jitsiRoom && (
             <iframe

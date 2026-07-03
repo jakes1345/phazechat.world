@@ -754,7 +754,7 @@ git commit -m "art: hand-drawn animated emoticon set, reduced-motion safe"
     onAnswer={() => void} onHangUp={() => void} />
   ```
 
-- [ ] **Step 1: CallScreen component**
+- [x] **Step 1: CallScreen component**
 
 ```tsx
 // web/src/CallScreen.tsx
@@ -813,7 +813,7 @@ export function CallScreen({ state, jitsiUrl, onAnswer, onHangUp }: {
 }
 ```
 
-- [ ] **Step 2: call.css**
+- [x] **Step 2: call.css**
 
 ```css
 /* Classic call screen — deep teal wash, centered caller card, dark bar. */
@@ -857,11 +857,11 @@ export function CallScreen({ state, jitsiUrl, onAnswer, onHangUp }: {
 .call7-hangup:hover { background: #C51017; }
 ```
 
-- [ ] **Step 3: Wire into App.tsx**
+- [x] **Step 3: Wire into App.tsx**
 
 In the call overlay block (~2099): when `theme === 'skype7' && callState`, render `<CallScreen state={callState} jitsiUrl={callState.status === 'active' && jitsiRoom ? /* the exact URL currently given to the Jitsi mount — grep jitsiRoom usage */ : null} onAnswer={/* existing answer handler */} onHangUp={/* existing reject/end handler that sends call_reject or call_end (~861) */} />` and skip the old overlay; other themes keep the current UI. Ringtone behavior (`ringingAudioRef`) is untouched — it lives outside the overlay JSX.
 
-- [ ] **Step 4: Verify + commit**
+- [x] **Step 4: Verify + commit**
 
 Run: `cd web && npx vitest run && npm run build` — Expected: green.
 Manual, two tabs: outgoing shows teal screen + "calling…" dots; incoming shows green/red buttons; answer drops both into Jitsi inside the chrome; red button ends the call for both sides (server gets `call_end`, not just an iframe unmount). Compare against `skymu-v0.4-call.png`.

@@ -1,0 +1,78 @@
+/* Classic call screen — deep teal wash, centered caller card, dark bar. */
+.call7 {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(120% 120% at 50% 0%, #1D5F7A 0%, #123F53 55%, #0C2C3B 100%);
+  color: #fff;
+}
+.call7-mark {
+  position: absolute;
+  top: 18px;
+  right: 26px;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  opacity: 0.14;
+}
+.call7-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.call7-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: 600;
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+.call7-name { font-size: 22px; font-weight: 600; }
+.call7-state { font-size: 14px; opacity: 0.85; }
+.call7-dots i { font-style: normal; animation: call7-blink 1.4s infinite; }
+.call7-dots i:nth-child(2) { animation-delay: 0.2s; }
+.call7-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes call7-blink { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
+.call7-jitsi {
+  position: absolute;
+  inset: 0 0 76px 0;
+  width: 100%;
+  height: calc(100% - 76px);
+  border: 0;
+}
+.call7-bar {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+  padding: 10px 22px;
+  background: rgba(10, 24, 32, 0.82);
+  border-radius: 999px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+.call7-bar button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.call7-answer { background: #5CB85C; }
+.call7-answer:hover { background: #4CAE4C; }
+.call7-hangup { background: #E4141B; }
+.call7-hangup:hover { background: #C51017; }
