@@ -464,7 +464,7 @@ git commit -m "feat: contacts tab, date-grouped recent list, sidebar bottom rows
   ```
   Task 6 renders tokens; Task 7 maps `id` → art. `emoji` is the unicode fallback glyph.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```ts
 // web/src/emoticons.test.ts
@@ -497,7 +497,7 @@ describe('tokenize', () => {
 
 Run: `cd web && npx vitest run src/emoticons.test.ts` — Expected: FAIL (module missing).
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 ```ts
 // web/src/emoticons.ts
@@ -561,7 +561,7 @@ export function tokenize(input: string): Token[] {
 }
 ```
 
-- [ ] **Step 3: Tests pass, commit**
+- [x] **Step 3: Tests pass, commit**
 
 Run: `cd web && npx vitest run src/emoticons.test.ts` — Expected: PASS (all 6).
 
