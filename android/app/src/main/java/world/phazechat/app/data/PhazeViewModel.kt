@@ -268,6 +268,26 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         _theme.value = t
         prefs.edit().putString("theme", t).apply()
     }
+    // Presence the user picked. Server validates; Invisible reads as Offline to others.
+    private val _myStatus = MutableStateFlow(prefs.getString("my_status", "Online") ?: "Online")
+    val myStatus = _myStatus.asStateFlow()
+    val dnd: Boolean get() = _myStatus.value == "Do Not Disturb"
+    private val _myMood = MutableStateFlow(prefs.getString("my_mood", "") ?: "")
+    val myMood = _myMood.asStateFlow()
+    // One-shot notices for the chrome to flash (status/mood save failures).
+    private val _uiNotice = MutableStateFlow<String?>(null)
+    val uiNotice = _uiNotice.asStateFlow()
+    fun clearNotice() { _uiNotice.value = null }
+
+    fun setStatus(s: String) {
+        if (s !in settableStatuses) return
+        prefs.edit().putString("last_acked_status", _myStatus.value).apply()
+        _myStatus.value = s
+        prefs.edit().putString("my_status", s).apply()
+        nexus.send(NexusMessage(type = "status_update", body = s))
+    }
+
+    private val settableStatuses = setOf("Online", "Away", "Do Not Disturb", "Invisible")
     // Snowflakes seasonal overlay.
     private val _snow = MutableStateFlow(prefs.getBoolean("snow", false))
     val snow = _snow.asStateFlow()
@@ -732,9 +752,10 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateProfile(displayName: String, mood: String) {
         val me = _me.value ?: return
+        prefs.edit().putString("last_acked_mood", _myMood.value).apply()
         _myDisplayName.value = displayName
+        _myMood.value = mood
         nexus.send(NexusMessage(type = "update_profile", sender = me, displayName = displayName, mood = mood))
-        nexus.send(NexusMessage(type = "status_update", sender = me, body = mood, status = "Online"))
     }
 
     /** Step 1 of enrollment: ask the server for a TOTP secret/URI. */
@@ -1099,10 +1120,12 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                         turnUrl = msg.turnUrl; turnUrls = msg.turnUrls; turnUsername = msg.turnUsername; turnPassword = msg.turnPassword
                     }
                     nexus.send(NexusMessage(
-                        type = "presence", sender = msg.sender, status = "Online",
+                        type = "presence", sender = msg.sender, status = _myStatus.value,
                         publicKey = encodePublicKeyB64(keyPair.publicKey),
                         keyFingerprint = fingerprint(keyPair.publicKey),
                     ))
+                    // Re-announce the picked status so the server persists it for this session.
+                    nexus.send(NexusMessage(type = "status_update", body = _myStatus.value))
                     val fcmToken = prefs.getString("fcm_token", null)
                     if (!fcmToken.isNullOrEmpty()) {
                         nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
@@ -1152,7 +1175,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                         turnUrl = msg.turnUrl; turnUrls = msg.turnUrls; turnUsername = msg.turnUsername; turnPassword = msg.turnPassword
                     }
                     nexus.send(NexusMessage(
-                        type = "presence", sender = msg.sender, status = "Online",
+                        type = "presence", sender = msg.sender, status = _myStatus.value,
                         publicKey = encodePublicKeyB64(keyPair.publicKey),
                         keyFingerprint = fingerprint(keyPair.publicKey),
                     ))
@@ -1208,6 +1231,20 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             "update_result" -> {
                 if (msg.status == "ok") {
                     prefs.edit().putString("display_name", _myDisplayName.value).apply()
+                    prefs.edit().putString("my_mood", _myMood.value).apply()
+                } else if (msg.error != null) {
+                    _myMood.value = prefs.getString("last_acked_mood", "") ?: ""
+                    _uiNotice.value = msg.error
+                }
+            }
+
+            "status_result" -> {
+                if (msg.error != null) {
+                    _myStatus.value = prefs.getString("last_acked_status", "Online") ?: "Online"
+                    prefs.edit().putString("my_status", _myStatus.value).apply()
+                    _uiNotice.value = msg.error
+                } else {
+                    msg.status?.let { prefs.edit().putString("last_acked_status", it).apply() }
                 }
             }
 
@@ -1281,7 +1318,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             "key_request" -> {
                 msg.sender?.let { sender ->
                     nexus.send(NexusMessage(
-                        type = "presence", sender = _me.value, recipient = sender, status = "Online",
+                        type = "presence", sender = _me.value, recipient = sender, status = _myStatus.value,
                         publicKey = encodePublicKeyB64(keyPair.publicKey),
                         keyFingerprint = fingerprint(keyPair.publicKey),
                     ))

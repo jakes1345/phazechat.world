@@ -45,7 +45,7 @@
 **Interfaces:**
 - Produces: `val myStatus: StateFlow<String>` (one of the four settable statuses), `fun setStatus(s: String)`, `val dnd: Boolean` derived getter (`myStatus.value == "Do Not Disturb"`). Prefs key: `"my_status"`. Task 3's picker calls `setStatus`; Task 3's mute checks `dnd`; the FCM service reads the same prefs key directly.
 
-- [ ] **Step 1: Add status state**
+- [x] **Step 1: Add status state**
 
 Next to `_theme` (~:265):
 
@@ -66,7 +66,7 @@ fun setStatus(s: String) {
 }
 ```
 
-- [ ] **Step 2: Handle status_result**
+- [x] **Step 2: Handle status_result**
 
 In the message `when` block, next to `"update_result"` (~:1208):
 
@@ -81,7 +81,7 @@ In the message `when` block, next to `"update_result"` (~:1208):
 }
 ```
 
-- [ ] **Step 3: Fix updateProfile (the live breakage)**
+- [x] **Step 3: Fix updateProfile (the live breakage)**
 
 Replace the body (~:733):
 
@@ -96,7 +96,7 @@ fun updateProfile(displayName: String, mood: String) {
 
 Add `_myMood`/`myMood` StateFlow next to `_myStatus` if not already present (grep `_myMood` first; create with `MutableStateFlow("")` seeded from the profile fetch or `update_result`).
 
-- [ ] **Step 4: Honest presence + login announce**
+- [x] **Step 4: Honest presence + login announce**
 
 At both login/`presence` send sites (~:1102, ~:1155): replace `status = "Online"` with `status = _myStatus.value`. Immediately after the login-success presence send, add:
 
@@ -104,7 +104,7 @@ At both login/`presence` send sites (~:1102, ~:1155): replace `status = "Online"
 nexus.send(NexusMessage(type = "status_update", body = _myStatus.value))
 ```
 
-- [ ] **Step 5: Build + commit**
+- [x] **Step 5: Build + commit**
 
 Run: `cd "/media/jack/New Volume/Skype/android" && ./gradlew assembleDebug`
 Expected: BUILD SUCCESSFUL
