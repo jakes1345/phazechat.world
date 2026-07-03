@@ -248,7 +248,7 @@ git commit -m "feat: emoticon tokenizer on android, first jvm unit tests"
 - Consumes: `vm.myStatus`, `vm.setStatus` (Task 1).
 - Produces: `@Composable fun PresenceBadge(status: String, size: Dp = 12.dp)`; `@Composable fun StatusPickerSheet(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit)`. Tasks 4–5 place `PresenceBadge` in the header, contact rows, and chat top bar.
 
-- [ ] **Step 1: Presence.kt**
+- [x] **Step 1: Presence.kt**
 
 ```kotlin
 // android/app/src/main/java/world/phazechat/app/ui/Presence.kt
@@ -327,7 +327,7 @@ fun StatusPickerSheet(current: String, onPick: (String) -> Unit, onDismiss: () -
 
 `clickableRow` is `androidx.compose.foundation.clickable` — import it and use `.clickable { ... }` directly (the name above is illustrative; write `.clickable`).
 
-- [ ] **Step 2: DND gates FCM notifications**
+- [x] **Step 2: DND gates FCM notifications**
 
 In `PhazeFCMService` before building the notification (~:64):
 
@@ -338,7 +338,7 @@ if (prefs.getString("my_status", "Online") == "Do Not Disturb") return
 
 (Place at the top of the message-received handler so DND drops the ping entirely; message data still syncs over WS when the app opens.)
 
-- [ ] **Step 3: Build + commit**
+- [x] **Step 3: Build + commit**
 
 Run: `cd android && ./gradlew assembleDebug testDebugUnitTest` — Expected: green.
 

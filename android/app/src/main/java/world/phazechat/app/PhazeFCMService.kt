@@ -46,6 +46,11 @@ class PhazeFCMService : FirebaseMessagingService() {
                 != PackageManager.PERMISSION_GRANTED) return
         }
 
+        // Do Not Disturb drops the ping entirely; the message still syncs
+        // over the socket next time the app opens.
+        val prefs = getSharedPreferences("phaze_prefs", Context.MODE_PRIVATE)
+        if (prefs.getString("my_status", "Online") == "Do Not Disturb") return
+
         val title = message.notification?.title ?: message.data["title"] ?: "Phaze"
         val body = message.notification?.body ?: message.data["body"] ?: ""
         val senderUsername = message.data["sender"] ?: message.data["from"] ?: ""
