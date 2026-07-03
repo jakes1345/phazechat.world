@@ -11,6 +11,7 @@ import android.os.Build
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -443,29 +444,19 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         return
     }
 
-    var tab by remember { mutableIntStateOf(0) }
+    var page by remember { mutableStateOf("chats") }
+    val themePack by vm.theme.collectAsState()
+    val skype7Shell = themePack == "skype7"
+    var showStatusSheet by remember { mutableStateOf(false) }
+    var showMoodDialog by remember { mutableStateOf(false) }
+    val myStatusNow by vm.myStatus.collectAsState()
+    val myMoodNow by vm.myMood.collectAsState()
+    val myDisplayNameNow by vm.myDisplayName.collectAsState()
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = tab == 0, onClick = { tab = 0 },
-                    icon = { Icon(Icons.Default.Email, "Chats") }, label = { Text("Chats") },
-                )
-                NavigationBarItem(
-                    selected = tab == 1, onClick = { tab = 1; vm.loadSpaces() },
-                    icon = { Icon(Icons.Default.Menu, "Spaces") }, label = { Text("Spaces") },
-                )
-                NavigationBarItem(
-                    selected = tab == 2, onClick = { tab = 2 },
-                    icon = { Icon(Icons.Default.Settings, "Settings") }, label = { Text("Settings") },
-                )
-            }
-        },
-    ) { padding ->
-        Box(modifier = Modifier.padding(padding)) {
-            when (tab) {
-                0 -> ChatsScreen(
+    val pageContent: @Composable () -> Unit = {
+        Box {
+            when (page) {
+                "chats" -> ChatsScreen(
                     friends = friends, pending = pending, unread = unread,
                     stories = stories, me = me!!,
                     onSelectChat = { vm.selectChat(it) },
@@ -477,7 +468,8 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                     onSearch = { vm.searchUsers(it) },
                     onClearSearch = { vm.clearSearch() },
                 )
-                1 -> {
+                "contacts" -> ContactsPlaceholder()
+                "spaces" -> {
                     val discoverList by vm.discoverSpaces.collectAsState()
                     SpacesScreen(
                         spaces = spaces, activeSpace = activeSpace, channels = channels,
@@ -494,7 +486,7 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                         onJoinPublic = { vm.joinPublicSpace(it) },
                     )
                 }
-                2 -> {
+                "settings" -> {
                     val linkCode by vm.activeLinkCode.collectAsState()
                     val linkStatus by vm.linkStatus.collectAsState()
                     val linkError by vm.linkError.collectAsState()
@@ -551,6 +543,94 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
             }
         }
     }
+
+    if (skype7Shell) {
+        Column(Modifier.fillMaxSize()) {
+            Skype7Header(
+                me = me!!,
+                status = myStatusNow,
+                mood = myMoodNow,
+                onStatusClick = { showStatusSheet = true },
+                onMoodClick = { showMoodDialog = true },
+                onSettings = { page = "settings" },
+            )
+            if (page != "settings") {
+                Skype7Tabs(
+                    selected = when (page) { "contacts" -> 1; "spaces" -> 2; else -> 0 },
+                    onSelect = { i ->
+                        page = listOf("chats", "contacts", "spaces")[i]
+                        if (i == 2) vm.loadSpaces()
+                    },
+                )
+            } else {
+                BackHandler { page = "chats" }
+            }
+            Box(Modifier.weight(1f)) { pageContent() }
+        }
+        if (showStatusSheet) {
+            StatusPickerSheet(
+                current = myStatusNow,
+                onPick = { vm.setStatus(it) },
+                onDismiss = { showStatusSheet = false },
+            )
+        }
+        if (showMoodDialog) {
+            MoodDialog(
+                current = myMoodNow,
+                onSave = { vm.updateProfile(myDisplayNameNow, it) },
+                onDismiss = { showMoodDialog = false },
+            )
+        }
+    } else {
+        Scaffold(
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = page == "chats", onClick = { page = "chats" },
+                        icon = { Icon(Icons.Default.Email, "Chats") }, label = { Text("Chats") },
+                    )
+                    NavigationBarItem(
+                        selected = page == "spaces", onClick = { page = "spaces"; vm.loadSpaces() },
+                        icon = { Icon(Icons.Default.Menu, "Spaces") }, label = { Text("Spaces") },
+                    )
+                    NavigationBarItem(
+                        selected = page == "settings", onClick = { page = "settings" },
+                        icon = { Icon(Icons.Default.Settings, "Settings") }, label = { Text("Settings") },
+                    )
+                }
+            },
+        ) { padding ->
+            Box(modifier = Modifier.padding(padding)) { pageContent() }
+        }
+    }
+}
+
+/** Until the real contacts list lands, the tab shows a quiet placeholder. */
+@Composable
+private fun ContactsPlaceholder() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Contacts", color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+@Composable
+private fun MoodDialog(current: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var draft by remember { mutableStateOf(current) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Mood") },
+        text = {
+            TextField(
+                value = draft,
+                onValueChange = { if (it.length <= 140) draft = it },
+                placeholder = { Text("Share what’s on your mind…") },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(draft.trim()); onDismiss() }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /** Bottom overlay shown while a voice message is recording: pulsing dot, timer, Cancel/Send. */
