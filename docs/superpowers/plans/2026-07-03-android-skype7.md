@@ -132,7 +132,7 @@ git commit -m "fix: stop sending mood as status_update, add real status state wi
   fun tokenize(input: String): List<EmoToken>
   ```
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
 
 ```kotlin
 // android/app/src/test/java/world/phazechat/app/EmoticonsTest.kt
@@ -160,7 +160,7 @@ class EmoticonsTest {
 Run: `cd android && ./gradlew testDebugUnitTest`
 Expected: FAIL — unresolved reference `tokenize` (compile error counts as the red step).
 
-- [ ] **Step 2: Implement Emoticons.kt**
+- [x] **Step 2: Implement Emoticons.kt**
 
 ```kotlin
 // android/app/src/main/java/world/phazechat/app/ui/Emoticons.kt
@@ -226,7 +226,7 @@ fun tokenize(input: String): List<EmoToken> {
 }
 ```
 
-- [ ] **Step 3: Tests pass + commit**
+- [x] **Step 3: Tests pass + commit**
 
 Run: `cd android && ./gradlew testDebugUnitTest`
 Expected: 6 tests pass.
