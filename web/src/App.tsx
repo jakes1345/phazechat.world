@@ -78,6 +78,24 @@ function Snowflakes() {
     </div>
   )
 }
+/** Flat line icon for the sidebar Home tab — hand-drawn, no external asset. */
+function IconChat() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
+      <path d="M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
+    </svg>
+  )
+}
+
+/** Flat "live" dot icon for the sidebar Live tab — hand-drawn, no external asset. */
+function IconLive() {
+  return (
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="#E4141B">
+      <circle cx="12" cy="12" r="10" />
+    </svg>
+  )
+}
+
 const HISTORY_LIMIT = 500
 const historyKey = (me: string, peer: string) => `phaze_chat_${me}_${peer}_v1`
 const unreadKey = (me: string) => `phaze_unread_${me}_v1`
@@ -598,6 +616,7 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const draftInputRef = useRef<HTMLInputElement>(null)
   const restoreCheckedRef = useRef(false)
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [paletteQuery, setPaletteQuery] = useState('')
   const [globalSearchResults, setGlobalSearchResults] = useState<string[]>([])
@@ -794,8 +813,16 @@ export default function App() {
     const pk = peerKeysRef.current[sender]
     const sk = keysRef.current.secretKey
     const out = { ...msg }
-    // Only decrypt body for chat messages — call signaling is not encrypted
-    if (out.body && pk && msg.type === 'msg') out.body = decryptFromPeer(out.body, pk, sk)
+    // Only decrypt body for chat messages — call signaling is not encrypted.
+    // Never let raw ciphertext reach the UI: no peer key yet, or a bad
+    // decrypt, both fall back to a placeholder instead of the E2EE: blob.
+    if (out.body && msg.type === 'msg') {
+      if (pk) {
+        try { out.body = decryptFromPeer(out.body, pk, sk) } catch { out.body = '[Encrypted]' }
+      } else {
+        out.body = '[Encrypted]'
+      }
+    }
     return out
   }, [])
 
@@ -1821,6 +1848,59 @@ export default function App() {
         {me && <span className="me">@{me}</span>}
       </header>
 
+      {/* ── Skype 7 menu bar (skype7 theme only — see .skype-menubar CSS) ── */}
+      {me && (
+        <nav className="skype-menubar" onMouseLeave={() => setMenuOpen(null)}>
+          {(['Skype', 'Contacts', 'Conversation', 'Call', 'View', 'Tools', 'Help'] as const).map((label) => (
+            <div key={label} className="skype-menu">
+              <button
+                type="button"
+                className={menuOpen === label ? 'on' : ''}
+                onClick={() => setMenuOpen(menuOpen === label ? null : label)}
+              >{label}</button>
+              {menuOpen === label && (
+                <div className="skype-menu-dropdown">
+                  {label === 'Skype' && (
+                    <button type="button" onClick={() => { setSettingsOpen(true); setMenuOpen(null) }}>Settings…</button>
+                  )}
+                  {label === 'Contacts' && (
+                    <>
+                      <button type="button" onClick={() => { setAddOpen(true); setAddFriend(''); setAddStatus(null); setMenuOpen(null) }}>Add a contact…</button>
+                      <button type="button" onClick={() => { setNewGroupOpen(true); setMenuOpen(null) }}>Create a group…</button>
+                      <button type="button" onClick={() => { setPaletteOpen(true); setPaletteQuery(''); setPaletteIdx(0); setMenuOpen(null) }}>Search friends… ⌘K</button>
+                    </>
+                  )}
+                  {label === 'Conversation' && (
+                    <button type="button" disabled={!selected} onClick={() => { setSearchOpen(true); setMenuOpen(null) }}>Search this conversation</button>
+                  )}
+                  {label === 'Call' && (
+                    <>
+                      <button type="button" disabled={!selected} onClick={() => { startCall('audio'); setMenuOpen(null) }}>Call{selected ? ` ${selected}` : ''}</button>
+                      <button type="button" disabled={!selected} onClick={() => { startCall('video'); setMenuOpen(null) }}>Video call{selected ? ` ${selected}` : ''}</button>
+                    </>
+                  )}
+                  {label === 'View' && (
+                    <>
+                      <button type="button" onClick={() => { setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'skype7' : 'dark'); setMenuOpen(null) }}>Change theme ({theme})</button>
+                      <button type="button" onClick={() => { setSnow((s) => !s); setMenuOpen(null) }}>{snow ? 'Turn off snow' : 'Let it snow'}</button>
+                    </>
+                  )}
+                  {label === 'Tools' && (
+                    <button type="button" onClick={() => { setRemoteOpen(true); setMenuOpen(null) }}>Remote Control…</button>
+                  )}
+                  {label === 'Help' && (
+                    <>
+                      <a href="https://phazechat.world/support" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(null)}>Get help</a>
+                      <a href="https://github.com/jakes1345/phaze" target="_blank" rel="noreferrer" onClick={() => setMenuOpen(null)}>View source on GitHub</a>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </nav>
+      )}
+
       {/* ── Floating bottom nav ─────────────────────────────────── */}
       {me && (
         <nav className="floating-nav">
@@ -2260,16 +2340,24 @@ export default function App() {
             <div className={`hub-content ${selected ? 'chat-open' : ''}`}>
               {/* ── Sidebar: search + contacts list ───────────────── */}
               <div className="hub-sidebar">
+                {/* ── Skype 7 me-bar at sidebar top ──────────────── */}
+                {me && (
+                  <div className="hub-me-bar">
+                    <span className="avatar hub-me-avatar" style={{ background: avatarColor(me) }}>
+                      {me[0]?.toUpperCase()}
+                      <span className="avatar-dot" data-online="" style={{ background: '#a7d131' }} />
+                    </span>
+                    <span className="hub-me-info">
+                      <span className="hub-me-name">{me}</span>
+                      <span className="hub-me-status">Online</span>
+                    </span>
+                    <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
+                  </div>
+                )}
                 <div className="sidebar-tabs">
-                  <button type="button" title="Home" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}>💬</button>
+                  <button type="button" title="Home" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}><IconChat /></button>
                   <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
-                  <button type="button" title="Live" className={view === 'live' ? 'on' : ''} onClick={() => setView('live')}>🔴</button>
-                  <button
-                    type="button"
-                    className="sidebar-tabs-theme"
-                    title={`Theme: ${theme} — click to cycle (dark · light · Skype 7)`}
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'skype7' : 'dark')}
-                  >💙</button>
+                  <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}><IconLive /></button>
                 </div>
                 <div className="hub-add-friend">
                   <div className="form">
@@ -2464,20 +2552,6 @@ export default function App() {
                   </ul>
                   <button type="button" className="new-group-btn" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>+ New group</button>
                 </div>
-                {/* ── Skype 7 me-bar at sidebar bottom ──────────── */}
-                {me && (
-                  <div className="hub-me-bar">
-                    <span className="avatar hub-me-avatar" style={{ background: avatarColor(me) }}>
-                      {me[0]?.toUpperCase()}
-                      <span className="avatar-dot" data-online="" style={{ background: '#a7d131' }} />
-                    </span>
-                    <span className="hub-me-info">
-                      <span className="hub-me-name">{me}</span>
-                      <span className="hub-me-status">Online</span>
-                    </span>
-                    <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
-                  </div>
-                )}
               </div>
 
               {/* ── Chat view ─────────────────────────────────────── */}
@@ -2661,6 +2735,15 @@ export default function App() {
                           )}
                           {!line.me && !showGap && <span className="bubble-avatar-spacer" />}
                           <div className={`bubble ${line.me ? 'me' : ''} ${line.deleted ? 'deleted' : ''} ${isPinned ? 'pinned' : ''} ${mentionsMe ? 'mentions-me' : ''}`} title={new Date(line.ts).toLocaleString()}>
+                            {theme === 'skype7' && showGap && (
+                              <div className="skype-msg-head">
+                                <span className="who clickable" onClick={() => !line.me && setProfileUser(line.from)}>{line.me ? 'You' : line.from}</span>
+                                <span className="skype-msg-head-ts">
+                                  {formatTime(line.ts)}
+                                  {line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}
+                                </span>
+                              </div>
+                            )}
                             {showGap && !line.me && <span className="who clickable" onClick={() => setProfileUser(line.from)}>{line.from}</span>}
                             {line.deleted ? (
                               <span className="bubble-text deleted-text">message deleted</span>

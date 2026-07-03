@@ -2820,6 +2820,67 @@ button.link-btn:hover,
 .app.theme-skype7 .floating-nav { display: none !important; }
 .app.theme-skype7 .banner       { margin: 0; border-radius: 0; }
 
+/* ── Classic menu bar (Skype/Contacts/Conversation/Call/View/Tools/Help) ── */
+.skype-menubar { display: none; }
+.app.theme-skype7 .skype-menubar {
+  display: flex;
+  align-items: stretch;
+  height: 24px;
+  background: linear-gradient(180deg, #F5F9FD 0%, #E7EFF6 100%);
+  border-bottom: 1px solid #B2C8D8;
+  flex-shrink: 0;
+  font-size: 12px;
+  position: relative;
+  z-index: 40;
+}
+.app.theme-skype7 .skype-menu { position: relative; }
+.app.theme-skype7 .skype-menu > button {
+  height: 100%;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.app.theme-skype7 .skype-menu > button:hover,
+.app.theme-skype7 .skype-menu > button.on {
+  background: var(--brand);
+  color: #fff;
+}
+.app.theme-skype7 .skype-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 190px;
+  background: #ffffff;
+  border: 1px solid #B2C8D8;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+.app.theme-skype7 .skype-menu-dropdown button,
+.app.theme-skype7 .skype-menu-dropdown a {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-radius: 2px;
+  text-decoration: none;
+}
+.app.theme-skype7 .skype-menu-dropdown button:hover,
+.app.theme-skype7 .skype-menu-dropdown a:hover {
+  background: var(--list-hover);
+}
+.app.theme-skype7 .skype-menu-dropdown button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.app.theme-skype7 .skype-menu-dropdown button:disabled:hover { background: transparent; }
+
 /* ── Sidebar tab row (Skymu-style Contacts/Groups/Recent strip) ──
    Real Skype 7 chrome has no floating pill nav or glass top bar —
    Spaces/Live/theme switching move into a flat icon-tab row inline
@@ -2853,12 +2914,6 @@ button.link-btn:hover,
   border-bottom-color: var(--brand);
   font-weight: 700;
 }
-.app.theme-skype7 .sidebar-tabs-theme {
-  margin-left: auto;
-  font-size: 0.8rem !important;
-  opacity: 0.7;
-}
-.app.theme-skype7 .sidebar-tabs-theme:hover { opacity: 1; }
 
 /* ── Full-height layout without top-bar offset ───────────────── */
 .app.theme-skype7 .grid {
@@ -3174,7 +3229,7 @@ button.link-btn:hover,
 /* ── Section labels ──────────────────────────────────────────── */
 .app.theme-skype7 .sidebar-section-label { display: none; }
 
-/* ── Me bar (bottom of sidebar) ──────────────────────────────── */
+/* ── Me bar (top of sidebar, matching Skymu's profile row) ───── */
 .hub-me-bar {
   display: none;
 }
@@ -3184,7 +3239,7 @@ button.link-btn:hover,
   gap: 9px;
   padding: 8px 10px;
   background: #BDD1E0;
-  border-top: 1px solid #A8BFD0;
+  border-bottom: 1px solid #A8BFD0;
   flex-shrink: 0;
 }
 .app.theme-skype7 .hub-me-avatar {
@@ -3350,59 +3405,72 @@ button.link-btn:hover,
   gap: 2px;
 }
 
-/* ── Bubble row layout ───────────────────────────────────────── */
-.app.theme-skype7 .bubble-row {
-  padding: 1px 12px;
-  gap: 8px;
+/* ── Bubble row layout — flat list, no avatars, no left/right split ──
+   Classic Skype 7 chat is a flat scroll of text, not alternating
+   bubbles: everyone's messages sit flush left, differentiated only
+   by the colored name + timestamp header line. */
+.app.theme-skype7 .bubble-row:not(.skype-hist) {
+  padding: 1px 16px;
+  gap: 0;
+  display: block;
 }
-.app.theme-skype7 .bubble-avatar,
+.app.theme-skype7 .bubble-row.me {
+  justify-content: normal;
+}
+.app.theme-skype7 .bubble-row:not(.skype-hist) .bubble-avatar,
 .app.theme-skype7 .bubble-avatar-spacer {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.app.theme-skype7 .bubble-avatar {
-  font-size: 0.78rem;
-  font-weight: 700;
-  box-shadow: none;
+  display: none;
 }
 
-/* ── Message bubbles ─────────────────────────────────────────── */
-.app.theme-skype7 .bubble {
-  max-width: 420px;
-  padding: 8px 14px 6px;
-  border-radius: 4px;
+/* ── Messages: flat text, no bubble background ───────────────── */
+.app.theme-skype7 .bubble:not(.skype-hist-bubble) {
+  max-width: none;
+  width: 100%;
+  padding: 1px 0 2px;
+  border-radius: 0;
   font-size: 13px;
   line-height: 1.45;
   box-shadow: none;
   border: none;
-}
-.app.theme-skype7 .bubble:not(.me) {
-  background: var(--bubble-in);
+  background: transparent;
   color: var(--bubble-text);
-  border-radius: 4px 4px 4px 0;
 }
+.app.theme-skype7 .bubble:not(.me):not(.skype-hist-bubble),
 .app.theme-skype7 .app:not(.theme-skype7) .bubble.me,
-.app.theme-skype7 .bubble.me {
-  background: var(--bubble-out);
-  color: var(--bubble-text-out);
-  border-radius: 4px 4px 0 4px;
+.app.theme-skype7 .bubble.me:not(.skype-hist-bubble) {
+  background: transparent;
+  color: var(--bubble-text);
+  border-radius: 0;
   box-shadow: none;
 }
-.app.theme-skype7 .bubble-ts {
-  font-size: 10px;
-  color: rgba(43,43,48,0.5);
+/* Original per-theme name/timestamp elements are superseded by
+   .skype-msg-head below — hide rather than remove so the shared
+   JSX/logic (receipt ticks, etc.) stays untouched for other themes.
+   Skype-history-import bubbles keep the original name label — they
+   never render .skype-msg-head. */
+.app.theme-skype7 .bubble:not(.skype-hist-bubble) > .who,
+.app.theme-skype7 .bubble:not(.skype-hist-bubble) > .bubble-ts {
+  display: none;
 }
-.app.theme-skype7 .bubble.me .bubble-ts {
-  color: rgba(255,255,255,0.65);
+.app.theme-skype7 .skype-msg-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 1px;
 }
-.app.theme-skype7 .bubble .who {
-  font-size: 10px;
+.app.theme-skype7 .skype-msg-head .who {
+  display: inline;
+  margin-bottom: 0;
+  font-size: 12px;
   font-weight: 700;
   color: #0095CC;
-  display: block;
-  margin-bottom: 2px;
+}
+.app.theme-skype7 .skype-msg-head-ts {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .app.theme-skype7 .bubble-row {
   animation: none;
