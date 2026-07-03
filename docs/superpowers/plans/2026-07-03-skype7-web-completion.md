@@ -184,7 +184,7 @@ git commit -m "feat: persist user status, validate status_update, mask invisible
 - Consumes: WS contract from Task 1 (`status_update` / `status_result`); me-bar JSX; `friends` record.
 - Produces: `type UserStatus = 'Online' | 'Away' | 'Do Not Disturb' | 'Invisible'`; `effectiveStatus(manual: UserStatus, idle: boolean): UserStatus`; `<PresenceIcon status={string} size={number} />` — used by Tasks 3–4 for contact rows and chat header. App state: `myStatus: UserStatus` (persisted to `localStorage['phaze_status']`), `notificationsMuted` derived from `myStatus === 'Do Not Disturb'`.
 
-- [ ] **Step 1: Failing tests for the pure logic**
+- [x] **Step 1: Failing tests for the pure logic**
 
 ```ts
 // web/src/presence.test.ts
@@ -208,7 +208,7 @@ describe('effectiveStatus', () => {
 
 Run: `cd web && npx vitest run src/presence.test.ts` — Expected: FAIL (module missing).
 
-- [ ] **Step 2: Implement presence.ts**
+- [x] **Step 2: Implement presence.ts**
 
 ```ts
 // web/src/presence.ts
@@ -227,7 +227,7 @@ export function effectiveStatus(manual: UserStatus, idle: boolean): UserStatus {
 
 Run: `cd web && npx vitest run src/presence.test.ts` — Expected: PASS.
 
-- [ ] **Step 3: PresenceIcon component**
+- [x] **Step 3: PresenceIcon component**
 
 ```tsx
 // web/src/PresenceIcon.tsx
@@ -256,7 +256,7 @@ export function PresenceIcon({ status, size = 12 }: { status: string; size?: num
 }
 ```
 
-- [ ] **Step 4: Wire into App.tsx**
+- [x] **Step 4: Wire into App.tsx**
 
 1. State next to `theme` (~610):
    ```tsx
@@ -272,13 +272,13 @@ export function PresenceIcon({ status, size = 12 }: { status: string; size?: num
 5. DND mute: `grep -n 'phazeSounds\|playSound\|Notification\|toast' web/src/App.tsx` — guard each notification-sound and toast call site with `if (!dnd)`. Message rendering/unread counts are NOT gated — only sounds and popups.
 6. Peer icons: wherever `statusColor(...)` paints a colored dot for a friend, render `<PresenceIcon status={st} />` instead when `theme === 'skype7'` (keep dots for other themes). CSS: `.presence-menu` dropdown styled like the existing `.skype-menu-dropdown`.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `cd web && npx vitest run && npm run build`
 Expected: all tests pass, build green.
 Manual: pick DND in one tab → other tab shows red minus on that contact; incoming message in DND tab makes no sound.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add web/src/presence.ts web/src/presence.test.ts web/src/PresenceIcon.tsx web/src/App.tsx web/src/App.css

@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react'
 import faviconUrl from '/icon-192.png'
 import jsQR from 'jsqr'
-import type { NexusMessage } from './nexusTypes'
+import type { NexusMessage, TurnConfig } from './nexusTypes'
 import {
   decryptFromPeer,
   decodePublicKeyField,
@@ -13,6 +13,8 @@ import {
 import { loadPins, savePins } from './keyPins'
 import { encryptKeypair as encryptKeyBackup } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
+import { PresenceIcon } from './PresenceIcon'
+import { STATUSES, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -59,6 +61,7 @@ function isPeerMuted(peer: string): boolean {
 }
 const THEME_KEY = 'phaze_theme_v1'
 const SNOW_KEY = 'phaze_snow_v1'
+const STATUS_KEY = 'phaze_status_v1'
 
 const SNOW_FLAKES = Array.from({ length: 40 }, (_, i) => ({
   i,
@@ -609,6 +612,17 @@ export default function App() {
   const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
   const [theme, setTheme] = useState<'light' | 'dark' | 'skype7'>(() => (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'skype7') || 'skype7')
   const [snow, setSnow] = useState<boolean>(() => localStorage.getItem(SNOW_KEY) === '1')
+  const [myStatus, setMyStatus] = useState<UserStatus>(() => (localStorage.getItem(STATUS_KEY) as UserStatus) || 'Online')
+  const [idle, setIdle] = useState(false)
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  // Refs so the WS handler and audio paths see the live values without re-subscribing.
+  const dndRef = useRef(false)
+  const idleRef = useRef(false)
+  const lastAckedStatusRef = useRef<UserStatus>('Online')
+  const announcedStatusRef = useRef<UserStatus | null>(null)
+  const shownStatus = effectiveStatus(myStatus, idle)
+  const dnd = myStatus === 'Do Not Disturb'
+  dndRef.current = dnd
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [emojiOpen, setEmojiOpen] = useState(false)
   const unreadRef = useRef<Record<string, number>>({})
@@ -644,8 +658,10 @@ export default function App() {
 
   const [convos, setConvos] = useState<Convo[]>([])
   const [selectedConvo, setSelectedConvo] = useState<string | null>(null)
-  const [convoLogs, setConvoLogs] = useState<Record<string, ConvoLine[]>>({})
-  const [convoDraft, setConvoDraft] = useState('')
+  const [turn, setTurn] = useState<TurnConfig | null>(null)
+  // Value is currently write-only: group history renders straight from the
+  // server replay, but we keep the log so a future group pane can read it.
+  const [, setConvoLogs] = useState<Record<string, ConvoLine[]>>({})
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([])
@@ -836,6 +852,7 @@ export default function App() {
 
   const startRinger = useCallback((filename: string) => {
     stopRinger()
+    if (dndRef.current) return // Do Not Disturb: calls still show, they just don't ring out loud
     try {
       const a = new Audio(phazeSoundUrl(filename))
       a.loop = true
@@ -913,11 +930,12 @@ export default function App() {
             const wasLoggedIn = !!meRef.current
             setMe(msg.sender ?? null)
             setErr('')
+            if (msg.turn_config) setTurn(msg.turn_config)
             if (!wasLoggedIn) playPhazeSound('Login.wav')
             sendRef.current({
               type: 'presence',
               sender: msg.sender,
-              status: 'Online',
+              status: (localStorage.getItem(STATUS_KEY) as UserStatus) || 'Online',
               public_key: encodePublicKeyB64(keysRef.current.publicKey),
             })
             registerPush(sendRef.current)
@@ -935,6 +953,15 @@ export default function App() {
             localStorage.removeItem(SESSION_KEY)
             if (msg.status === 'totp_required') { setNeedsTotp(true); setErr('Enter your 2FA code or a backup code.') }
             else setErr(msg.error || msg.status || 'Auth failed')
+          }
+          break
+
+        case 'status_result':
+          if (msg.error) {
+            setErr(msg.error)
+            setMyStatus(lastAckedStatusRef.current)
+          } else if (msg.status) {
+            lastAckedStatusRef.current = msg.status as UserStatus
           }
           break
 
@@ -1042,9 +1069,10 @@ export default function App() {
               if (peer && loadHistory(my!, peer).some((l) => l.id === incomingId)) break
             }
             appendLog(msg.sender, msg.body || '[empty]', msg.sender === my, { id: incomingId })
-            // Suppress notification sound + browser notification for muted peers.
+            // Suppress notification sound + browser notification for muted
+            // peers, and for everyone while we're on Do Not Disturb.
             const senderIsMuted = msg.sender ? isPeerMuted(msg.sender) : false
-            if (msg.sender !== my && !senderIsMuted) {
+            if (msg.sender !== my && !senderIsMuted && !dndRef.current) {
               playPhazeSound('MessageReceived.wav')
               if (document.hidden) {
                 const preview = (msg.body || '').startsWith('phaze-file')
@@ -1100,7 +1128,7 @@ export default function App() {
               ...prev,
               [msg.convo_id!]: [...(prev[msg.convo_id!] ?? []), gline],
             }))
-            if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id) {
+            if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id && !dndRef.current) {
               playPhazeSound('MessageReceived.wav')
             }
           }
@@ -1391,6 +1419,40 @@ export default function App() {
   }, [wsUrl, wsRetry])
 
   const send = useCallback((m: NexusMessage) => { sendRef.current(m) }, [])
+
+  const pickStatus = useCallback((s: UserStatus) => {
+    setMyStatus(s)
+    localStorage.setItem(STATUS_KEY, s)
+  }, [])
+
+  // Auto-away: ten quiet minutes downgrade Online to Away; any activity undoes it.
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout>
+    const arm = () => {
+      clearTimeout(t)
+      if (idleRef.current) { idleRef.current = false; setIdle(false) }
+      t = setTimeout(() => { idleRef.current = true; setIdle(true) }, IDLE_MS)
+    }
+    arm()
+    window.addEventListener('mousemove', arm)
+    window.addEventListener('keydown', arm)
+    document.addEventListener('visibilitychange', arm)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('mousemove', arm)
+      window.removeEventListener('keydown', arm)
+      document.removeEventListener('visibilitychange', arm)
+    }
+  }, [])
+
+  // Tell the server whenever the effective status changes (login, manual pick,
+  // idle in/out). The ref stops repeat sends of the same value.
+  useEffect(() => {
+    if (!me) { announcedStatusRef.current = null; return }
+    if (announcedStatusRef.current === shownStatus) return
+    announcedStatusRef.current = shownStatus
+    send({ type: 'status_update', body: shownStatus })
+  }, [me, shownStatus, send])
 
   const doAuth = async (username: string, password: string, totp: string) => {
     if (!username) { setErr('Username is required.'); return }
@@ -2345,13 +2407,25 @@ export default function App() {
                   <div className="hub-me-bar">
                     <span className="avatar hub-me-avatar" style={{ background: avatarColor(me) }}>
                       {me[0]?.toUpperCase()}
-                      <span className="avatar-dot" data-online="" style={{ background: '#a7d131' }} />
+                      <span className="hub-me-presence"><PresenceIcon status={shownStatus} size={11} /></span>
                     </span>
                     <span className="hub-me-info">
                       <span className="hub-me-name">{me}</span>
-                      <span className="hub-me-status">Online</span>
+                      <button type="button" className="hub-me-status" onClick={() => setStatusMenuOpen((o) => !o)}>
+                        <PresenceIcon status={shownStatus} size={10} /> {shownStatus} ▾
+                      </button>
                     </span>
                     <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
+                    {statusMenuOpen && (
+                      <div className="presence-menu" onMouseLeave={() => setStatusMenuOpen(false)}>
+                        {STATUSES.map((s) => (
+                          <button key={s} type="button" className={s === myStatus ? 'on' : ''}
+                            onClick={() => { pickStatus(s); setStatusMenuOpen(false) }}>
+                            <PresenceIcon status={s} /> {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="sidebar-tabs">
@@ -2502,7 +2576,9 @@ export default function App() {
                         <button type="button" className={`friend-row ${selected === u ? 'sel' : ''}`} onClick={() => openChat(u)}>
                           <span className="avatar" style={{ background: avatarColor(u) }}>
                             {u[0]?.toUpperCase()}
-                            <span className="avatar-dot" data-online={st === 'Online' ? '' : undefined} style={{ background: statusColor(st) }} />
+                            {theme === 'skype7'
+                              ? <span className="avatar-presence"><PresenceIcon status={st} size={11} /></span>
+                              : <span className="avatar-dot" data-online={st === 'Online' ? '' : undefined} style={{ background: statusColor(st) }} />}
                           </span>
                           <span className="friend-meta">
                             <span className="friend-line">
@@ -2565,7 +2641,9 @@ export default function App() {
                         </button>
                         <span className="avatar chat-peer-avatar" style={{ background: avatarColor(selected) }}>
                           {selected[0]?.toUpperCase()}
-                          <span className="avatar-dot" style={{ background: statusColor(friends[selected] ?? 'Offline') }} />
+                          {theme === 'skype7'
+                            ? <span className="avatar-presence"><PresenceIcon status={friends[selected] ?? 'Offline'} size={11} /></span>
+                            : <span className="avatar-dot" style={{ background: statusColor(friends[selected] ?? 'Offline') }} />}
                         </span>
                         <span className="chat-peer-info">
                           <span className="chat-peer-name clickable" onClick={() => setProfileUser(selected)}>{selected}</span>
