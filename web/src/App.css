@@ -3419,6 +3419,26 @@ button.link-btn:hover,
 }
 /* The classic bottom strip replaces the floating "+ New group" under skype7. */
 .app.theme-skype7 .new-group-btn { display: none; }
+/* Skymu-style date bands: normal case on a soft gradient strip, and the
+   two bottom actions share one row with the online count underneath. */
+.app.theme-skype7 .contacts-letter,
+.app.theme-skype7 .convo-date-header {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  color: #4A6070;
+  background: linear-gradient(#F7FAFC, #E9EFF5);
+  border-top: 1px solid #EDF2F6;
+  border-bottom: 1px solid #DDE6EC;
+  padding: 3px 12px 2px;
+}
+.app.theme-skype7 .hub-side-bottom { flex-direction: row; flex-wrap: wrap; border-top-color: #C9D8E4; }
+.app.theme-skype7 .hub-side-bottom button {
+  flex: 1 1 50%;
+  border-bottom: 1px solid #E4ECEF;
+}
+.app.theme-skype7 .hub-side-bottom button + button { border-left: 1px solid #E4ECEF; }
+.app.theme-skype7 .online-strip { flex-basis: 100%; background: #EDF3F8; color: #7A8E9C; }
 /* Emoticons — classic picker grid + inline art in messages. */
 .emoticon-picker {
   position: absolute;

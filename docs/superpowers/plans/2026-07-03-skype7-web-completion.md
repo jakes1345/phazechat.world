@@ -878,7 +878,7 @@ git commit -m "feat: classic call screens — teal ring screen, dark control bar
 **Files:**
 - Modify: `web/src/App.css` (skype7 section only) — whatever the comparison flags.
 
-- [ ] **Step 1: Fetch references**
+- [x] **Step 1: Fetch references**
 
 ```bash
 mkdir -p scratch/skymu
@@ -886,11 +886,11 @@ curl -sL -o scratch/skymu/chat.png https://raw.githubusercontent.com/TheSkymuTea
 curl -sL -o scratch/skymu/call.png https://raw.githubusercontent.com/TheSkymuTeam/Skymu/master/Images/skymu-v0.4-call.png
 ```
 
-- [ ] **Step 2: Side-by-side at 100% zoom**
+- [x] **Step 2: Side-by-side at 100% zoom**
 
 Run `cd web && npm run dev`, open the app in skype7 theme next to each screenshot. Check, in order: menu bar height/background; me-bar spacing; tab row underline style; date-header typography; contact row density; compose bar proportions and Send pill; call screen gradient stops and bar placement. Fix only real mismatches — do not invent detail the screenshots don't show.
 
-- [ ] **Step 3: Full suite + commit**
+- [x] **Step 3: Full suite + commit**
 
 Run: `cd web && npx vitest run && npm run build && cd ../nexus_server && go test ./...`
 Expected: everything green.
