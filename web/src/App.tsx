@@ -16,6 +16,7 @@ import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
 import { STATUSES, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
 import { MoodEditor } from './MoodEditor'
+import { ContactsView } from './ContactsView'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -82,11 +83,22 @@ function Snowflakes() {
     </div>
   )
 }
-/** Flat line icon for the sidebar Home tab — hand-drawn, no external asset. */
-function IconChat() {
+/** Person icon for the sidebar Contacts tab — hand-drawn, no external asset. */
+function IconPerson() {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round">
-      <path d="M4 5.5h16a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/** Clock icon for the sidebar Recent tab — hand-drawn, no external asset. */
+function IconClock() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" strokeLinecap="round" />
     </svg>
   )
 }
@@ -592,7 +604,7 @@ export default function App() {
   const [regPass, setRegPass] = useState('')
   const [regCode, setRegCode] = useState('')
 
-  const [view, setView] = useState<'dms' | 'spaces' | 'live'>('dms')
+  const [view, setView] = useState<'contacts' | 'dms' | 'spaces' | 'live'>('dms')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [remoteOpen, setRemoteOpen] = useState(false)
   const [groupCallRoom, setGroupCallRoom] = useState<string | null>(null)
@@ -2487,7 +2499,8 @@ export default function App() {
                   </div>
                 )}
                 <div className="sidebar-tabs">
-                  <button type="button" title="Home" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}><IconChat /></button>
+                  <button type="button" title="Contacts" className={view === 'contacts' ? 'on' : ''} onClick={() => setView('contacts')}><IconPerson /></button>
+                  <button type="button" title="Recent" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}><IconClock /></button>
                   <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
                   <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}><IconLive /></button>
                 </div>
@@ -2614,6 +2627,10 @@ export default function App() {
                     </div>
                   )}
 
+                  {view === 'contacts' ? (
+                    <ContactsView friends={friends} moods={moods} onOpen={(u) => { openChat(u); setView('dms') }} />
+                  ) : (
+                  <>
                   {Object.keys(friends).length === 0 && (
                     <div className="friends-empty">
                       <div className="friends-empty-icon">💬</div>
@@ -2625,12 +2642,19 @@ export default function App() {
 
                   {Object.keys(friends).length > 0 && <div className="sidebar-section-label">Messages</div>}
                   <ul className="list">
-                    {Object.entries(friends)
-                      .map(([u, st]) => ({ u, st, last: lastLineFor(me, u) }))
-                      .filter(({ u }) => !contactFilter.trim() || u.toLowerCase().includes(contactFilter.toLowerCase()))
-                      .sort((a, b) => (b.last?.ts ?? 0) - (a.last?.ts ?? 0))
-                      .map(({ u, st, last }) => (
+                    {(() => {
+                      const rows = Object.entries(friends)
+                        .map(([u, st]) => ({ u, st, last: lastLineFor(me, u) }))
+                        .filter(({ u }) => !contactFilter.trim() || u.toLowerCase().includes(contactFilter.toLowerCase()))
+                        .sort((a, b) => (b.last?.ts ?? 0) - (a.last?.ts ?? 0))
+                      let lastGroup = ''
+                      return rows.map(({ u, st, last }) => {
+                      const group = last ? dateSepLabel(last.ts) : ''
+                      const showHeader = theme === 'skype7' && group !== '' && group !== lastGroup
+                      if (group) lastGroup = group
+                      return (
                       <li key={u}>
+                        {showHeader && <div className="convo-date-header">{group}</div>}
                         <button type="button" className={`friend-row ${selected === u ? 'sel' : ''}`} onClick={() => openChat(u)}>
                           <span className="avatar" style={{ background: avatarColor(u) }}>
                             {u[0]?.toUpperCase()}
@@ -2652,7 +2676,9 @@ export default function App() {
                           </span>
                         </button>
                       </li>
-                    ))}
+                      )
+                      })
+                    })()}
                     {Object.keys(friends).length > 0 && contactFilter.trim() &&
                       Object.keys(friends).filter(u => u.toLowerCase().includes(contactFilter.toLowerCase())).length === 0 && (
                       <li className="no-filter-match">No contacts match "{contactFilter}"</li>
@@ -2685,7 +2711,16 @@ export default function App() {
                     ))}
                   </ul>
                   <button type="button" className="new-group-btn" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>+ New group</button>
+                  </>
+                  )}
                 </div>
+                {theme === 'skype7' && (
+                  <div className="hub-side-bottom">
+                    <button type="button" onClick={() => { setAddOpen(true); setAddFriend(''); setAddStatus(null) }}>Add a contact</button>
+                    <button type="button" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>Create a group</button>
+                    <div className="online-strip">{Object.values(friends).filter((s) => s !== 'Offline').length} people online</div>
+                  </div>
+                )}
               </div>
 
               {/* ── Chat view ─────────────────────────────────────── */}

@@ -356,7 +356,7 @@ git commit -m "feat: mood line in me-bar, peer moods in chat header"
 - Consumes: `friends: Record<string, string>`, `moods` (Task 3), `PresenceIcon` (Task 2), existing `setSelected`/DM-open handler, existing add-contact & create-group modal openers (`setAddOpen`, `setNewGroupOpen`).
 - Produces: view union gains `'contacts'`; `<ContactsView friends={...} moods={...} onOpen={(u: string) => void} />`.
 
-- [ ] **Step 1: ContactsView**
+- [x] **Step 1: ContactsView**
 
 ```tsx
 // web/src/ContactsView.tsx
@@ -403,7 +403,7 @@ export function ContactsView({ friends, moods, onOpen }: Props) {
 }
 ```
 
-- [ ] **Step 2: Tabs + view wiring in App.tsx**
+- [x] **Step 2: Tabs + view wiring in App.tsx**
 
 1. Extend every `view` literal union / setter: `'contacts' | 'dms' | 'spaces' | 'live'` (grep `view === '` — all sites listed in landmarks).
 2. Tab row order becomes: person (Contacts) / clock (Recent = `dms`, stays the default view) / `#` (Spaces) / red dot (Live). Add two icons beside `IconChat`/`IconLive` (~App.tsx:80):
@@ -438,7 +438,7 @@ export function ContactsView({ friends, moods, onOpen }: Props) {
    ```
 6. CSS: `.contacts-letter` and `.convo-date-header` — 11px uppercase `var(--muted)`, padding 6px 12px 2px; `.contacts-row` — full-width flex button, 8px gap, `var(--list-hover)` on hover; `.contacts-mood` — 11px `var(--text-secondary)`, ellipsis overflow; `.hub-side-bottom` — top border `var(--separator)`, buttons styled like Skymu's flat left-aligned rows; `.online-strip` — 11px, `var(--muted)`, `var(--shell)` background strip.
 
-- [ ] **Step 3: Verify + commit**
+- [x] **Step 3: Verify + commit**
 
 Run: `cd web && npx vitest run && npm run build` — Expected: green.
 Manual: four tabs render and switch; Contacts groups alphabetically with presence icons; Recent shows `Today`/`Yesterday` headers; bottom buttons open the right modals; online count matches reality. Compare sidebar side-by-side with `skymu-v0.4-chat.png`.

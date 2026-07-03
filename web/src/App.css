@@ -3360,6 +3360,65 @@ button.link-btn:hover,
   color: var(--text, #2b2b30);
 }
 .chat-peer-mood { color: var(--muted, #a0b7c8); }
+/* Contacts view + date-grouped recent list. */
+.contacts-view { display: flex; flex-direction: column; }
+.contacts-letter,
+.convo-date-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted, #a0b7c8);
+  padding: 6px 12px 2px;
+}
+.contacts-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--text, #2b2b30);
+  text-align: left;
+}
+.contacts-row:hover { background: var(--list-hover, rgba(0, 0, 0, 0.05)); }
+.contacts-name { flex-shrink: 0; }
+.contacts-mood {
+  font-size: 11px;
+  color: var(--text-secondary, #6e6e73);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.contacts-empty { padding: 16px 12px; font-size: 12px; color: var(--muted, #a0b7c8); }
+/* Sidebar bottom rows — Skymu's flat action strip. */
+.hub-side-bottom {
+  border-top: 1px solid var(--separator, #e4ecef);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hub-side-bottom button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--text, #2b2b30);
+  border-bottom: 1px solid var(--separator, #e4ecef);
+}
+.hub-side-bottom button:hover { background: var(--list-hover, rgba(0, 0, 0, 0.05)); }
+.online-strip {
+  font-size: 11px;
+  color: var(--muted, #a0b7c8);
+  padding: 5px 12px;
+  background: var(--shell, #d4e2f2);
+}
+/* The classic bottom strip replaces the floating "+ New group" under skype7. */
+.app.theme-skype7 .new-group-btn { display: none; }
 .app.theme-skype7 .hub-me-settings {
   background: transparent;
   border: none;
