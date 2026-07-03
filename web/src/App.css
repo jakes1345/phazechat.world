@@ -3419,6 +3419,47 @@ button.link-btn:hover,
 }
 /* The classic bottom strip replaces the floating "+ New group" under skype7. */
 .app.theme-skype7 .new-group-btn { display: none; }
+/* Emoticons — classic picker grid + inline art in messages. */
+.emoticon-picker {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 45;
+  display: grid;
+  grid-template-columns: repeat(8, 30px);
+  gap: 4px;
+  padding: 8px;
+  background: var(--panel, #fff);
+  border: 1px solid var(--panel-edge, #d9d9d9);
+  border-radius: 6px;
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.12));
+}
+.emoticon-picker button {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0;
+}
+.emoticon-picker button:hover { background: var(--list-hover, rgba(0, 0, 0, 0.06)); }
+.emoticon { display: inline-block; margin: 0 1px; line-height: 1; }
+.send-pill {
+  background: var(--brand, #00aff0);
+  color: #fff;
+  font-size: 13px;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.send-pill:hover { background: var(--brand-hover, #0095cc); }
 .app.theme-skype7 .hub-me-settings {
   background: transparent;
   border: none;

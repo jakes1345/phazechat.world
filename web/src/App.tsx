@@ -17,6 +17,9 @@ import { PresenceIcon } from './PresenceIcon'
 import { STATUSES, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
 import { MoodEditor } from './MoodEditor'
 import { ContactsView } from './ContactsView'
+import { tokenize as tokenizeEmoticons } from './emoticons'
+import { Emoticon } from './emoticonArt'
+import { EmoticonPicker } from './EmoticonPicker'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -342,6 +345,16 @@ function tokenize(text: string): Segment[] {
   return out
 }
 
+/** Plain-text run with classic emoticon shortcuts swapped for art. */
+function EmoticonText({ text }: { text: string }) {
+  return (
+    <>
+      {tokenizeEmoticons(text).map((t, i) =>
+        t.kind === 'text' ? <span key={i}>{t.value}</span> : <Emoticon key={i} id={t.id} />)}
+    </>
+  )
+}
+
 function RichText({ text, me }: { text: string; me: string | null }) {
   const segs = useMemo(() => tokenize(text), [text])
   return (
@@ -354,7 +367,7 @@ function RichText({ text, me }: { text: string; me: string | null }) {
           const isMe = me === s.value
           return <span key={i} className={`msg-mention ${isMe ? 'me' : ''}`}>@{s.value}</span>
         }
-        return <span key={i}>{s.value}</span>
+        return <EmoticonText key={i} text={s.value} />
       })}
     </>
   )
@@ -3037,7 +3050,12 @@ export default function App() {
                       )}
                       <div className="emoji-wrap">
                         <button type="button" className="emoji-btn" title="Emoji" onClick={() => setEmojiOpen((v) => !v)}>😊</button>
-                        {emojiOpen && (
+                        {emojiOpen && (theme === 'skype7' ? (
+                          <EmoticonPicker
+                            onPick={(sc) => { setDraft((d) => d + sc + ' '); setEmojiOpen(false); draftInputRef.current?.focus() }}
+                            onClose={() => setEmojiOpen(false)}
+                          />
+                        ) : (
                           <div className="emoji-picker" role="dialog" aria-label="Emoji picker">
                             {EMOJIS.map((e) => (
                               <button
@@ -3048,7 +3066,7 @@ export default function App() {
                               >{e}</button>
                             ))}
                           </div>
-                        )}
+                        ))}
                       </div>
                       <div className="draft-wrap">
                         <input
@@ -3105,7 +3123,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <button type="button" className="send-btn" onClick={sendChat} disabled={conn !== 'open'} title={conn !== 'open' ? 'Reconnecting…' : undefined}>{editingId ? 'Save' : '▶'}</button>
+                      <button type="button" className={theme === 'skype7' && !editingId ? 'send-btn send-pill' : 'send-btn'} onClick={sendChat} disabled={conn !== 'open'} title={conn !== 'open' ? 'Reconnecting…' : undefined}>{editingId ? 'Save' : theme === 'skype7' ? 'Send message' : '▶'}</button>
                     </div>
                   )}
                 </section>

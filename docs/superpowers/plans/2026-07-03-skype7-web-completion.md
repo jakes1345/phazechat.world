@@ -582,7 +582,7 @@ git commit -m "feat: emoticon shortcut tokenizer with classic skype-style codes"
 - Consumes: `EMOTICONS`, `tokenize` (Task 5).
 - Produces: `<EmoticonPicker onPick={(shortcut: string) => void} onClose={() => void} />`; `<MessageBody text={string} />` helper inside App.tsx used everywhere a message body currently renders as text.
 
-- [ ] **Step 1: EmoticonPicker**
+- [x] **Step 1: EmoticonPicker**
 
 ```tsx
 // web/src/EmoticonPicker.tsx
@@ -623,7 +623,7 @@ export function Emoticon({ id }: { id: string }) {
 }
 ```
 
-- [ ] **Step 2: Wire the compose bar and message rendering in App.tsx**
+- [x] **Step 2: Wire the compose bar and message rendering in App.tsx**
 
 1. `MessageBody` helper near the other small components:
    ```tsx
@@ -641,7 +641,7 @@ export function Emoticon({ id }: { id: string }) {
 3. Send button (~2934): when `theme === 'skype7'` render `Send message` in a blue pill (class `send-pill`); other themes keep `'▶'`.
 4. CSS: `.emoticon-picker` — absolute popover above the compose bar, white, `var(--panel-edge)` border, `var(--shadow-md)`, 8-per-row grid, 4px gap; buttons 30×30 flat, `var(--list-hover)` on hover; `.emoticon` — inline-block, `font-size: 18px`, 1px 2px margin; `.send-pill` — `var(--brand)` background, white 13px text, 999px radius, 6px 16px padding, `var(--brand-hover)` on hover.
 
-- [ ] **Step 3: Verify + commit**
+- [x] **Step 3: Verify + commit**
 
 Run: `cd web && npx vitest run && npm run build` — Expected: green.
 Manual: pick `(wave)` from the picker → shortcut lands in input → send → renders as the emoticon in both sender and recipient tabs; a message that is only `https://example.com/:( ` keeps its link intact.
