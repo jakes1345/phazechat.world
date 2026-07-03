@@ -15,6 +15,7 @@ import { encryptKeypair as encryptKeyBackup } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
 import { STATUSES, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
+import { MoodEditor } from './MoodEditor'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -620,6 +621,11 @@ export default function App() {
   const idleRef = useRef(false)
   const lastAckedStatusRef = useRef<UserStatus>('Online')
   const announcedStatusRef = useRef<UserStatus | null>(null)
+  const [myMood, setMyMood] = useState('')
+  const [moods, setMoods] = useState<Record<string, string>>({})
+  const myDisplayNameRef = useRef('')
+  const prevMoodRef = useRef('')
+  const moodFetchedRef = useRef<Set<string>>(new Set())
   const shownStatus = effectiveStatus(myStatus, idle)
   const dnd = myStatus === 'Do Not Disturb'
   dndRef.current = dnd
@@ -962,6 +968,24 @@ export default function App() {
             setMyStatus(lastAckedStatusRef.current)
           } else if (msg.status) {
             lastAckedStatusRef.current = msg.status as UserStatus
+          }
+          break
+
+        case 'profile_update':
+          if (msg.sender) {
+            setMoods((m) => ({ ...m, [msg.sender!]: msg.mood || '' }))
+            if (msg.sender === meRef.current) {
+              // Another device of ours changed it; mirror locally.
+              setMyMood(msg.mood || '')
+              myDisplayNameRef.current = msg.display_name || myDisplayNameRef.current
+            }
+          }
+          break
+
+        case 'update_result':
+          if (msg.error) {
+            setErr(msg.error)
+            setMyMood(prevMoodRef.current)
           }
           break
 
@@ -1424,6 +1448,35 @@ export default function App() {
     setMyStatus(s)
     localStorage.setItem(STATUS_KEY, s)
   }, [])
+
+  const saveMood = useCallback((mood: string) => {
+    prevMoodRef.current = myMood
+    setMyMood(mood)
+    send({ type: 'update_profile', sender: meRef.current ?? undefined, mood, display_name: myDisplayNameRef.current })
+  }, [myMood, send])
+
+  // Seed our own mood + display name once we know who we are.
+  useEffect(() => {
+    if (!me) return
+    fetch(`/api/v1/profile/${me}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => {
+        if (!p) return
+        setMyMood(p.mood || '')
+        myDisplayNameRef.current = p.display_name || ''
+      })
+      .catch(() => {})
+  }, [me])
+
+  // Lazily pick up a peer's mood the first time we open their chat.
+  useEffect(() => {
+    if (!selected || moodFetchedRef.current.has(selected)) return
+    moodFetchedRef.current.add(selected)
+    fetch(`/api/v1/profile/${selected}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => { if (p) setMoods((m) => ({ ...m, [selected]: p.mood || '' })) })
+      .catch(() => {})
+  }, [selected])
 
   // Auto-away: ten quiet minutes downgrade Online to Away; any activity undoes it.
   useEffect(() => {
@@ -2428,6 +2481,11 @@ export default function App() {
                     )}
                   </div>
                 )}
+                {me && (
+                  <div className="hub-mood-bar">
+                    <MoodEditor value={myMood} onSave={saveMood} />
+                  </div>
+                )}
                 <div className="sidebar-tabs">
                   <button type="button" title="Home" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}><IconChat /></button>
                   <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
@@ -2647,7 +2705,10 @@ export default function App() {
                         </span>
                         <span className="chat-peer-info">
                           <span className="chat-peer-name clickable" onClick={() => setProfileUser(selected)}>{selected}</span>
-                          <span className="chat-peer-status">{friends[selected] ?? 'Offline'}</span>
+                          <span className="chat-peer-status">
+                            {friends[selected] ?? 'Offline'}
+                            {theme === 'skype7' && moods[selected] ? <span className="chat-peer-mood"> · {moods[selected]}</span> : null}
+                          </span>
                         </span>
                         <div className="chat-call-btns">
                           <button

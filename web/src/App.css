@@ -3324,6 +3324,42 @@ button.link-btn:hover,
 }
 .presence-menu button:hover { background: var(--list-hover, rgba(0, 0, 0, 0.05)); }
 .presence-menu button.on { font-weight: 700; }
+/* Mood line — the little "share what's on your mind" strip under the me-bar. */
+.hub-mood-bar {
+  padding: 3px 10px 5px;
+  flex-shrink: 0;
+}
+.app.theme-skype7 .hub-mood-bar {
+  background: #BDD1E0;
+  border-bottom: 1px solid #A8BFD0;
+  margin-top: -1px;
+}
+.mood-line {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 1px 0;
+  cursor: text;
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-secondary, #6e6e73);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mood-line.empty { font-style: italic; color: var(--muted, #a0b7c8); }
+.mood-line-input {
+  display: block;
+  width: 100%;
+  font-size: 11px;
+  padding: 1px 3px;
+  border: 1px solid var(--input-border, #d9d9d9);
+  border-radius: 3px;
+  background: var(--input-bg, #fff);
+  color: var(--text, #2b2b30);
+}
+.chat-peer-mood { color: var(--muted, #a0b7c8); }
 .app.theme-skype7 .hub-me-settings {
   background: transparent;
   border: none;

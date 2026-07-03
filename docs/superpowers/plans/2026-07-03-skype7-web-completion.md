@@ -297,7 +297,7 @@ git commit -m "feat: presence states — status menu, idle-away, dnd mutes sound
 - Consumes: server `update_profile` (fields `mood`, `display_name`, max 140/64; answers `update_result`; fans out via `broadcastProfileUpdate` — `grep -n "broadcastProfileUpdate" nexus_server/main.go` for the exact outbound message type, then find the matching `case` in App.tsx's WS switch; add one if the web never handled it).
 - Produces: `<MoodEditor value={string} onSave={(mood: string) => void} />`; App state `myMood: string`, `moods: Record<string, string>` — Task 4's ContactsView consumes `moods`.
 
-- [ ] **Step 1: MoodEditor component**
+- [x] **Step 1: MoodEditor component**
 
 ```tsx
 // web/src/MoodEditor.tsx
@@ -327,14 +327,14 @@ export function MoodEditor({ value, onSave }: { value: string; onSave: (mood: st
 }
 ```
 
-- [ ] **Step 2: Wire into App.tsx**
+- [x] **Step 2: Wire into App.tsx**
 
 1. State: `myMood` (seed from wherever the login/profile payload delivers the user's own mood — `grep -n 'mood' web/src/App.tsx web/src/Settings.tsx` first; Settings.tsx already speaks `update_profile`, reuse its field names) and `moods: Record<string, string>` filled by the profile-update case.
 2. Me-bar: replace the static `Online` status line with `<MoodEditor value={myMood} onSave={saveMood} />` under the display name (the status word now lives on the presence badge from Task 2). `saveMood` sends `update_profile` with the new mood AND the current display_name (the server overwrites both — never send an empty display_name if one is set). On `update_result` error: restore previous `myMood`, toast via `setErr`.
 3. Peer moods: show `moods[peer]` as a gray subtitle in the chat header under the conversation name (skype7 theme).
 4. CSS (App.css, skype7 section): `.mood-line` — borderless button, left-aligned, 12px, `var(--text-secondary)`; `.mood-line.empty` — italic, `var(--muted)`; `.mood-line-input` — same footprint, 1px `var(--input-border)`.
 
-- [ ] **Step 3: Verify + commit**
+- [x] **Step 3: Verify + commit**
 
 Run: `cd web && npx vitest run && npm run build` — Expected: green.
 Manual: set a mood in tab A → appears in tab B's chat header for that contact; survives A's reload.
