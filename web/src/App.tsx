@@ -32,6 +32,7 @@ import SupportBubble from './SupportBubble'
 import SupportForm from './SupportForm'
 import Settings from './Settings'
 import DesktopTitleBar from './DesktopTitleBar'
+import { AvatarImg } from './AvatarImg'
 import './App.css'
 
 // Wails desktop bridge — only present when running inside the Wails desktop app.
@@ -2152,6 +2153,7 @@ export default function App() {
                   >
                     <span className="avatar" style={{ background: avatarColor(u) }}>
                       {u[0]?.toUpperCase()}
+                      <AvatarImg user={u} />
                       <span className="avatar-dot" style={{ background: isFriend ? statusColor(st) : '#555' }} />
                     </span>
                     <span className="palette-meta">
@@ -2504,6 +2506,7 @@ export default function App() {
                   <div className="hub-me-bar">
                     <span className="avatar hub-me-avatar" style={{ background: avatarColor(me) }}>
                       {me[0]?.toUpperCase()}
+                      <AvatarImg user={me} />
                       <span className="hub-me-presence"><PresenceIcon status={shownStatus} size={11} /></span>
                     </span>
                     <span className="hub-me-info">
@@ -2648,6 +2651,7 @@ export default function App() {
                         <div key={u} className="pending-row">
                           <span className="avatar" style={{ background: avatarColor(u) }}>
                             {u[0]?.toUpperCase()}
+                            <AvatarImg user={u} />
                           </span>
                           <span className="pending-info">
                             <span className="pending-name">{u}</span>
@@ -2690,6 +2694,7 @@ export default function App() {
                         <button type="button" className={`friend-row ${selected === u ? 'sel' : ''}`} onClick={() => openChat(u)}>
                           <span className="avatar" style={{ background: avatarColor(u) }}>
                             {u[0]?.toUpperCase()}
+                            <AvatarImg user={u} />
                             {theme === 'skype7'
                               ? <span className="avatar-presence"><PresenceIcon status={st} size={11} /></span>
                               : <span className="avatar-dot" data-online={st === 'Online' ? '' : undefined} style={{ background: statusColor(st) }} />}
@@ -2766,6 +2771,7 @@ export default function App() {
                         </button>
                         <span className="avatar chat-peer-avatar" style={{ background: avatarColor(selected) }}>
                           {selected[0]?.toUpperCase()}
+                          <AvatarImg user={selected} />
                           {theme === 'skype7'
                             ? <span className="avatar-presence"><PresenceIcon status={friends[selected] ?? 'Offline'} size={11} /></span>
                             : <span className="avatar-dot" style={{ background: statusColor(friends[selected] ?? 'Offline') }} />}

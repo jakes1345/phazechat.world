@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import QRCode from 'qrcode'
 import type { NexusMessage } from './nexusTypes'
+import { bumpAvatarVersion } from './AvatarImg'
 import './settings.css'
 
 type Tab = 'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite' | 'import'
@@ -480,6 +481,29 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
           {/* ── Profile ──────────────────────────────────────── */}
           {tab === 'profile' && (
             <div className="settings-section">
+              <label className="settings-label">Profile picture</label>
+              <input
+                className="settings-input"
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0]
+                  if (!f) return
+                  try {
+                    const resp = await fetch('/api/v1/avatars', { method: 'POST', credentials: 'include', body: f })
+                    if (resp.ok) {
+                      bumpAvatarVersion(me)
+                      setProfileMsg('Saved.')
+                    } else {
+                      setProfileMsg(await resp.text() || 'Upload failed')
+                    }
+                  } catch {
+                    setProfileMsg('Upload failed — network error')
+                  }
+                  e.target.value = ''
+                }}
+              />
+
               <label className="settings-label">Display name</label>
               <input className="settings-input" placeholder={me} value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={64} />
 
