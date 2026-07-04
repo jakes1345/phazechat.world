@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,7 +59,12 @@ fun CallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(
+                // Classic deep-teal wash behind everything; video paints over it.
+                Brush.verticalGradient(
+                    listOf(Color(0xFF1D5F7A), Color(0xFF123F53), Color(0xFF0C2C3B))
+                )
+            ),
         contentAlignment = Alignment.Center,
     ) {
         // Remote video fills the screen when available.
@@ -68,6 +74,14 @@ fun CallScreen(
                 eglContext = eglContext!!,
                 mirror = false,
                 modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Text(
+                "phaze",
+                fontSize = 26.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White.copy(alpha = 0.14f),
+                modifier = Modifier.align(Alignment.TopEnd).padding(18.dp),
             )
         }
 
@@ -79,15 +93,15 @@ fun CallScreen(
             if (!(showVideo && hasRemoteVideo && remoteVideoTrack != null)) {
                 Box(
                     modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
+                        .size(96.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(avatarTint(peer)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(peer.firstOrNull()?.uppercase() ?: "?", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(peer.firstOrNull()?.uppercase() ?: "?", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
                 Spacer(Modifier.height(16.dp))
-                Text(peer, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(peer, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                 Spacer(Modifier.height(4.dp))
 
                 Text(
@@ -105,29 +119,35 @@ fun CallScreen(
 
             Spacer(Modifier.weight(1f))
 
-            // Controls
-            if (isIncoming && callStatus == "ringing") {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(32.dp),
-                    modifier = Modifier.padding(bottom = 48.dp),
-                ) {
-                    CallButton(text = "Decline", color = PhazeDanger) { onReject() }
-                    CallButton(text = "Answer", color = PhazeSuccess) { onAnswer() }
-                }
-            } else {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(20.dp),
-                    modifier = Modifier.padding(bottom = 48.dp),
-                ) {
-                    CallButton(text = if (isMuted) "Unmute" else "Mute", color = if (isMuted) Color(0xFF0095CC) else Color.DarkGray) { onToggleMute() }
-                    CallButton(text = if (speakerOn) "Earpiece" else "Speaker", color = if (speakerOn) Color(0xFF0095CC) else Color.DarkGray) {
-                        speakerOn = onToggleSpeakerphone()
+            // Controls — one dark rounded bar, classic style.
+            Surface(
+                color = Color(0xD00A1820),
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.padding(bottom = 40.dp),
+            ) {
+                if (isIncoming && callStatus == "ringing") {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(32.dp),
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
+                    ) {
+                        CallButton(text = "Decline", color = PhazeDanger) { onReject() }
+                        CallButton(text = "Answer", color = PhazeSuccess) { onAnswer() }
                     }
-                    if (isVideo) {
-                        CallButton(text = if (isCameraOn) "Cam Off" else "Cam On", color = if (isCameraOn) Color(0xFF0095CC) else Color.DarkGray) { onToggleCamera() }
-                        CallButton(text = if (isScreenSharing) "Stop Share" else "Share", color = if (isScreenSharing) Color(0xFF00AFF0) else Color.DarkGray) { onToggleScreenShare() }
+                } else {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 10.dp),
+                    ) {
+                        CallButton(text = if (isMuted) "Unmute" else "Mute", color = if (isMuted) Color(0xFF0095CC) else Color.DarkGray) { onToggleMute() }
+                        CallButton(text = if (speakerOn) "Earpiece" else "Speaker", color = if (speakerOn) Color(0xFF0095CC) else Color.DarkGray) {
+                            speakerOn = onToggleSpeakerphone()
+                        }
+                        if (isVideo) {
+                            CallButton(text = if (isCameraOn) "Cam Off" else "Cam On", color = if (isCameraOn) Color(0xFF0095CC) else Color.DarkGray) { onToggleCamera() }
+                            CallButton(text = if (isScreenSharing) "Stop Share" else "Share", color = if (isScreenSharing) Color(0xFF00AFF0) else Color.DarkGray) { onToggleScreenShare() }
+                        }
+                        CallButton(text = "End", color = PhazeDanger) { onHangUp() }
                     }
-                    CallButton(text = "End", color = PhazeDanger) { onHangUp() }
                 }
             }
         }
