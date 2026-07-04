@@ -146,6 +146,10 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         uri?.let { vm.postStory(it) }
     }
 
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { vm.uploadAvatar(it) }
+    }
+
     // Load stories on login
     LaunchedEffect(me) { if (me != null) vm.loadStories() }
 
@@ -503,6 +507,7 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                         mood = friends[me]?.mood ?: "",
                         displayName = myDisplayName,
                         onUpdateProfile = { name, mood -> vm.updateProfile(name, mood) },
+                        onPickAvatar = { avatarPicker.launch("image/*") },
                         onEnable2FA = { vm.enable2FA() },
                         onConfirm2FA = { code -> vm.confirm2FA(code) },
                         onDisable2FA = { pw -> vm.disable2FA(pw) },

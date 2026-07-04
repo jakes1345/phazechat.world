@@ -36,10 +36,10 @@
 - [x] Gate + commit `feat: profile pictures on web — upload in settings, avatars with letter fallback`.
 
 ### Task 3: Android — Coil avatars + upload
-- `app/build.gradle.kts`: `implementation("io.coil-kt:coil-compose:2.7.0")`.
-- `Avatar()` (ChatsScreen.kt:248): wrap letter Box with Coil `AsyncImage(model = "$httpBase/api/v1/avatars/$name", ...)` on top; find `httpBase`/server URL source (grep how PhazeViewModel builds HTTP URLs for upload) — pass or hardcode same constant path used by uploads; keep letter beneath (AsyncImage transparent until success).
-- SettingsScreen: "Profile picture" row → image picker (reuse the pattern of story/file pickers in MainActivity — add a callback param wired there) → VM `uploadAvatar(uri)` using the same OkHttp/HttpURLConnection code path as file upload but to `/api/v1/avatars`.
-- Gate + commit `feat: profile pictures on android — coil rendering, upload in settings`.
+- [x] `app/build.gradle.kts`: `implementation("io.coil-kt:coil-compose:2.7.0")`.
+- [x] `Avatar()` (ChatsScreen.kt:248): wrap letter Box with Coil `AsyncImage(model = "$httpBase/api/v1/avatars/$name", ...)` on top; find `httpBase`/server URL source (grep how PhazeViewModel builds HTTP URLs for upload) — pass or hardcode same constant path used by uploads; keep letter beneath (AsyncImage transparent until success).
+- [x] SettingsScreen: "Profile picture" row → image picker (reuse the pattern of story/file pickers in MainActivity — add a callback param wired there) → VM `uploadAvatar(uri)` using the same OkHttp/HttpURLConnection code path as file upload but to `/api/v1/avatars`.
+- [x] Gate + commit `feat: profile pictures on android — coil rendering, upload in settings`.
 
 ### Task 4: Web — fix B1 (live group messages invisible)
 - Grep the `selectedConvo` render block; identify the state the group message list ACTUALLY reads (likely populated only by `convo_history`). Point `case 'convo_msg'` at that same state (and delete the write-only `convoLogs` if truly redundant — verify with grep before deleting).

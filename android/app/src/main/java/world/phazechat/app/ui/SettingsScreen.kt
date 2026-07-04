@@ -36,6 +36,7 @@ fun SettingsScreen(
     mood: String = "",
     displayName: String = "",
     onUpdateProfile: ((String, String) -> Unit)? = null,
+    onPickAvatar: (() -> Unit)? = null,
     onEnable2FA: (() -> Unit)? = null,
     onConfirm2FA: ((String) -> Unit)? = null,
     onDisable2FA: ((String) -> Unit)? = null,
@@ -130,6 +131,12 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(8.dp))
 
+        if (onPickAvatar != null) {
+            OutlinedButton(onClick = onPickAvatar, modifier = Modifier.fillMaxWidth()) {
+                Text("Change profile picture")
+            }
+            Spacer(Modifier.height(8.dp))
+        }
         if (onUpdateProfile != null) {
             Button(
                 onClick = {
