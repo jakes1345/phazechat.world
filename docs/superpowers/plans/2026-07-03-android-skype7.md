@@ -842,16 +842,16 @@ git commit -m "style: classic teal call screen, dark rounded control bar"
 
 ### Task 8: Full build + suite gate
 
-- [ ] **Step 1: Everything green**
+- [x] **Step 1: Everything green**
 
 Run: `cd android && ./gradlew assembleDebug testDebugUnitTest`
 Expected: BUILD SUCCESSFUL, 6+ unit tests passing.
 
-- [ ] **Step 2: Install if a device is reachable**
+- [x] **Step 2: Install if a device is reachable**
 
 Run: `cd android && adb devices` — if a device/emulator is listed: `./gradlew installDebug` and hand-check header, tabs, status picker, emoticons, call ring screen. If none: note it and leave device QA to the user.
 
-- [ ] **Step 3: Commit any straggler fixes**
+- [x] **Step 3: Commit any straggler fixes**
 
 ```bash
 git add -A android/ docs/superpowers/plans/2026-07-03-android-skype7.md
