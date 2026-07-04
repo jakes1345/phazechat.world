@@ -33,6 +33,7 @@ import SupportForm from './SupportForm'
 import Settings from './Settings'
 import DesktopTitleBar from './DesktopTitleBar'
 import { AvatarImg } from './AvatarImg'
+import GroupChat from './GroupChat'
 import './App.css'
 
 // Wails desktop bridge — only present when running inside the Wails desktop app.
@@ -692,9 +693,7 @@ export default function App() {
   const [convos, setConvos] = useState<Convo[]>([])
   const [selectedConvo, setSelectedConvo] = useState<string | null>(null)
   const [turn, setTurn] = useState<TurnConfig | null>(null)
-  // Value is currently write-only: group history renders straight from the
-  // server replay, but we keep the log so a future group pane can read it.
-  const [, setConvoLogs] = useState<Record<string, ConvoLine[]>>({})
+  const [convoLogs, setConvoLogs] = useState<Record<string, ConvoLine[]>>({})
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([])
@@ -2762,6 +2761,33 @@ export default function App() {
 
               {/* ── Chat view ─────────────────────────────────────── */}
               <div className="hub-chat-view">
+                {selectedConvo && !selected ? (
+                  <GroupChat
+                    name={convos.find((c) => c.id === selectedConvo)?.name ?? selectedConvo}
+                    members={convos.find((c) => c.id === selectedConvo)?.members ?? []}
+                    lines={convoLogs[selectedConvo] ?? []}
+                    renderBody={(t) => <RichText text={t} me={me} />}
+                    senderColor={avatarColor}
+                    onSend={(text) => {
+                      send({ type: 'convo_msg', convo_id: selectedConvo, sender: me ?? undefined, body: text })
+                      // Server fans out to the other members only — echo locally.
+                      const cid = selectedConvo
+                      setConvoLogs((prev) => ({
+                        ...prev,
+                        [cid]: [...(prev[cid] ?? []), {
+                          id: `${cid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                          sender: me ?? '', body: text, ts: Date.now(), me: true,
+                        }],
+                      }))
+                    }}
+                    onLeave={() => {
+                      send({ type: 'convo_leave', convo_id: selectedConvo, sender: me ?? undefined })
+                      setConvos((prev) => prev.filter((c) => c.id !== selectedConvo))
+                      setSelectedConvo(null)
+                    }}
+                    onClose={() => setSelectedConvo(null)}
+                  />
+                ) : (
                 <section className="panel grow">
                   <div className="chat-header-bar">
                     {selected ? (
@@ -3152,6 +3178,7 @@ export default function App() {
                     </div>
                   )}
                 </section>
+                )}
               </div>
             </div>
           </main>
