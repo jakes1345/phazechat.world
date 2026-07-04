@@ -288,6 +288,41 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private val settableStatuses = setOf("Online", "Away", "Do Not Disturb", "Invisible")
+
+    // Bumped after an avatar upload so Coil refetches our own picture.
+    private val _avatarVersion = MutableStateFlow(0)
+    val avatarVersion = _avatarVersion.asStateFlow()
+
+    fun uploadAvatar(uri: android.net.Uri) {
+        val token = _sessionToken.value ?: return
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val bytes = getApplication<Application>().contentResolver.openInputStream(uri)?.readBytes()
+                if (bytes == null) {
+                    viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) { _actionStatus.value = "Could not read image" }
+                    return@launch
+                }
+                val conn = java.net.URL("https://phazechat.world/api/v1/avatars").openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Authorization", "Bearer $token")
+                conn.doOutput = true
+                conn.outputStream.write(bytes)
+                val code = conn.responseCode
+                val err = if (code != 200) runCatching { conn.errorStream?.bufferedReader()?.readText() }.getOrNull() else null
+                conn.disconnect()
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                    if (code == 200) {
+                        _avatarVersion.value++
+                        _actionStatus.value = "Profile picture updated"
+                    } else {
+                        _actionStatus.value = err?.take(80) ?: "Avatar upload failed ($code)"
+                    }
+                }
+            } catch (e: Exception) {
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) { _actionStatus.value = "Avatar upload error: ${e.message}" }
+            }
+        }
+    }
     // Snowflakes seasonal overlay.
     private val _snow = MutableStateFlow(prefs.getBoolean("snow", false))
     val snow = _snow.asStateFlow()

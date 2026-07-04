@@ -245,7 +245,7 @@ fun FriendRow(friend: FriendInfo, unreadCount: Int, onClick: () -> Unit) {
 }
 
 @Composable
-fun Avatar(name: String, size: Int, status: String? = null) {
+fun Avatar(name: String, size: Int, status: String? = null, cacheBust: Int = 0) {
     Box(contentAlignment = Alignment.BottomEnd) {
         Box(
             modifier = Modifier
@@ -259,6 +259,13 @@ fun Avatar(name: String, size: Int, status: String? = null) {
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = (size / 2.6f).sp,
+            )
+            // Uploaded picture paints over the letter; a 404 leaves it alone.
+            coil.compose.AsyncImage(
+                model = "https://phazechat.world/api/v1/avatars/$name?v=$cacheBust",
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.size(size.dp).clip(CircleShape),
             )
         }
         if (status != null && status != "Offline") {
