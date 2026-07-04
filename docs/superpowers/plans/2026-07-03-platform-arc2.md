@@ -30,10 +30,10 @@
 - [x] Gate + commit `feat: avatar upload endpoint, png/jpeg sniffed, 2mb cap`.
 
 ### Task 2: Web — AvatarImg everywhere + Settings upload
-- Create `web/src/AvatarImg.tsx`: props `{user, size, className?}`; renders `<span class="avatar">` letter-circle exactly as today PLUS an absolutely-positioned `<img src={/api/v1/profile-independent avatar URL}?v=bump>` that hides itself `onError`; export a module-level `bumpAvatarVersion(user)` (Map + listeners or simple counter state via zustand-free custom event) so an upload refreshes instances.
-- Swap the letter-circle at: me-bar, friend rows, contacts rows, chat header, palette rows (grep `avatarColor(` render sites in App.tsx/ContactsView.tsx — keep presence badges overlaid as-is).
-- Settings.tsx: "Profile picture" block — file input; POST body to `/api/v1/avatars` with `credentials:'include'`; on ok call `bumpAvatarVersion(me)`; error → existing settings error surface.
-- Gate + commit `feat: profile pictures on web — upload in settings, avatars with letter fallback`.
+- [x] Create `web/src/AvatarImg.tsx`: props `{user, size, className?}`; renders `<span class="avatar">` letter-circle exactly as today PLUS an absolutely-positioned `<img src={/api/v1/profile-independent avatar URL}?v=bump>` that hides itself `onError`; export a module-level `bumpAvatarVersion(user)` (Map + listeners or simple counter state via zustand-free custom event) so an upload refreshes instances.
+- [x] Swap the letter-circle at: me-bar, friend rows, contacts rows, chat header, palette rows (grep `avatarColor(` render sites in App.tsx/ContactsView.tsx — keep presence badges overlaid as-is).
+- [x] Settings.tsx: "Profile picture" block — file input; POST body to `/api/v1/avatars` with `credentials:'include'`; on ok call `bumpAvatarVersion(me)`; error → existing settings error surface.
+- [x] Gate + commit `feat: profile pictures on web — upload in settings, avatars with letter fallback`.
 
 ### Task 3: Android — Coil avatars + upload
 - `app/build.gradle.kts`: `implementation("io.coil-kt:coil-compose:2.7.0")`.

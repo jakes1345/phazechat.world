@@ -4233,12 +4233,14 @@ func (s *NexusServer) avatarHandler(w http.ResponseWriter, r *http.Request) {
 	// the same regex used at registration — so callers can't sneak ".." or
 	// "/" into the avatar path.
 	if !validUsername(username) {
-		http.ServeFile(w, r, "assets/default_avatar.png")
+		http.NotFound(w, r)
 		return
 	}
+	// 404 when no picture is set: clients render their own letter-circle
+	// fallback, which beats shipping one generic silhouette to everybody.
 	path := "avatars/" + username + ".png"
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		http.ServeFile(w, r, "assets/default_avatar.png")
+		http.NotFound(w, r)
 		return
 	}
 	http.ServeFile(w, r, path)

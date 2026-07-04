@@ -3522,6 +3522,16 @@ button.link-btn:hover,
   flex: 0 0 auto;
 }
 .send-pill:hover { background: var(--brand-hover, #0095cc); }
+/* Uploaded profile picture paints over the letter circle; 404 removes it. */
+.avatar { position: relative; }
+.avatar-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
 .app.theme-skype7 .hub-me-settings {
   background: transparent;
   border: none;
