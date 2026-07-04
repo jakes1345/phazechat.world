@@ -800,7 +800,7 @@ git commit -m "feat: drawn emoticons in chat, picker panel, send message pill"
 **Interfaces:**
 - Consumes: existing `CallScreen` signature (peer, isIncoming, callStatus, WebRTC tracks, callbacks) — unchanged.
 
-- [ ] **Step 1: Restyle**
+- [x] **Step 1: Restyle**
 
 Keep all logic (elapsed timer, renderers, toggles). Replace the root `Box` background with the teal radial wash and restructure the ring-state layout:
 
@@ -829,7 +829,7 @@ Add, when not `isActive` (ringing/connecting):
 
 Video-active state keeps the renderers full-bleed exactly as today; only the control bar restyles.
 
-- [ ] **Step 2: Build + commit**
+- [x] **Step 2: Build + commit**
 
 Run: `cd android && ./gradlew assembleDebug` — Expected: green.
 

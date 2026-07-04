@@ -281,7 +281,7 @@ private val avatarPalette = listOf(
     Color(0xFF16A085), Color(0xFF2980B9), Color(0xFFD35400),
 )
 
-private fun avatarTint(name: String): Color {
+fun avatarTint(name: String): Color {
     val idx = name.fold(0) { acc, c -> acc + c.code } % avatarPalette.size
     return avatarPalette[idx]
 }
