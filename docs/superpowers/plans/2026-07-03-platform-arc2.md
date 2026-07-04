@@ -23,11 +23,11 @@
 ---
 
 ### Task 1: Server — avatar upload endpoint
-- Create `nexus_server/avatars.go`: `func (s *NexusServer) avatarUploadHandler(w, r)` — POST only; authenticate exactly like `/api/v1/upload` (grep and copy its session check); `r.Body` capped via `http.MaxBytesReader(w, r.Body, 2<<20)`; read, sniff with `http.DetectContentType` allowing `image/png`/`image/jpeg`; decode via `image/png`+`image/jpeg`, re-encode PNG, write `avatars/<username>.png` (MkdirAll first). JSON `{ok:true}` / error text.
-- Register in main.go next to the GET route: `http.HandleFunc("/api/v1/avatars", rateLimit(server.avatarUploadHandler))` (no trailing slash = upload; with slash = GET stays).
-- GET handler: add `w.Header().Set("Cache-Control", "no-cache")`.
-- Test `nexus_server/avatars_test.go`: table test on the sniff/size validation helper (extract `validateAvatar(data []byte) error`).
-- Gate + commit `feat: avatar upload endpoint, png/jpeg sniffed, 2mb cap`.
+- [x] Create `nexus_server/avatars.go`: `func (s *NexusServer) avatarUploadHandler(w, r)` — POST only; authenticate exactly like `/api/v1/upload` (grep and copy its session check); `r.Body` capped via `http.MaxBytesReader(w, r.Body, 2<<20)`; read, sniff with `http.DetectContentType` allowing `image/png`/`image/jpeg`; decode via `image/png`+`image/jpeg`, re-encode PNG, write `avatars/<username>.png` (MkdirAll first). JSON `{ok:true}` / error text.
+- [x] Register in main.go next to the GET route: `http.HandleFunc("/api/v1/avatars", rateLimit(server.avatarUploadHandler))` (no trailing slash = upload; with slash = GET stays).
+- [x] GET handler: add `w.Header().Set("Cache-Control", "no-cache")`.
+- [x] Test `nexus_server/avatars_test.go`: table test on the sniff/size validation helper (extract `validateAvatar(data []byte) error`).
+- [x] Gate + commit `feat: avatar upload endpoint, png/jpeg sniffed, 2mb cap`.
 
 ### Task 2: Web — AvatarImg everywhere + Settings upload
 - Create `web/src/AvatarImg.tsx`: props `{user, size, className?}`; renders `<span class="avatar">` letter-circle exactly as today PLUS an absolutely-positioned `<img src={/api/v1/profile-independent avatar URL}?v=bump>` that hides itself `onError`; export a module-level `bumpAvatarVersion(user)` (Map + listeners or simple counter state via zustand-free custom event) so an upload refreshes instances.

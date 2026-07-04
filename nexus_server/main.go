@@ -3881,6 +3881,7 @@ func main() {
 	http.HandleFunc("/api/v1/version", rateLimit(server.versionHandler))
 	http.HandleFunc("/api/v1/profile/", rateLimit(server.profileHandler))
 	http.HandleFunc("/api/v1/avatars/", rateLimit(server.avatarHandler))
+	http.HandleFunc("/api/v1/avatars", rateLimit(server.avatarUploadHandler))
 	http.HandleFunc("/api/v1/upload", rateLimit(server.uploadHandler))
 	http.HandleFunc("/uploads/", server.uploadsServeHandler)
 	http.HandleFunc("/twiml/outbound", rateLimit(server.twimlHandler))
@@ -4225,6 +4226,8 @@ func (s *NexusServer) avatarHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Username required", 400)
 		return
 	}
+	// Fresh uploads should show without a hard refresh.
+	w.Header().Set("Cache-Control", "no-cache")
 	// Block path traversal: reject anything that isn't a plain valid
 	// username. validUsername already enforces [a-zA-Z0-9_] and length —
 	// the same regex used at registration — so callers can't sneak ".." or
