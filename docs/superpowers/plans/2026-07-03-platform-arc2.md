@@ -42,9 +42,9 @@
 - [x] Gate + commit `feat: profile pictures on android — coil rendering, upload in settings`.
 
 ### Task 4: Web — fix B1 (live group messages invisible)
-- Grep the `selectedConvo` render block; identify the state the group message list ACTUALLY reads (likely populated only by `convo_history`). Point `case 'convo_msg'` at that same state (and delete the write-only `convoLogs` if truly redundant — verify with grep before deleting).
-- Add a "not end-to-end encrypted" caption in the group chat header (skype7 + default themes).
-- Manual verify via local-verify recipe (two users, one group, live message appears). Gate + commit `fix: live group messages render without reopening the convo`.
+- [x] Grep the `selectedConvo` render block; identify the state the group message list ACTUALLY reads (likely populated only by `convo_history`). Point `case 'convo_msg'` at that same state (and delete the write-only `convoLogs` if truly redundant — verify with grep before deleting).
+- [x] Add a "not end-to-end encrypted" caption in the group chat header (skype7 + default themes).
+- [x] Manual verify via local-verify recipe (two users, one group, live message appears). Gate + commit `fix: live group messages render without reopening the convo`.
 
 ### Task 5: Android — group chats
 - NexusMessage.kt: ensure `convo_id`, `convo_name`, `members` map (grep; add missing).
