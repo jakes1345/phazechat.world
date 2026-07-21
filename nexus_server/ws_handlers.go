@@ -1513,7 +1513,14 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			roomID = "phaze-" + roomID
-			callID, startedAt := s.recordCallStart(username, msg.Recipient, msg.Body)
+			// Web sends the call kind in Body ("audio"/"video"); native
+			// clients still on raw WebRTC signaling send SDP there instead
+			// and never set a kind — default rather than log garbage.
+			callKind := msg.Body
+			if callKind != "audio" && callKind != "video" {
+				callKind = "audio"
+			}
+			callID, startedAt := s.recordCallStart(username, msg.Recipient, callKind)
 			if callerClient, ok := s.Clients[username]; ok {
 				callerClient.PendingCallRoom = roomID
 				callerClient.PendingCallID = callID

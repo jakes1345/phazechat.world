@@ -23,6 +23,26 @@ import androidx.compose.ui.unit.sp
 import world.phazechat.app.data.ConvoInfo
 import world.phazechat.app.data.FriendInfo
 
+/** Real recency first, falling back to online-first/alpha when nobody has a lastTs yet. */
+fun sortFriendsForRecent(friends: Collection<FriendInfo>): List<FriendInfo> =
+    friends.sortedWith(
+        compareByDescending<FriendInfo> { it.lastTs }
+            .thenByDescending { it.status == "Online" }
+            .thenBy { it.username }
+    )
+
+private fun dayLabel(ts: Long): String {
+    val cal = java.util.Calendar.getInstance()
+    val today = cal.get(java.util.Calendar.DAY_OF_YEAR) to cal.get(java.util.Calendar.YEAR)
+    cal.timeInMillis = ts
+    val that = cal.get(java.util.Calendar.DAY_OF_YEAR) to cal.get(java.util.Calendar.YEAR)
+    return when {
+        that == today -> "Today"
+        today.second == that.second && today.first - that.first == 1 -> "Yesterday"
+        else -> java.text.SimpleDateFormat("EEEE, MMMM d", java.util.Locale.US).format(java.util.Date(ts))
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatsScreen(
@@ -115,10 +135,9 @@ fun ChatsScreen(
             }
         }
 
-        // Contacts list
-        val sorted = friends.values.sortedWith(
-            compareByDescending<FriendInfo> { it.status == "Online" }.thenBy { it.username }
-        )
+        // Contacts list — real recency first; falls back to online-first/alpha
+        // when nobody has a lastTs yet (fresh install, no history synced).
+        val sorted = sortFriendsForRecent(friends.values)
 
         if (sorted.isEmpty() && convos.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -153,13 +172,33 @@ fun ChatsScreen(
                         )
                     }
                 }
-                items(sorted, key = { it.username }) { friend ->
-                    val count = unread[friend.username] ?: 0
-                    FriendRow(friend, count) { onSelectChat(friend.username) }
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 72.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                    )
+                var lastBand = ""
+                sorted.forEach { friend ->
+                    // Bands only appear once we have a real timestamp to bucket —
+                    // never invent one for a friend with no activity yet.
+                    if (friend.lastTs > 0) {
+                        val band = dayLabel(friend.lastTs)
+                        if (band != lastBand) {
+                            lastBand = band
+                            item(key = "band-$band") {
+                                Text(
+                                    band,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                                )
+                            }
+                        }
+                    }
+                    item(key = friend.username) {
+                        val count = unread[friend.username] ?: 0
+                        FriendRow(friend, count) { onSelectChat(friend.username) }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                        )
+                    }
                 }
             }
         }

@@ -65,9 +65,9 @@
 - [x] Gate + commit `feat: call history lines in chat, recent order seeded from server ts`.
 
 ### Task 8: Android — call rows + real Recent
-- `call_log` case → append ChatLine (system style) to the peer's log + bump unread if not open.
-- FriendInfo gains `lastTs: Long = 0` set from friend_status `ts`; ChatsScreen sorts by `lastTs` desc (falls back to old order when all zero) and shows the date bands (dayLabel helper from the android plan Task 5 — implement now that data exists).
-- JVM test: recent sort comparator. Gate + commit `feat: android recent sorted by real time, call rows, date bands`.
+- [x] `call_log` case → append ChatLine (system style) to the peer's log + bump unread if not open.
+- [x] FriendInfo gains `lastTs: Long = 0` set from friend_status `ts`; ChatsScreen sorts by `lastTs` desc (falls back to old order when all zero) and shows the date bands (dayLabel helper from the android plan Task 5 — implement now that data exists).
+- [x] JVM test: recent sort comparator. Gate + commit `feat: android recent sorted by real time, call rows, date bands`.
 
 ### Task 9: Web — inline images + drag-drop + progress
 - In the `phaze-file` bubble branch: `mime.startsWith('image/')` → `<img class="bubble-img" src={url} loading="lazy" onClick=open>` (max-height 260px CSS, radius) instead of the paperclip row.

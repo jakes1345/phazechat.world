@@ -12,6 +12,12 @@ import org.json.JSONArray
 import org.json.JSONObject
 import world.phazechat.app.crypto.*
 
+data class CallLogInfo(
+    val kind: String,
+    val answered: Boolean,
+    val durationS: Int,
+)
+
 data class ChatLine(
     val id: String,
     val from: String,
@@ -25,6 +31,7 @@ data class ChatLine(
     val deleted: Boolean = false,
     val reaction: String? = null,
     val seen: Boolean = false,
+    val callInfo: CallLogInfo? = null,
 )
 
 data class FriendInfo(
@@ -32,6 +39,7 @@ data class FriendInfo(
     val status: String = "Offline",
     val mood: String? = null,
     val supporter: Boolean = false,
+    val lastTs: Long = 0L,
 )
 
 data class ConvoInfo(
@@ -1411,13 +1419,45 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 msg.sender?.let { sender ->
                     _friends.value = _friends.value.toMutableMap().apply {
                         val existing = get(sender)
-                        put(sender, FriendInfo(sender, msg.status ?: "Offline", existing?.mood, msg.supporter || (existing?.supporter ?: false)))
+                        put(sender, FriendInfo(
+                            sender, msg.status ?: "Offline", existing?.mood,
+                            msg.supporter || (existing?.supporter ?: false),
+                            msg.ts ?: existing?.lastTs ?: 0L,
+                        ))
                     }
                     msg.publicKey?.let { pk -> decodePublicKeyB64(pk)?.let { peerKeys[sender] = it } }
                     if (msg.status == "Offline" && _callState.value?.peer == sender) {
                         callManager?.hangUp()
                         callManager = null
                         _callState.value = null
+                    }
+                }
+            }
+
+            "call_log" -> {
+                val me = _me.value
+                val caller = msg.sender
+                val callee = msg.recipient
+                if (me != null && caller != null && callee != null) {
+                    val peer = if (caller == me) callee else caller
+                    val info = CallLogInfo(
+                        kind = msg.body ?: "audio",
+                        answered = msg.status == "answered",
+                        durationS = msg.duration ?: 0,
+                    )
+                    val line = ChatLine(
+                        id = "call-${msg.ts}-$peer", from = peer, text = "", me = false,
+                        ts = msg.ts ?: System.currentTimeMillis(), callInfo = info,
+                    )
+                    if (_selectedChat.value == peer) {
+                        _chatLog.value = _chatLog.value + line
+                    } else {
+                        _unread.value = _unread.value.toMutableMap().apply { put(peer, (get(peer) ?: 0) + 1) }
+                    }
+                    _friends.value[peer]?.let { fi ->
+                        _friends.value = _friends.value.toMutableMap().apply {
+                            put(peer, fi.copy(lastTs = maxOf(fi.lastTs, line.ts)))
+                        }
                     }
                 }
             }

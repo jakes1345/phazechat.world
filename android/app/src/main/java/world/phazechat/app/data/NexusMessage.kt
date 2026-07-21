@@ -20,6 +20,10 @@ data class NexusMessage(
     val convoId: String? = null,
     val convoName: String? = null,
     val members: List<String>? = null,
+    // unix-ms timestamp: last DM activity on friend_status, call start on call_log
+    val ts: Long? = null,
+    // call length in seconds, present on call_log
+    val duration: Int? = null,
     val turnUrl: String? = null,
     val turnUrls: List<String>? = null,
     val turnUsername: String? = null,
@@ -70,6 +74,8 @@ data class NexusMessage(
         convoId?.let { put("convo_id", it) }
         convoName?.let { put("convo_name", it) }
         members?.let { put("members", org.json.JSONArray(it)) }
+        ts?.let { put("ts", it) }
+        duration?.let { put("duration", it) }
         serverId?.let { put("server_id", it) }
         channelId?.let { put("channel_id", it) }
         serverName?.let { put("server_name", it) }
@@ -146,6 +152,8 @@ data class NexusMessage(
                 convoId = j.str("convo_id"),
                 convoName = j.str("convo_name"),
                 members = members,
+                ts = if (j.has("ts") && !j.isNull("ts")) j.optLong("ts") else null,
+                duration = if (j.has("duration") && !j.isNull("duration")) j.optInt("duration") else null,
                 turnUrl = turnUrl,
                 turnUrls = turnUrls,
                 turnUsername = turnUser,

@@ -242,6 +242,28 @@ fun MessageBubble(
     onDelete: () -> Unit = {},
     onReact: (String) -> Unit = {},
 ) {
+    line.callInfo?.let { call ->
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+            ) {
+                Text("📞", fontSize = 13.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    if (!call.answered) "Missed ${call.kind} call"
+                    else "${if (call.kind == "video") "Video" else "Audio"} call · ${call.durationS / 60}:${(call.durationS % 60).toString().padStart(2, '0')}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        return
+    }
+
     val align = if (line.me) Arrangement.End else Arrangement.Start
     val bubbleColor = if (line.me) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val textColor = if (line.me) Color.White else MaterialTheme.colorScheme.onSurface
