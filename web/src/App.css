@@ -3932,6 +3932,22 @@ button.link-btn:hover,
   height: 1px;
   background: #C8D9E6;
 }
+/* Missed/completed call notice, dropped inline where the call happened. */
+.call-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px auto;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: var(--list-hover, rgba(0, 0, 0, 0.05));
+  color: var(--text-secondary, #6e6e73);
+  font-size: 12px;
+  width: fit-content;
+  max-width: 80%;
+}
+.call-line-icon.missed { filter: grayscale(1) brightness(0.7) sepia(1) hue-rotate(-40deg) saturate(4); }
 
 /* ── Message timestamps: only on row hover ───────────────────── */
 .app.theme-skype7 .bubble-ts {

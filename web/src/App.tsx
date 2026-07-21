@@ -208,6 +208,7 @@ type ChatLine = {
   reactions?: Record<string, string[]> // emoji -> users
   file?: FileAttachment
   seen?: boolean // peer has opened the conversation since this message was sent
+  callInfo?: { kind: string; status: 'answered' | 'missed'; duration: number } // present on call-history lines
 }
 
 const FILE_PREFIX = 'phaze-file'
@@ -698,6 +699,10 @@ export default function App() {
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([])
   const selectedConvoRef = useRef<string | null>(null)
+  // Server-reported last-activity time per friend, from friend_status.ts.
+  // Only consulted when there's no local chat history to sort by (fresh
+  // browser/device) — real local history always wins.
+  const friendLastTsRef = useRef<Record<string, number>>({})
   useLayoutEffect(() => { selectedConvoRef.current = selectedConvo }, [selectedConvo])
 
   useEffect(() => {
@@ -786,13 +791,13 @@ export default function App() {
   }, [selected, me])
   useEffect(() => { callStateRef.current = callState }, [callState])
 
-  const appendLog = useCallback((from: string, text: string, isMe: boolean, opts?: { id?: string; file?: FileAttachment }) => {
+  const appendLog = useCallback((from: string, text: string, isMe: boolean, opts?: { id?: string; file?: FileAttachment; peer?: string; ts?: number; callInfo?: ChatLine['callInfo'] }) => {
     const id = opts?.id || newMsgId()
-    const ts = Date.now()
+    const ts = opts?.ts ?? Date.now()
     const file = opts?.file || decodeFileBody(text) || undefined
-    const line: ChatLine = { id, from, text: file ? '' : text, me: isMe, ts, file }
+    const line: ChatLine = { id, from, text: file ? '' : text, me: isMe, ts, file, callInfo: opts?.callInfo }
     const my = meRef.current
-    const peer = isMe ? selectedRef.current : from
+    const peer = opts?.peer ?? (isMe ? selectedRef.current : from)
     if (my && peer) {
       const existing = loadHistory(my, peer)
       saveHistory(my, peer, [...existing, line])
@@ -1018,11 +1023,26 @@ export default function App() {
         case 'friend_status':
           if (msg.sender) {
             setFriends((f) => ({ ...f, [msg.sender!]: msg.status || 'Offline' }))
+            if (msg.ts) friendLastTsRef.current[msg.sender] = msg.ts
             if (msg.status === 'Offline' && callStateRef.current?.peer === msg.sender) {
               tearDownCall()
             }
           }
           break
+
+        case 'call_log': {
+          const my = meRef.current
+          if (my && msg.sender && msg.recipient) {
+            const peer = msg.sender === my ? msg.recipient : msg.sender
+            appendLog(peer, '', false, {
+              id: newMsgId(),
+              peer,
+              ts: msg.ts ?? Date.now(),
+              callInfo: { kind: msg.body || 'audio', status: msg.status === 'answered' ? 'answered' : 'missed', duration: msg.duration ?? 0 },
+            })
+          }
+          break
+        }
 
         case 'pending_requests':
           setPending(msg.results ?? [])
@@ -2679,7 +2699,10 @@ export default function App() {
                   <ul className="list">
                     {(() => {
                       const rows = Object.entries(friends)
-                        .map(([u, st]) => ({ u, st, last: lastLineFor(me, u) }))
+                        .map(([u, st]) => ({
+                          u, st,
+                          last: lastLineFor(me, u) ?? (friendLastTsRef.current[u] ? { text: st, ts: friendLastTsRef.current[u] } : null),
+                        }))
                         .filter(({ u }) => !contactFilter.trim() || u.toLowerCase().includes(contactFilter.toLowerCase()))
                         .sort((a, b) => (b.last?.ts ?? 0) - (a.last?.ts ?? 0))
                       let lastGroup = ''
@@ -2965,6 +2988,14 @@ export default function App() {
                       return (
                         <React.Fragment key={line.id}>
                         {showDateSep && <div className="date-sep"><span>{dateSepLabel(line.ts)}</span></div>}
+                        {line.callInfo ? (
+                          <div className="call-line">
+                            <span className={`call-line-icon ${line.callInfo.status}`}>📞</span>
+                            {line.callInfo.status === 'missed'
+                              ? `Missed ${line.callInfo.kind} call`
+                              : `${line.callInfo.kind === 'video' ? 'Video' : 'Audio'} call · ${Math.floor(line.callInfo.duration / 60)}:${String(line.callInfo.duration % 60).padStart(2, '0')}`}
+                          </div>
+                        ) : (
                         <div data-msg-id={line.id} className={`bubble-row ${line.me ? 'me' : ''}`}>
                           {!line.me && showGap && (
                             <span className="bubble-avatar" style={{ background: avatarColor(line.from) }}>
@@ -3040,6 +3071,7 @@ export default function App() {
                             {isPinned && <span className="pin-indicator" title="Pinned">📌</span>}
                           </div>
                         </div>
+                        )}
                         </React.Fragment>
                       )
                     })

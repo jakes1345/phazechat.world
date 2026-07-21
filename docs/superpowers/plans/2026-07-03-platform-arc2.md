@@ -60,9 +60,9 @@
 - [x] Unit test: finalize math helper (missed vs answered duration). Gate + commit `feat: call log table, call_log events, last-message ts on friend_status`.
 
 ### Task 7: Web — call rows + Recent truth
-- `case 'call_log'`: `appendLog(peer, body, false, …)` as a system-style line — grep how system lines render (`'system'` sender in appendLog) and add a `call-line` style: "📞 Missed call" red / "📞 Call · m:ss".
-- friend_status `ts` → seed `lastLineFor` ordering when local history is empty (store in a `lastTsRef` map consulted by the Recent sort).
-- Gate + commit `feat: call history lines in chat, recent order seeded from server ts`.
+- [x] `case 'call_log'`: `appendLog(peer, body, false, …)` as a system-style line — grep how system lines render (`'system'` sender in appendLog) and add a `call-line` style: "📞 Missed call" red / "📞 Call · m:ss".
+- [x] friend_status `ts` → seed `lastLineFor` ordering when local history is empty (store in a `lastTsRef` map consulted by the Recent sort).
+- [x] Gate + commit `feat: call history lines in chat, recent order seeded from server ts`.
 
 ### Task 8: Android — call rows + real Recent
 - `call_log` case → append ChatLine (system style) to the peer's log + bump unread if not open.
