@@ -31,6 +31,10 @@ export interface NexusMessage {
   qr_token?: string
   qr_data?: string
   device_info?: string
+  /** unix-ms timestamp — last DM activity on friend_status, call start on call_log */
+  ts?: number
+  /** call length in seconds, present on call_log */
+  duration?: number
   envelopes?: Record<string, string>
   /** Go JSON encodes []byte as base64 string */
   public_key?: string | number[]
