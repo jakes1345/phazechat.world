@@ -112,6 +112,14 @@ type NexusMessage struct {
 	// and server. Used by key_backup_put / key_backup_get cases.
 	KeyBackup   *KeyBackupPayload `json:"key_backup,omitempty"`
 	BackupCodes []string          `json:"backup_codes,omitempty"` // one-time TOTP recovery codes, returned on TOTP enable
+
+	// Ts is a unix-millisecond timestamp. On "friend_status" it's the last
+	// DM activity between the two users, letting clients sort Recent by
+	// real time instead of alphabetically. On "call_log" it's when the call
+	// started.
+	Ts int64 `json:"ts,omitempty"`
+	// Duration is call length in seconds, set on "call_log" (0 for missed).
+	Duration int `json:"duration,omitempty"`
 }
 
 // ServerSummary is the slim view a client gets for the server-list pane.
@@ -205,6 +213,15 @@ type Client struct {
 	CallPartner string
 	// PendingCallRoom is the Jitsi room ID generated on call_offer, consumed on call_answer.
 	PendingCallRoom string
+	// PendingCallID is the calls-table row id for the in-flight call this
+	// client placed, set on call_offer and consumed on call_answer/end/reject.
+	PendingCallID int64
+	// PendingCallStarted is when the call row was inserted, so call_log can
+	// report a real start time without a second DB round-trip.
+	PendingCallStarted time.Time
+	// PendingCallAnswered flips true on call_answer; read on end/reject to
+	// tell a completed call apart from one that was never picked up.
+	PendingCallAnswered bool
 }
 
 // Send locks the per-connection write mutex and emits a JSON message.
@@ -639,6 +656,19 @@ func (s *NexusServer) initDB() {
 		// Presence: the status the user picked (Online/Away/Do Not Disturb/
 		// Invisible). Friends only ever see it through publicStatus().
 		`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Online'`,
+		// Call history: one row per call attempt. answered=0 + duration_s=0
+		// means missed/declined/unanswered; a real call has both set.
+		`CREATE TABLE IF NOT EXISTS calls (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			caller TEXT NOT NULL,
+			callee TEXT NOT NULL,
+			kind TEXT NOT NULL DEFAULT 'audio',
+			started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			answered INTEGER DEFAULT 0,
+			duration_s INTEGER DEFAULT 0
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller)`,
+		`CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee)`,
 		// Supporters: a `supporter` flag (with the date it was granted) plus a
 		// queue of opt-in requests captured by the public support form. The
 		// admin matches a request against the actual Buy Me a Coffee payment
