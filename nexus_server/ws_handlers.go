@@ -106,7 +106,11 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					status = publicStatus(c.Status)
 				}
 				s.Mu.RUnlock()
-				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status})
+				var lastSec int64
+				s.DB.QueryRow(`SELECT COALESCE(MAX(strftime('%s', created_at)), 0) FROM dm_messages
+					WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)`,
+					username, f, f, username).Scan(&lastSec)
+				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
 			}
 			pending := s.getPendingRequests(username)
 			if len(pending) > 0 {
@@ -149,6 +153,28 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 						partner.InCall = false
 						partner.CallPartner = ""
 						partner.Send(NexusMessage{Type: "call_end", Sender: username})
+
+						// Close out the call row too — client is already
+						// removed from s.Clients, so use the local pointer.
+						var pendingClient *Client
+						var logCaller, logCallee string
+						if client.PendingCallID != 0 {
+							pendingClient, logCaller, logCallee = client, username, callPartner
+						} else if partner.PendingCallID != 0 {
+							pendingClient, logCaller, logCallee = partner, callPartner, username
+						}
+						if pendingClient != nil {
+							kind, answered, duration := s.finalizeCall(pendingClient.PendingCallID, pendingClient.PendingCallAnswered, pendingClient.PendingCallStarted)
+							started := pendingClient.PendingCallStarted
+							pendingClient.PendingCallID = 0
+							pendingClient.PendingCallAnswered = false
+							status := "missed"
+							if answered {
+								status = "answered"
+							}
+							// Only the surviving partner is still connected to receive this live.
+							partner.Send(NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration})
+						}
 					}
 				}
 				s.Mu.Unlock()
@@ -441,7 +467,11 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					status = publicStatus(c.Status)
 				}
 				s.Mu.RUnlock()
-				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status})
+				var lastSec int64
+				s.DB.QueryRow(`SELECT COALESCE(MAX(strftime('%s', created_at)), 0) FROM dm_messages
+					WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)`,
+					username, f, f, username).Scan(&lastSec)
+				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
 			}
 
 		case "session_auth":
@@ -1483,8 +1513,11 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			roomID = "phaze-" + roomID
+			callID, startedAt := s.recordCallStart(username, msg.Recipient, msg.Body)
 			if callerClient, ok := s.Clients[username]; ok {
 				callerClient.PendingCallRoom = roomID
+				callerClient.PendingCallID = callID
+				callerClient.PendingCallStarted = startedAt
 			}
 			msg.RoomID = roomID
 			if online {
@@ -1506,6 +1539,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if callerClient, ok := s.Clients[msg.Recipient]; ok {
 				roomID = callerClient.PendingCallRoom
 				callerClient.PendingCallRoom = ""
+				callerClient.PendingCallAnswered = true
 				callerClient.InCall = true
 				callerClient.CallPartner = username
 			}
@@ -1528,14 +1562,48 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			s.Mu.Lock()
-			if c, ok := s.Clients[username]; ok {
-				c.InCall = false
-				c.CallPartner = ""
+			selfClient, selfOK := s.Clients[username]
+			peerClient, peerOK := s.Clients[msg.Recipient]
+
+			// The call row lives on whichever side placed the call — find
+			// it before either client's state gets cleared below.
+			var pendingClient *Client
+			var logCaller, logCallee string
+			if selfOK && selfClient.PendingCallID != 0 {
+				pendingClient, logCaller, logCallee = selfClient, username, msg.Recipient
+			} else if peerOK && peerClient.PendingCallID != 0 {
+				pendingClient, logCaller, logCallee = peerClient, msg.Recipient, username
 			}
-			if c, ok := s.Clients[msg.Recipient]; ok {
-				c.InCall = false
-				c.CallPartner = ""
-				c.Send(msg)
+			var logMsg *NexusMessage
+			if pendingClient != nil {
+				kind, answered, duration := s.finalizeCall(pendingClient.PendingCallID, pendingClient.PendingCallAnswered, pendingClient.PendingCallStarted)
+				started := pendingClient.PendingCallStarted
+				pendingClient.PendingCallID = 0
+				pendingClient.PendingCallAnswered = false
+				status := "missed"
+				if answered {
+					status = "answered"
+				}
+				m := NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration}
+				logMsg = &m
+			}
+
+			if selfOK {
+				selfClient.InCall = false
+				selfClient.CallPartner = ""
+			}
+			if peerOK {
+				peerClient.InCall = false
+				peerClient.CallPartner = ""
+				peerClient.Send(msg)
+			}
+			if logMsg != nil {
+				if selfOK {
+					selfClient.Send(*logMsg)
+				}
+				if peerOK {
+					peerClient.Send(*logMsg)
+				}
 			}
 			s.Mu.Unlock()
 

@@ -54,10 +54,10 @@
 - [x] Gate + commit `feat: group chats on android — list, create, live messages, history`.
 
 ### Task 6: Server — call log + `ts` on friend_status
-- Migration: ```CREATE TABLE IF NOT EXISTS calls (id INTEGER PRIMARY KEY AUTOINCREMENT, caller TEXT, callee TEXT, kind TEXT, started_at DATETIME DEFAULT CURRENT_TIMESTAMP, answered INTEGER DEFAULT 0, duration_s INTEGER DEFAULT 0)```.
-- `call_invite`: INSERT row, stash id in the Client (or map keyed by pair). `call_answer`: answered=1 + note answer time (in-memory). `call_end`/`call_reject`: finalize duration (0 for missed), then send both parties `{type:"call_log", sender:caller, recipient:callee, body:kind, status: answered?"answered":"missed", ts: startedUnixMs, duration…}` — add optional `Ts int64 \`json:"ts,omitempty"\`` and `Duration int \`json:"duration,omitempty"\`` to NexusMessage.
-- Login friend_status loop: include `Ts` = `SELECT MAX(strftime('%s', sent_at))*1000 FROM dm_messages WHERE (sender=? AND recipient=?) OR (sender=? AND recipient=?)`.
-- Unit test: finalize math helper (missed vs answered duration). Gate + commit `feat: call log table, call_log events, last-message ts on friend_status`.
+- [x] Migration: ```CREATE TABLE IF NOT EXISTS calls (id INTEGER PRIMARY KEY AUTOINCREMENT, caller TEXT, callee TEXT, kind TEXT, started_at DATETIME DEFAULT CURRENT_TIMESTAMP, answered INTEGER DEFAULT 0, duration_s INTEGER DEFAULT 0)```.
+- [x] `call_invite`: INSERT row, stash id in the Client (or map keyed by pair). `call_answer`: answered=1 + note answer time (in-memory). `call_end`/`call_reject`: finalize duration (0 for missed), then send both parties `{type:"call_log", sender:caller, recipient:callee, body:kind, status: answered?"answered":"missed", ts: startedUnixMs, duration…}` — add optional `Ts int64 \`json:"ts,omitempty"\`` and `Duration int \`json:"duration,omitempty"\`` to NexusMessage.
+- [x] Login friend_status loop: include `Ts` = `SELECT MAX(strftime('%s', sent_at))*1000 FROM dm_messages WHERE (sender=? AND recipient=?) OR (sender=? AND recipient=?)`.
+- [x] Unit test: finalize math helper (missed vs answered duration). Gate + commit `feat: call log table, call_log events, last-message ts on friend_status`.
 
 ### Task 7: Web — call rows + Recent truth
 - `case 'call_log'`: `appendLog(peer, body, false, …)` as a system-style line — grep how system lines render (`'system'` sender in appendLog) and add a `call-line` style: "📞 Missed call" red / "📞 Call · m:ss".
