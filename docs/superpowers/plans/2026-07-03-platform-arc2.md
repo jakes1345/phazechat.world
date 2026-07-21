@@ -47,11 +47,11 @@
 - [x] Manual verify via local-verify recipe (two users, one group, live message appears). Gate + commit `fix: live group messages render without reopening the convo`.
 
 ### Task 5: Android — group chats
-- NexusMessage.kt: ensure `convo_id`, `convo_name`, `members` map (grep; add missing).
-- PhazeViewModel: `_convos: MutableStateFlow<List<ConvoInfo>>` (`data class ConvoInfo(id, name, members)`), `_selectedConvo`, `_convoLog: MutableStateFlow<List<ChatLine>>`; cases `convo_info`/`convo_created` (add + request history), `convo_msg` (append when selected; unread++ otherwise), `convo_history` reply handling (grep the exact reply type the server sends — read server case), `createConvo(name, members)`, `sendConvoMessage(text)` (plaintext body), `selectConvo(id)`.
-- UI: Groups section under Recent tab list (ChatsScreen param or separate composable `GroupsSection(convos, onOpen)`); group chat screen = reuse `ChatScreen` with `peerStatus = "${members.size} people"` and sender names already shown for non-me lines; "＋ group" entry (name + friend checkboxes — mirror web's modal).
-- Header note "not end-to-end encrypted".
-- Gate + commit `feat: group chats on android — list, create, live messages, history`.
+- [x] NexusMessage.kt: ensure `convo_id`, `convo_name`, `members` map (grep; add missing).
+- [x] PhazeViewModel: `_convos: MutableStateFlow<List<ConvoInfo>>` (`data class ConvoInfo(id, name, members)`), `_selectedConvo`, `_convoLog: MutableStateFlow<List<ChatLine>>`; cases `convo_info`/`convo_created` (add + request history), `convo_msg` (append when selected; unread++ otherwise), `convo_history` reply handling (grep the exact reply type the server sends — read server case), `createConvo(name, members)`, `sendConvoMessage(text)` (plaintext body), `selectConvo(id)`.
+- [x] UI: Groups section under Recent tab list (ChatsScreen param or separate composable `GroupsSection(convos, onOpen)`); group chat screen = reuse `ChatScreen` with `peerStatus = "${members.size} people"` and sender names already shown for non-me lines; "＋ group" entry (name + friend checkboxes — mirror web's modal).
+- [x] Header note "not end-to-end encrypted".
+- [x] Gate + commit `feat: group chats on android — list, create, live messages, history`.
 
 ### Task 6: Server — call log + `ts` on friend_status
 - Migration: ```CREATE TABLE IF NOT EXISTS calls (id INTEGER PRIMARY KEY AUTOINCREMENT, caller TEXT, callee TEXT, kind TEXT, started_at DATETIME DEFAULT CURRENT_TIMESTAMP, answered INTEGER DEFAULT 0, duration_s INTEGER DEFAULT 0)```.

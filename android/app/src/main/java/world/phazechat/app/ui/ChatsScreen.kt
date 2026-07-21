@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import world.phazechat.app.data.ConvoInfo
 import world.phazechat.app.data.FriendInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,9 +39,15 @@ fun ChatsScreen(
     searchResults: List<String> = emptyList(),
     onSearch: (String) -> Unit = {},
     onClearSearch: () -> Unit = {},
+    convos: List<ConvoInfo> = emptyList(),
+    onOpenConvo: (String) -> Unit = {},
+    onCreateConvo: ((String, List<String>) -> Unit)? = null,
 ) {
     var addDialogOpen by remember { mutableStateOf(false) }
     var addName by remember { mutableStateOf("") }
+    var groupDialogOpen by remember { mutableStateOf(false) }
+    var groupName by remember { mutableStateOf("") }
+    var groupMembers by remember { mutableStateOf(setOf<String>()) }
 
     Column(modifier = Modifier.fillMaxSize()) {
 
@@ -61,6 +68,11 @@ fun ChatsScreen(
             )
             IconButton(onClick = { addDialogOpen = true }) {
                 Icon(Icons.Default.Search, contentDescription = "Search contacts", tint = Color.White)
+            }
+            if (onCreateConvo != null) {
+                IconButton(onClick = { groupDialogOpen = true; groupName = ""; groupMembers = emptySet() }) {
+                    Text("＋#", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
             }
             IconButton(onClick = { addDialogOpen = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Add contact", tint = Color.White)
@@ -108,7 +120,7 @@ fun ChatsScreen(
             compareByDescending<FriendInfo> { it.status == "Online" }.thenBy { it.username }
         )
 
-        if (sorted.isEmpty()) {
+        if (sorted.isEmpty() && convos.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("No contacts yet", fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
@@ -122,6 +134,25 @@ fun ChatsScreen(
             }
         } else {
             LazyColumn {
+                if (convos.isNotEmpty()) {
+                    item(key = "groups-label") {
+                        Text(
+                            "Groups",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        )
+                    }
+                    items(convos, key = { "convo-${it.id}" }) { convo ->
+                        val count = unread[convo.id] ?: 0
+                        GroupRow(convo, count) { onOpenConvo(convo.id) }
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
+                        )
+                    }
+                }
                 items(sorted, key = { it.username }) { friend ->
                     val count = unread[friend.username] ?: 0
                     FriendRow(friend, count) { onSelectChat(friend.username) }
@@ -132,6 +163,54 @@ fun ChatsScreen(
                 }
             }
         }
+    }
+
+    // Create-group dialog
+    if (groupDialogOpen && onCreateConvo != null) {
+        AlertDialog(
+            onDismissRequest = { groupDialogOpen = false },
+            title = { Text("Create a group") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = { groupName = it },
+                        label = { Text("Group name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("Members", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                    Column(Modifier.heightIn(max = 220.dp)) {
+                        friends.keys.sorted().forEach { u ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        groupMembers = if (u in groupMembers) groupMembers - u else groupMembers + u
+                                    }
+                                    .padding(vertical = 6.dp),
+                            ) {
+                                Checkbox(checked = u in groupMembers, onCheckedChange = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text(u, fontSize = 14.sp)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onCreateConvo(groupName, groupMembers.toList())
+                        groupDialogOpen = false
+                    },
+                    enabled = groupName.isNotBlank() && groupMembers.isNotEmpty(),
+                ) { Text("Create") }
+            },
+            dismissButton = { TextButton(onClick = { groupDialogOpen = false }) { Text("Cancel") } },
+        )
     }
 
     // Add / search dialog
@@ -184,6 +263,41 @@ fun ChatsScreen(
                 TextButton(onClick = closeAdd) { Text("Cancel") }
             },
         )
+    }
+}
+
+@Composable
+fun GroupRow(convo: ConvoInfo, unreadCount: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(46.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(convo.name.firstOrNull()?.uppercase() ?: "#", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(convo.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                "${convo.members.size} people",
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                fontSize = 12.sp,
+            )
+        }
+        if (unreadCount > 0) {
+            Box(
+                modifier = Modifier.size(20.dp).clip(CircleShape).background(MaterialTheme.colorScheme.error),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(unreadCount.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 

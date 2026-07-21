@@ -450,6 +450,24 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         return
     }
 
+    val selectedConvoId by vm.selectedConvo.collectAsState()
+    if (selectedConvoId != null) {
+        val cid = selectedConvoId!!
+        val convosNow by vm.convos.collectAsState()
+        val convoLog by vm.convoLog.collectAsState()
+        val info = convosNow.find { it.id == cid }
+        ChatScreen(
+            peer = info?.name ?: "Group",
+            peerStatus = "${info?.members?.size ?: 0} people · not end-to-end encrypted",
+            messages = convoLog,
+            onBack = { vm.selectConvo("") },
+            onSend = { vm.sendConvoMessage(it) },
+            canSend = connState == ConnState.CONNECTED,
+            skype7 = skype7Shell,
+        )
+        return
+    }
+
     var page by remember { mutableStateOf("chats") }
     var showStatusSheet by remember { mutableStateOf(false) }
     var showMoodDialog by remember { mutableStateOf(false) }
@@ -460,18 +478,24 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     val pageContent: @Composable () -> Unit = {
         Box {
             when (page) {
-                "chats" -> ChatsScreen(
-                    friends = friends, pending = pending, unread = unread,
-                    stories = stories, me = me!!,
-                    onSelectChat = { vm.selectChat(it) },
-                    onAddFriend = { vm.sendFriendRequest(it) },
-                    onAcceptFriend = { vm.acceptFriend(it) },
-                    onViewStory = { viewingStoryAuthor = it },
-                    onAddStory = { storyPicker.launch("image/*") },
-                    searchResults = searchResults,
-                    onSearch = { vm.searchUsers(it) },
-                    onClearSearch = { vm.clearSearch() },
-                )
+                "chats" -> {
+                    val convosNow by vm.convos.collectAsState()
+                    ChatsScreen(
+                        friends = friends, pending = pending, unread = unread,
+                        stories = stories, me = me!!,
+                        onSelectChat = { vm.selectChat(it) },
+                        onAddFriend = { vm.sendFriendRequest(it) },
+                        onAcceptFriend = { vm.acceptFriend(it) },
+                        onViewStory = { viewingStoryAuthor = it },
+                        onAddStory = { storyPicker.launch("image/*") },
+                        searchResults = searchResults,
+                        onSearch = { vm.searchUsers(it) },
+                        onClearSearch = { vm.clearSearch() },
+                        convos = convosNow,
+                        onOpenConvo = { vm.selectConvo(it) },
+                        onCreateConvo = { name, members -> vm.createConvo(name, members) },
+                    )
+                }
                 "contacts" -> ContactsTab(friends = friends, onOpen = { vm.selectChat(it) })
                 "spaces" -> {
                     val discoverList by vm.discoverSpaces.collectAsState()

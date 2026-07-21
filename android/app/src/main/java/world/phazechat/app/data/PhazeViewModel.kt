@@ -34,6 +34,12 @@ data class FriendInfo(
     val supporter: Boolean = false,
 )
 
+data class ConvoInfo(
+    val id: String,
+    val name: String,
+    val members: List<String> = emptyList(),
+)
+
 data class SpaceInfo(
     val id: String,
     val name: String,
@@ -292,6 +298,52 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     // Bumped after an avatar upload so Coil refetches our own picture.
     private val _avatarVersion = MutableStateFlow(0)
     val avatarVersion = _avatarVersion.asStateFlow()
+
+    // Group conversations. Messages are plaintext on the wire (server fans
+    // them out per member) — the UI says so in the group header.
+    private val _convos = MutableStateFlow<List<ConvoInfo>>(emptyList())
+    val convos = _convos.asStateFlow()
+    private val _selectedConvo = MutableStateFlow<String?>(null)
+    val selectedConvo = _selectedConvo.asStateFlow()
+    private val _convoLog = MutableStateFlow<List<ChatLine>>(emptyList())
+    val convoLog = _convoLog.asStateFlow()
+    private val convoLogs = mutableMapOf<String, MutableList<ChatLine>>()
+
+    fun selectConvo(id: String) {
+        if (id.isBlank()) { _selectedConvo.value = null; _convoLog.value = emptyList(); return }
+        _selectedChat.value = null
+        _selectedConvo.value = id
+        _unread.value = _unread.value.toMutableMap().apply { remove(id) }
+        _convoLog.value = convoLogs[id]?.toList() ?: emptyList()
+        nexus.send(NexusMessage(type = "convo_history", convoId = id))
+    }
+
+    fun createConvo(name: String, members: List<String>) {
+        val me = _me.value ?: return
+        if (name.isBlank() || members.isEmpty()) return
+        val id = "$me-${System.currentTimeMillis().toString(36)}"
+        nexus.send(NexusMessage(type = "convo_create", sender = me, convoId = id, convoName = name.trim(), members = members))
+    }
+
+    fun sendConvoMessage(text: String) {
+        val id = _selectedConvo.value ?: return
+        val me = _me.value ?: return
+        nexus.send(NexusMessage(type = "convo_msg", sender = me, convoId = id, body = text))
+        // Server fans out to the other members only — echo locally.
+        appendConvoLine(id, ChatLine(id = "$id-${System.nanoTime()}", from = me, text = text, me = true))
+    }
+
+    fun leaveConvo(id: String) {
+        nexus.send(NexusMessage(type = "convo_leave", sender = _me.value, convoId = id))
+        _convos.value = _convos.value.filter { it.id != id }
+        convoLogs.remove(id)
+        if (_selectedConvo.value == id) selectConvo("")
+    }
+
+    private fun appendConvoLine(convoId: String, line: ChatLine) {
+        convoLogs.getOrPut(convoId) { mutableListOf() }.add(line)
+        if (_selectedConvo.value == convoId) _convoLog.value = convoLogs[convoId]!!.toList()
+    }
 
     fun uploadAvatar(uri: android.net.Uri) {
         val token = _sessionToken.value ?: return
@@ -569,6 +621,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectChat(peer: String) {
         if (peer.isBlank()) { _selectedChat.value = null; return }
+        _selectedConvo.value = null
         _selectedChat.value = peer
         _unread.value = _unread.value.toMutableMap().apply { remove(peer) }
         _chatLog.value = emptyList()
@@ -1261,6 +1314,66 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             "referral_stats" -> {
                 _referralCount.value = msg.token?.toIntOrNull() ?: 0
                 _referredUsers.value = msg.results ?: emptyList()
+            }
+
+            "convo_info", "convo_created" -> {
+                msg.convoId?.let { cid ->
+                    if (_convos.value.none { it.id == cid }) {
+                        _convos.value = _convos.value + ConvoInfo(cid, msg.convoName ?: cid, msg.members ?: emptyList())
+                    }
+                    // Creator lands straight in the new group.
+                    if (msg.type == "convo_created" && msg.sender == _me.value) {
+                        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) { selectConvo(cid) }
+                    }
+                }
+            }
+
+            "convo_msg" -> {
+                val cid = msg.convoId
+                val sender = msg.sender
+                if (cid != null && sender != null && sender != _me.value) {
+                    appendConvoLine(cid, ChatLine(id = "$cid-${System.nanoTime()}", from = sender, text = msg.body ?: "", me = false))
+                    if (_selectedConvo.value != cid) {
+                        _unread.value = _unread.value.toMutableMap().apply { put(cid, (get(cid) ?: 0) + 1) }
+                    }
+                }
+            }
+
+            "convo_history" -> {
+                val cid = msg.convoId
+                val raw = msg.rawDmHistory
+                if (cid != null && raw != null) {
+                    try {
+                        val arr = JSONArray(raw)
+                        val lines = mutableListOf<ChatLine>()
+                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                        sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                        for (i in 0 until arr.length()) {
+                            val r = arr.getJSONObject(i)
+                            val sender = r.getString("sender")
+                            lines.add(ChatLine(
+                                id = "$cid-h-$i",
+                                from = sender,
+                                text = r.optString("body", ""),
+                                me = sender == _me.value,
+                                ts = try { sdf.parse(r.getString("created_at"))?.time ?: 0L } catch (_: Exception) { 0L },
+                            ))
+                        }
+                        lines.sortBy { it.ts }
+                        convoLogs[cid] = lines
+                        if (_selectedConvo.value == cid) _convoLog.value = lines.toList()
+                    } catch (_: Exception) { /* malformed history — leave log as is */ }
+                }
+            }
+
+            "convo_left" -> {
+                val cid = msg.convoId
+                val who = msg.sender
+                if (cid != null && who != null) {
+                    _convos.value = _convos.value.map {
+                        if (it.id == cid) it.copy(members = it.members.filter { m -> m != who }) else it
+                    }
+                }
             }
 
             "update_result" -> {
