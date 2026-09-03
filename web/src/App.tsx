@@ -21,6 +21,7 @@ import { tokenize as tokenizeEmoticons } from './emoticons'
 import { Emoticon } from './emoticonArt'
 import { EmoticonPicker } from './EmoticonPicker'
 import { CallScreen } from './CallScreen'
+import { THEMES, type ThemeId, isThemeId, nextTheme, themeIcon, themeLabel, hasFeature } from './themes'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -640,7 +641,10 @@ export default function App() {
     { icon: '🎨', title: 'Skype 7 theme', desc: 'Classic blue Skype skin is now the default. Dark and light themes still available.', color: '#a855f7' },
   ]
   const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
-  const [theme, setTheme] = useState<'light' | 'dark' | 'skype7'>(() => (localStorage.getItem(THEME_KEY) as 'light' | 'dark' | 'skype7') || 'skype7')
+  const [theme, setTheme] = useState<ThemeId>(() => {
+    const raw = localStorage.getItem(THEME_KEY)
+    return isThemeId(raw) ? raw : 'skype7'
+  })
   const [snow, setSnow] = useState<boolean>(() => localStorage.getItem(SNOW_KEY) === '1')
   const [myStatus, setMyStatus] = useState<UserStatus>(() => (localStorage.getItem(STATUS_KEY) as UserStatus) || 'Online')
   const [idle, setIdle] = useState(false)
@@ -713,6 +717,14 @@ export default function App() {
       sendRef.current({ type: 'settings_set', sender: meRef.current, body: JSON.stringify({ key: 'theme', value: theme }) })
     }
   }, [theme])
+
+  /* When the user switches to an era that never shipped the currently-active
+   * view (e.g. viewing Spaces then picking Skype 3), fall back to the DMs
+   * home so they don't end up staring at an empty pane. */
+  useEffect(() => {
+    if (view === 'spaces' && !hasFeature(theme, 'spaces')) setView('dms')
+    else if (view === 'live' && !hasFeature(theme, 'live_streams')) setView('dms')
+  }, [theme, view])
 
   useEffect(() => {
     localStorage.setItem(SNOW_KEY, snow ? '1' : '0')
@@ -1424,7 +1436,7 @@ export default function App() {
         case 'settings_result':
           if (msg.status === 'ok' && msg.envelopes) {
             const t = msg.envelopes['theme']
-            if (t === 'dark' || t === 'light' || t === 'skype7') setTheme(t)
+            if (isThemeId(t)) setTheme(t)
           }
           break
 
@@ -2001,15 +2013,15 @@ export default function App() {
         </span>
         <button
           className="settings-gear"
-          title={`Theme: ${theme} — click to cycle (dark · light · Skype 7)`}
-          onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'skype7' : 'dark')}
-        >{theme === 'dark' ? '☀' : theme === 'light' ? '🎨' : '💙'}</button>
+          title={`Theme: ${themeLabel(theme)} — click to cycle (View menu has the full picker)`}
+          onClick={() => setTheme(nextTheme(theme))}
+        >{themeIcon(theme)}</button>
         <button
           className="settings-gear"
           title={snow ? 'Turn off snow' : 'Let it snow'}
           onClick={() => setSnow((s) => !s)}
         >{snow ? '🌨' : '❄'}</button>
-        {me && (
+        {me && hasFeature(theme, 'remote_control') && (
           <button className="settings-gear" title="Remote Control" onClick={() => setRemoteOpen(true)}>🖥</button>
         )}
         {me && (
@@ -2051,7 +2063,22 @@ export default function App() {
                   )}
                   {label === 'View' && (
                     <>
-                      <button type="button" onClick={() => { setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'skype7' : 'dark'); setMenuOpen(null) }}>Change theme ({theme})</button>
+                      <div className="skype-menu-sectionlabel">Theme</div>
+                      {THEMES.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className={t.id === theme ? 'skype-menu-item on' : 'skype-menu-item'}
+                          onClick={() => { setTheme(t.id); setMenuOpen(null) }}
+                          title={t.hint}
+                        >
+                          <span className="skype-menu-item-icon">{t.icon}</span>
+                          <span className="skype-menu-item-label">{t.label}</span>
+                          {t.hint && <span className="skype-menu-item-hint">{t.hint}</span>}
+                          {t.id === theme && <span className="skype-menu-item-check">✓</span>}
+                        </button>
+                      ))}
+                      <div className="skype-menu-sep" />
                       <button type="button" onClick={() => { setSnow((s) => !s); setMenuOpen(null) }}>{snow ? 'Turn off snow' : 'Let it snow'}</button>
                     </>
                   )}
@@ -2078,14 +2105,18 @@ export default function App() {
             <span className="nav-icon">💬</span>
             <span className="nav-label">Home</span>
           </button>
-          <button type="button" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>
-            <span className="nav-icon">🌐</span>
-            <span className="nav-label">Spaces</span>
-          </button>
-          <button type="button" className={view === 'live' ? 'on' : ''} onClick={() => setView('live')}>
-            <span className="nav-icon">🔴</span>
-            <span className="nav-label">Live</span>
-          </button>
+          {hasFeature(theme, 'spaces') && (
+            <button type="button" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>
+              <span className="nav-icon">🌐</span>
+              <span className="nav-label">Spaces</span>
+            </button>
+          )}
+          {hasFeature(theme, 'live_streams') && (
+            <button type="button" className={view === 'live' ? 'on' : ''} onClick={() => setView('live')}>
+              <span className="nav-icon">🔴</span>
+              <span className="nav-label">Live</span>
+            </button>
+          )}
           <button type="button" onClick={() => setSettingsOpen(true)}>
             <span className="nav-icon">👤</span>
             <span className="nav-label">Profile</span>
@@ -2514,7 +2545,7 @@ export default function App() {
         )}
 
         {/* ── Hub view (logged in, DMs) ───────────────────────────── */}
-        {me && sessionToken && <Suspense fallback={null}><Stories me={me} sessionToken={sessionToken} /></Suspense>}
+        {me && sessionToken && hasFeature(theme, 'stories') && <Suspense fallback={null}><Stories me={me} sessionToken={sessionToken} /></Suspense>}
         {me && (
           <main className="grid">
             <div className={`hub-content ${selected ? 'chat-open' : ''}`}>
@@ -2555,8 +2586,12 @@ export default function App() {
                 <div className="sidebar-tabs">
                   <button type="button" title="Contacts" className={view === 'contacts' ? 'on' : ''} onClick={() => setView('contacts')}><IconPerson /></button>
                   <button type="button" title="Recent" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}><IconClock /></button>
-                  <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
-                  <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}><IconLive /></button>
+                  {hasFeature(theme, 'spaces') && (
+                    <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
+                  )}
+                  {hasFeature(theme, 'live_streams') && (
+                    <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}><IconLive /></button>
+                  )}
                 </div>
                 <div className="hub-add-friend">
                   <div className="form">

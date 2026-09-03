@@ -4069,3 +4069,254 @@ button.link-btn:hover,
   background: #A0C8E0;
   cursor: default;
 }
+
+
+/* =============================================================
+   Skype era themes — starter palettes.
+   These give the whole app an era-accurate colour scheme.
+   Deeper pixel-perfect work (chrome, gradients, custom controls)
+   is layered on per-era in follow-up passes, in the same
+   ".app.theme-skypeN <selector>" pattern the skype7 block uses above.
+   ============================================================= */
+
+/* ── Skype 3 (2007 · XP Luna) ──────────────────────────────── */
+.app.theme-skype3 {
+  --phaze-cyan: #2E6BC6;
+  --phaze-blue: #1A3F7A;
+  --brand: #2E6BC6;
+  --brand-hover: #1A3F7A;
+  --brand-soft: rgba(46, 107, 198, 0.10);
+  --brand-glow: rgba(46, 107, 198, 0.22);
+  --shell: #ECE9D8;
+  --chrome: #F5F4EA;
+  --panel: #ffffff;
+  --panel-edge: #ACA899;
+  --separator: #C8C4B0;
+  --text: #000000;
+  --text-secondary: #333333;
+  --muted: #666666;
+  --list-hover: #DDEAF7;
+  --list-sel: #316AC5;
+  --bubble-in: #ffffff;
+  --bubble-out: #DFE7F3;
+  --bubble-edge: #7B9BC7;
+  --bubble-text: #000000;
+  --bubble-text-out: #000000;
+  --input-bg: #ffffff;
+  --input-border: #7F9DB9;
+  --input-focus: rgba(46, 107, 198, 0.30);
+  --chat-bg-1: #F5F4EA;
+  --chat-bg-2: #ffffff;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.10);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.15);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.20);
+  --glass: #ffffff;
+  --glass-border: #ACA899;
+  --glass-blur: 0px;
+  --sidebar-width: 240px;
+  --header-height: 60px;
+  --nav-height: 0px;
+  font-family: Tahoma, 'MS Sans Serif', sans-serif;
+  font-size: 11px;
+}
+
+/* ── Skype 4 (2009 · Vista Aero glass) ─────────────────────── */
+.app.theme-skype4 {
+  --phaze-cyan: #4A90E2;
+  --phaze-blue: #2E5C8A;
+  --brand: #4A90E2;
+  --brand-hover: #2E5C8A;
+  --brand-soft: rgba(74, 144, 226, 0.10);
+  --brand-glow: rgba(74, 144, 226, 0.25);
+  --shell: #DBE8F5;
+  --chrome: #F7FAFD;
+  --panel: #ffffff;
+  --panel-edge: #A5B8CC;
+  --separator: #C0D1E2;
+  --text: #1A1A1A;
+  --text-secondary: #4A5865;
+  --muted: #607080;
+  --list-hover: #DCEAF7;
+  --list-sel: #C8DDF2;
+  --bubble-in: #ffffff;
+  --bubble-out: #DCEAF7;
+  --bubble-edge: #98B4D2;
+  --bubble-text: #1A1A1A;
+  --bubble-text-out: #1A1A1A;
+  --input-bg: #ffffff;
+  --input-border: #A5B8CC;
+  --input-focus: rgba(74, 144, 226, 0.28);
+  --chat-bg-1: #EDF3FA;
+  --chat-bg-2: #ffffff;
+  --shadow-sm: 0 1px 3px rgba(20,60,110,0.08);
+  --shadow-md: 0 3px 10px rgba(20,60,110,0.14);
+  --shadow-lg: 0 6px 20px rgba(20,60,110,0.20);
+  --glass: rgba(255,255,255,0.85);
+  --glass-border: rgba(165,184,204,0.5);
+  --glass-blur: 12px;
+  --sidebar-width: 260px;
+  --header-height: 64px;
+  --nav-height: 0px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 12px;
+}
+
+/* ── Skype 5 (2010 · big avatars, brighter blue) ───────────── */
+.app.theme-skype5 {
+  --phaze-cyan: #00A2E8;
+  --phaze-blue: #007AB8;
+  --brand: #00A2E8;
+  --brand-hover: #007AB8;
+  --brand-soft: rgba(0, 162, 232, 0.10);
+  --brand-glow: rgba(0, 162, 232, 0.22);
+  --shell: #E8F1F7;
+  --chrome: #F0F6FA;
+  --panel: #ffffff;
+  --panel-edge: #BFCED9;
+  --separator: #D4DDE5;
+  --text: #2A2A2A;
+  --text-secondary: #56666F;
+  --muted: #7A8894;
+  --list-hover: #DDEEF7;
+  --list-sel: #C8E6F5;
+  --bubble-in: #ffffff;
+  --bubble-out: #E4F1FA;
+  --bubble-edge: #92C4E0;
+  --bubble-text: #2A2A2A;
+  --bubble-text-out: #2A2A2A;
+  --input-bg: #ffffff;
+  --input-border: #BFCED9;
+  --input-focus: rgba(0, 162, 232, 0.25);
+  --chat-bg-1: #F0F6FA;
+  --chat-bg-2: #ffffff;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.10);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.14);
+  --glass: #ffffff;
+  --glass-border: #BFCED9;
+  --glass-blur: 0px;
+  --sidebar-width: 280px;
+  --header-height: 64px;
+  --nav-height: 0px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 12px;
+}
+
+/* ── Skype 6 (2012 · post-Microsoft, Metro-tinted flat) ───── */
+.app.theme-skype6 {
+  --phaze-cyan: #00AFF0;
+  --phaze-blue: #007ACC;
+  --brand: #00AFF0;
+  --brand-hover: #007ACC;
+  --brand-soft: rgba(0, 175, 240, 0.10);
+  --brand-glow: rgba(0, 175, 240, 0.22);
+  --shell: #F5F5F5;
+  --chrome: #EAEAEA;
+  --panel: #ffffff;
+  --panel-edge: #D0D0D0;
+  --separator: #D0D0D0;
+  --text: #333333;
+  --text-secondary: #555555;
+  --muted: #808080;
+  --list-hover: #E8F5FC;
+  --list-sel: #B3E5FC;
+  --bubble-in: #ffffff;
+  --bubble-out: #B3E5FC;
+  --bubble-edge: #00AFF0;
+  --bubble-text: #333333;
+  --bubble-text-out: #003C58;
+  --input-bg: #ffffff;
+  --input-border: #D0D0D0;
+  --input-focus: rgba(0, 175, 240, 0.28);
+  --chat-bg-1: #ffffff;
+  --chat-bg-2: #F5F5F5;
+  --shadow-sm: none;
+  --shadow-md: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-lg: 0 2px 8px rgba(0,0,0,0.08);
+  --glass: #ffffff;
+  --glass-border: #D0D0D0;
+  --glass-blur: 0px;
+  --sidebar-width: 280px;
+  --header-height: 64px;
+  --nav-height: 0px;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 12px;
+}
+.app.theme-skype6 .bubble { border-radius: 0 !important; }
+
+/* ── Skype 8+ (2018 · modern Fluent, dark by default) ─────── */
+.app.theme-skype8 {
+  --phaze-cyan: #0078D4;
+  --phaze-blue: #005A9E;
+  --brand: #0078D4;
+  --brand-hover: #005A9E;
+  --brand-soft: rgba(0, 120, 212, 0.12);
+  --brand-glow: rgba(0, 120, 212, 0.30);
+  --shell: #1F1F1F;
+  --chrome: #2A2A2A;
+  --panel: #2A2A2A;
+  --panel-edge: #3A3A3A;
+  --separator: #333333;
+  --text: #F0F0F0;
+  --text-secondary: #C8C8C8;
+  --muted: #909090;
+  --list-hover: #333333;
+  --list-sel: #094771;
+  --bubble-in: #2A2A2A;
+  --bubble-out: #0078D4;
+  --bubble-edge: transparent;
+  --bubble-text: #F0F0F0;
+  --bubble-text-out: #ffffff;
+  --input-bg: #242424;
+  --input-border: #3A3A3A;
+  --input-focus: rgba(0, 120, 212, 0.35);
+  --chat-bg-1: #1F1F1F;
+  --chat-bg-2: #262626;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.30);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.45);
+  --glass: rgba(42,42,42,0.85);
+  --glass-border: rgba(255,255,255,0.06);
+  --glass-blur: 20px;
+  --sidebar-width: 320px;
+  --header-height: 56px;
+  --nav-height: 64px;
+  font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+}
+.app.theme-skype8 .bubble { border-radius: 16px !important; }
+
+/* ── Theme picker (rendered inside the Skype menubar's View submenu) ── */
+.skype-menu-sectionlabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  padding: 8px 12px 4px;
+}
+.skype-menu-sep {
+  height: 1px;
+  background: var(--separator);
+  margin: 6px 4px;
+}
+.skype-menu-item {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px !important;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  text-align: left;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.skype-menu-item:hover { background: var(--list-hover); }
+.skype-menu-item.on { background: var(--brand-soft); color: var(--text); }
+.skype-menu-item-icon { width: 18px; text-align: center; font-size: 13px; }
+.skype-menu-item-label { flex: 1; }
+.skype-menu-item-hint { color: var(--muted); font-size: 10.5px; margin-left: 6px; }
+.skype-menu-item-check { color: var(--brand); font-weight: 700; margin-left: 6px; }
