@@ -21,7 +21,7 @@ import { tokenize as tokenizeEmoticons } from './emoticons'
 import { Emoticon } from './emoticonArt'
 import { EmoticonPicker } from './EmoticonPicker'
 import { CallScreen } from './CallScreen'
-import { THEMES, type ThemeId, isThemeId, nextTheme, themeIcon, themeLabel, hasFeature } from './themes'
+import { THEMES, type ThemeId, isThemeId, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype } from './themes'
 import OSChrome from './OSChrome'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
@@ -2311,7 +2311,7 @@ export default function App() {
       )}
 
       {/* ── Call overlay ─────────────────────────────────────────── */}
-      {callState && theme === 'skype7' && (
+      {callState && isClassicSkype(theme) && (
         <CallScreen
           state={callState}
           jitsiUrl={callState.status === 'active' && jitsiRoom ? `https://meet.jit.si/${jitsiRoom}` : null}
@@ -2758,7 +2758,7 @@ export default function App() {
                       let lastGroup = ''
                       return rows.map(({ u, st, last }) => {
                       const group = last ? dateSepLabel(last.ts) : ''
-                      const showHeader = theme === 'skype7' && group !== '' && group !== lastGroup
+                      const showHeader = isClassicSkype(theme) && group !== '' && group !== lastGroup
                       if (group) lastGroup = group
                       return (
                       <li key={u}>
@@ -2767,7 +2767,7 @@ export default function App() {
                           <span className="avatar" style={{ background: avatarColor(u) }}>
                             {u[0]?.toUpperCase()}
                             <AvatarImg user={u} />
-                            {theme === 'skype7'
+                            {isClassicSkype(theme)
                               ? <span className="avatar-presence"><PresenceIcon status={st} size={11} /></span>
                               : <span className="avatar-dot" data-online={st === 'Online' ? '' : undefined} style={{ background: statusColor(st) }} />}
                           </span>
@@ -2823,7 +2823,7 @@ export default function App() {
                   </>
                   )}
                 </div>
-                {theme === 'skype7' && (
+                {isClassicSkype(theme) && (
                   <div className="hub-side-bottom">
                     <button type="button" onClick={() => { setAddOpen(true); setAddFriend(''); setAddStatus(null) }}>Add a contact</button>
                     <button type="button" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>Create a group</button>
@@ -2871,7 +2871,7 @@ export default function App() {
                         <span className="avatar chat-peer-avatar" style={{ background: avatarColor(selected) }}>
                           {selected[0]?.toUpperCase()}
                           <AvatarImg user={selected} />
-                          {theme === 'skype7'
+                          {isClassicSkype(theme)
                             ? <span className="avatar-presence"><PresenceIcon status={friends[selected] ?? 'Offline'} size={11} /></span>
                             : <span className="avatar-dot" style={{ background: statusColor(friends[selected] ?? 'Offline') }} />}
                         </span>
@@ -2879,7 +2879,7 @@ export default function App() {
                           <span className="chat-peer-name clickable" onClick={() => setProfileUser(selected)}>{selected}</span>
                           <span className="chat-peer-status">
                             {friends[selected] ?? 'Offline'}
-                            {theme === 'skype7' && moods[selected] ? <span className="chat-peer-mood"> · {moods[selected]}</span> : null}
+                            {isClassicSkype(theme) && moods[selected] ? <span className="chat-peer-mood"> · {moods[selected]}</span> : null}
                           </span>
                         </span>
                         <div className="chat-call-btns">
@@ -3054,7 +3054,7 @@ export default function App() {
                           )}
                           {!line.me && !showGap && <span className="bubble-avatar-spacer" />}
                           <div className={`bubble ${line.me ? 'me' : ''} ${line.deleted ? 'deleted' : ''} ${isPinned ? 'pinned' : ''} ${mentionsMe ? 'mentions-me' : ''}`} title={new Date(line.ts).toLocaleString()}>
-                            {theme === 'skype7' && showGap && (
+                            {isClassicSkype(theme) && showGap && (
                               <div className="skype-msg-head">
                                 <span className="who clickable" onClick={() => !line.me && setProfileUser(line.from)}>{line.me ? 'You' : line.from}</span>
                                 <span className="skype-msg-head-ts">
@@ -3183,7 +3183,7 @@ export default function App() {
                       )}
                       <div className="emoji-wrap">
                         <button type="button" className="emoji-btn" title="Emoji" onClick={() => setEmojiOpen((v) => !v)}>😊</button>
-                        {emojiOpen && (theme === 'skype7' ? (
+                        {emojiOpen && (isClassicSkype(theme) ? (
                           <EmoticonPicker
                             onPick={(sc) => { setDraft((d) => d + sc + ' '); setEmojiOpen(false); draftInputRef.current?.focus() }}
                             onClose={() => setEmojiOpen(false)}
@@ -3256,7 +3256,7 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <button type="button" className={theme === 'skype7' && !editingId ? 'send-btn send-pill' : 'send-btn'} onClick={sendChat} disabled={conn !== 'open'} title={conn !== 'open' ? 'Reconnecting…' : undefined}>{editingId ? 'Save' : theme === 'skype7' ? 'Send message' : '▶'}</button>
+                      <button type="button" className={isClassicSkype(theme) && !editingId ? 'send-btn send-pill' : 'send-btn'} onClick={sendChat} disabled={conn !== 'open'} title={conn !== 'open' ? 'Reconnecting…' : undefined}>{editingId ? 'Save' : isClassicSkype(theme) ? 'Send message' : '▶'}</button>
                     </div>
                   )}
                 </section>

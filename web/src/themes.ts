@@ -70,6 +70,18 @@ export function isSkypeEra(id: ThemeId): boolean {
   return themeMeta(id).era === true
 }
 
+/** True for the classic desktop releases, Skype 3 through 7.
+ *
+ *  These shared a house style that Skype 8 abandoned: a menu bar, a compact
+ *  contact list, and a flat message log where every line carries its own
+ *  "Name  timestamp" header instead of being wrapped in a chat bubble.
+ *  Skype 8 is deliberately excluded — it's the release that moved to modern
+ *  right-aligned bubbles. */
+export function isClassicSkype(id: ThemeId): boolean {
+  return id === 'skype3' || id === 'skype4' || id === 'skype5' ||
+         id === 'skype6' || id === 'skype7'
+}
+
 /* =============================================================
    Per-era feature capabilities.
 
