@@ -1,0 +1,318 @@
+/* =============================================================
+   Per-era desktop window chrome.
+
+   Cosmetic only — a styled frame on a CSS wallpaper. No emulation,
+   no VM, no real window management. Each block recreates the window
+   decoration of the OS that Skype era actually shipped against.
+
+   Wallpapers are gradient approximations of the era's default, not
+   the real bitmaps (those are Microsoft's, and we ship none of them).
+   ============================================================= */
+
+.os-desktop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 3vw;
+  overflow: hidden;
+}
+
+.os-window {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: 1180px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.os-window-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--shell, #fff);
+}
+
+/* The app root normally owns the viewport; inside a frame it fills the
+   window body instead. */
+.os-window-body > .app {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+
+.os-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  user-select: none;
+  position: relative;
+}
+
+.os-title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+  border-radius: 50%;
+  background: #00AFF0;
+  color: #fff;
+}
+
+.os-title-text {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.os-title-buttons {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.os-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: default;
+  padding: 0;
+  position: relative;
+}
+
+/* Shared glyph primitives — each era resizes / recolours them. */
+.os-glyph-min,
+.os-glyph-max,
+.os-glyph-close { display: block; position: relative; }
+
+.os-glyph-min { width: 10px; height: 1px; background: currentColor; }
+.os-glyph-max { width: 9px; height: 9px; border: 1px solid currentColor; }
+.os-glyph-close { width: 10px; height: 10px; }
+.os-glyph-close::before,
+.os-glyph-close::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 0;
+  width: 100%; height: 1px;
+  background: currentColor;
+}
+.os-glyph-close::before { transform: rotate(45deg); }
+.os-glyph-close::after  { transform: rotate(-45deg); }
+
+/* ── Windows XP · Luna Blue (Skype 3, 2007) ─────────────────── */
+.os-xp {
+  background:
+    radial-gradient(ellipse 120% 80% at 50% 100%, #7CB342 0%, #558B2F 45%, transparent 70%),
+    linear-gradient(180deg, #1E5799 0%, #3E92D8 38%, #7DB9E8 62%, #A8D18D 78%, #6B9B37 100%);
+}
+.os-xp .os-window {
+  border: 3px solid #0A50C8;
+  border-top: none;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+}
+.os-xp .os-titlebar {
+  height: 29px;
+  padding: 0 3px 0 5px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg,
+    #0F62D6 0%, #2E7CE8 8%, #4A94F0 20%,
+    #1B6BDE 42%, #0A50C8 88%, #2A6FD0 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  font: 700 13px 'Trebuchet MS', Tahoma, sans-serif;
+  color: #fff;
+}
+.os-xp .os-title-text { text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.55); padding-left: 2px; }
+.os-xp .os-title-icon { width: 16px; height: 16px; font-size: 10px; }
+.os-xp .os-title-buttons { gap: 2px; }
+.os-xp .os-btn {
+  width: 21px; height: 21px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: #fff;
+  background: linear-gradient(180deg, #5B9BEF 0%, #2A6FD8 55%, #1358C4 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.os-xp .os-btn-close {
+  width: 33px;
+  background: linear-gradient(180deg, #F08A6B 0%, #E15F35 45%, #C4341A 100%);
+}
+.os-xp .os-glyph-min { width: 8px; height: 2px; margin-top: 5px; }
+.os-xp .os-glyph-max { width: 9px; height: 8px; border-width: 2px 1px 1px; }
+
+/* ── Windows Vista · Aero glass (Skype 4, 2009) ─────────────── */
+.os-vista {
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 40%, rgba(90, 170, 255, 0.5) 0%, transparent 65%),
+    linear-gradient(160deg, #071A38 0%, #0E3566 40%, #10508F 70%, #082444 100%);
+}
+.os-vista .os-window {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px 8px 4px 4px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 18px 55px rgba(0, 0, 0, 0.6),
+    0 0 70px rgba(120, 190, 255, 0.28);
+}
+.os-vista .os-titlebar {
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border-radius: 7px 7px 0 0;
+  background: linear-gradient(180deg,
+    rgba(235, 246, 255, 0.82) 0%,
+    rgba(175, 214, 245, 0.72) 48%,
+    rgba(140, 190, 232, 0.68) 52%,
+    rgba(196, 226, 248, 0.78) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+  font: 400 13px 'Segoe UI', Tahoma, sans-serif;
+  color: #0B2B4E;
+}
+.os-vista .os-title-text { text-shadow: 0 0 6px rgba(255, 255, 255, 0.95); }
+.os-vista .os-title-icon { width: 17px; height: 17px; font-size: 10px; }
+.os-vista .os-title-buttons { gap: 1px; }
+.os-vista .os-btn {
+  width: 27px; height: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 3px;
+  color: #0B2B4E;
+  background: linear-gradient(180deg, rgba(255,255,255,0.75) 0%, rgba(205,230,250,0.5) 50%, rgba(170,210,240,0.55) 100%);
+}
+.os-vista .os-btn-close {
+  width: 45px;
+  color: #fff;
+  background: linear-gradient(180deg, #F4A088 0%, #E4674A 48%, #C93A22 100%);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Windows 7 · refined Aero (Skype 5, 2010) ───────────────── */
+.os-win7 {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 45%, rgba(120, 200, 255, 0.42) 0%, transparent 62%),
+    linear-gradient(165deg, #041226 0%, #0B2F52 42%, #10527F 72%, #05182E 100%);
+}
+.os-win7 .os-window {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 7px 7px 3px 3px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 16px 48px rgba(0, 0, 0, 0.58),
+    0 0 60px rgba(110, 185, 255, 0.22);
+}
+.os-win7 .os-titlebar {
+  height: 30px;
+  padding: 0 3px 0 8px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg,
+    rgba(246, 251, 255, 0.86) 0%,
+    rgba(198, 226, 246, 0.76) 50%,
+    rgba(214, 235, 250, 0.8) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6);
+  font: 400 12.5px 'Segoe UI', Tahoma, sans-serif;
+  color: #12314F;
+}
+.os-win7 .os-title-text { text-shadow: 0 0 5px rgba(255, 255, 255, 0.9); }
+.os-win7 .os-title-icon { width: 16px; height: 16px; font-size: 10px; }
+.os-win7 .os-btn {
+  width: 29px; height: 21px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 3px;
+  color: #12314F;
+  background: linear-gradient(180deg, rgba(255,255,255,0.7) 0%, rgba(210,232,250,0.45) 100%);
+}
+.os-win7 .os-btn-close {
+  width: 46px;
+  color: #fff;
+  background: linear-gradient(180deg, #F09C82 0%, #DD6046 50%, #C0331C 100%);
+}
+
+/* ── Windows 8 · Metro flat (Skype 6, 2012) ─────────────────── */
+.os-win8 { background: #0F7BBF; }
+.os-win8 .os-window {
+  border: 1px solid #0A5E93;
+  border-radius: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+.os-win8 .os-titlebar {
+  height: 30px;
+  padding: 0 0 0 10px;
+  background: #F0F0F0;
+  border-bottom: 1px solid #DCDCDC;
+  font: 400 12px 'Segoe UI', Tahoma, sans-serif;
+  color: #2B2B2B;
+}
+.os-win8 .os-title-icon { width: 16px; height: 16px; font-size: 10px; border-radius: 0; }
+.os-win8 .os-btn { width: 45px; height: 30px; color: #2B2B2B; border-radius: 0; }
+.os-win8 .os-btn-close { color: #2B2B2B; }
+
+/* ── Windows 10 (Skype 7, 2014) ─────────────────────────────── */
+.os-win10 {
+  background: linear-gradient(150deg, #071B33 0%, #0E3358 45%, #123F6B 70%, #06182C 100%);
+}
+.os-win10 .os-window {
+  border: 1px solid #2B2B2B;
+  border-radius: 0;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+}
+.os-win10 .os-titlebar {
+  height: 32px;
+  padding: 0 0 0 10px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E4E4;
+  font: 400 12px 'Segoe UI', Tahoma, sans-serif;
+  color: #1A1A1A;
+}
+.os-win10 .os-title-icon { width: 16px; height: 16px; font-size: 10px; border-radius: 2px; }
+.os-win10 .os-btn { width: 46px; height: 32px; color: #1A1A1A; border-radius: 0; }
+
+/* ── Windows 11 · Mica + rounded (Skype 8+, 2018→) ──────────── */
+.os-win11 {
+  background:
+    radial-gradient(ellipse 70% 60% at 30% 30%, rgba(90, 150, 255, 0.42) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 75% 70%, rgba(150, 90, 235, 0.34) 0%, transparent 62%),
+    linear-gradient(150deg, #0B1020 0%, #14203C 50%, #0A1428 100%);
+}
+.os-win11 .os-window {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.62);
+}
+.os-win11 .os-titlebar {
+  height: 34px;
+  padding: 0 0 0 12px;
+  border-radius: 8px 8px 0 0;
+  background: rgba(32, 32, 36, 0.94);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font: 400 12.5px 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  color: #EDEDED;
+}
+.os-win11 .os-title-icon { width: 16px; height: 16px; font-size: 10px; }
+.os-win11 .os-btn { width: 46px; height: 34px; color: #EDEDED; border-radius: 0; }
+.os-win11 .os-btn-max:last-of-type { border-radius: 0 8px 0 0; }
+.os-win11 .os-glyph-max { border-radius: 1px; }
+
+/* ── Small screens: the frame costs more than it gives ──────── */
+@media (max-width: 900px), (max-height: 620px) {
+  .os-desktop { padding: 0; }
+  .os-window {
+    max-width: none;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .os-titlebar { border-radius: 0 !important; }
+}

@@ -2821,8 +2821,14 @@ button.link-btn:hover,
 .app.theme-skype7 .banner       { margin: 0; border-radius: 0; }
 
 /* ── Classic menu bar (Skype/Contacts/Conversation/Call/View/Tools/Help) ── */
+/* Every Skype from 3 through 7 shipped a classic menu bar; Skype 8 dropped it.
+   The base rule hides it, and each era that had one opts back in below. */
 .skype-menubar { display: none; }
-.app.theme-skype7 .skype-menubar {
+.app.theme-skype3 .skype-menubar,
+.app.theme-skype4 .skype-menubar,
+.app.theme-skype5 .skype-menubar,
+.app.theme-skype6 .skype-menubar,
+.skype-menubar .skype-menubar {
   display: flex;
   align-items: stretch;
   height: 24px;
@@ -2833,8 +2839,8 @@ button.link-btn:hover,
   position: relative;
   z-index: 40;
 }
-.app.theme-skype7 .skype-menu { position: relative; }
-.app.theme-skype7 .skype-menu > button {
+.skype-menubar .skype-menu { position: relative; }
+.skype-menubar .skype-menu > button {
   height: 100%;
   padding: 0 10px;
   background: transparent;
@@ -2842,12 +2848,12 @@ button.link-btn:hover,
   color: var(--text);
   cursor: pointer;
 }
-.app.theme-skype7 .skype-menu > button:hover,
-.app.theme-skype7 .skype-menu > button.on {
+.skype-menubar .skype-menu > button:hover,
+.skype-menubar .skype-menu > button.on {
   background: var(--brand);
   color: #fff;
 }
-.app.theme-skype7 .skype-menu-dropdown {
+.skype-menubar .skype-menu-dropdown {
   position: absolute;
   top: 100%;
   left: 0;
@@ -2859,8 +2865,8 @@ button.link-btn:hover,
   flex-direction: column;
   padding: 4px;
 }
-.app.theme-skype7 .skype-menu-dropdown button,
-.app.theme-skype7 .skype-menu-dropdown a {
+.skype-menubar .skype-menu-dropdown button,
+.skype-menubar .skype-menu-dropdown a {
   background: transparent;
   border: none;
   color: var(--text);
@@ -2871,22 +2877,28 @@ button.link-btn:hover,
   border-radius: 2px;
   text-decoration: none;
 }
-.app.theme-skype7 .skype-menu-dropdown button:hover,
-.app.theme-skype7 .skype-menu-dropdown a:hover {
+.skype-menubar .skype-menu-dropdown button:hover,
+.skype-menubar .skype-menu-dropdown a:hover {
   background: var(--list-hover);
 }
-.app.theme-skype7 .skype-menu-dropdown button:disabled {
+.skype-menubar .skype-menu-dropdown button:disabled {
   color: var(--muted);
   cursor: default;
 }
-.app.theme-skype7 .skype-menu-dropdown button:disabled:hover { background: transparent; }
+.skype-menubar .skype-menu-dropdown button:disabled:hover { background: transparent; }
 
 /* ── Sidebar tab row (Skymu-style Contacts/Groups/Recent strip) ──
-   Real Skype 7 chrome has no floating pill nav or glass top bar —
-   Spaces/Live/theme switching move into a flat icon-tab row inline
+   Classic Skype chrome has no floating pill nav or glass top bar —
+   Contacts/Recent/Spaces/Live move into a flat icon-tab row inline
    in the sidebar instead, matching the Skymu reference. Hidden on
-   other themes since they use the floating pill nav for this. */
+   the modern themes since they use the floating pill nav for this.
+   The children below are scoped to .sidebar-tabs, so this one rule
+   is what gates the whole strip per era. */
 .sidebar-tabs { display: none; }
+.app.theme-skype3 .sidebar-tabs,
+.app.theme-skype4 .sidebar-tabs,
+.app.theme-skype5 .sidebar-tabs,
+.app.theme-skype6 .sidebar-tabs,
 .app.theme-skype7 .sidebar-tabs {
   display: flex;
   align-items: center;
@@ -2895,7 +2907,7 @@ button.link-btn:hover,
   border-bottom: 1px solid #B2C8D8;
   flex-shrink: 0;
 }
-.app.theme-skype7 .sidebar-tabs button {
+.sidebar-tabs button {
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
@@ -2908,8 +2920,8 @@ button.link-btn:hover,
   align-items: center;
   justify-content: center;
 }
-.app.theme-skype7 .sidebar-tabs button:hover { background: rgba(0,0,0,0.04); }
-.app.theme-skype7 .sidebar-tabs button.on {
+.sidebar-tabs button:hover { background: rgba(0,0,0,0.04); }
+.sidebar-tabs button.on {
   color: var(--brand);
   border-bottom-color: var(--brand);
   font-weight: 700;

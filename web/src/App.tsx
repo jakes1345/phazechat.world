@@ -22,6 +22,7 @@ import { Emoticon } from './emoticonArt'
 import { EmoticonPicker } from './EmoticonPicker'
 import { CallScreen } from './CallScreen'
 import { THEMES, type ThemeId, isThemeId, nextTheme, themeIcon, themeLabel, hasFeature } from './themes'
+import OSChrome from './OSChrome'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -70,6 +71,7 @@ function isPeerMuted(peer: string): boolean {
 }
 const THEME_KEY = 'phaze_theme_v1'
 const SNOW_KEY = 'phaze_snow_v1'
+const OSFRAME_KEY = 'phaze_osframe_v1'
 const STATUS_KEY = 'phaze_status_v1'
 
 const SNOW_FLAKES = Array.from({ length: 40 }, (_, i) => ({
@@ -646,6 +648,9 @@ export default function App() {
     return isThemeId(raw) ? raw : 'skype7'
   })
   const [snow, setSnow] = useState<boolean>(() => localStorage.getItem(SNOW_KEY) === '1')
+  // Period-accurate desktop window frame around the app. Off by default —
+  // it costs screen space, so it's opt-in from the View menu.
+  const [osFrame, setOsFrame] = useState<boolean>(() => localStorage.getItem(OSFRAME_KEY) === '1')
   const [myStatus, setMyStatus] = useState<UserStatus>(() => (localStorage.getItem(STATUS_KEY) as UserStatus) || 'Online')
   const [idle, setIdle] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
@@ -729,6 +734,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(SNOW_KEY, snow ? '1' : '0')
   }, [snow])
+
+  useEffect(() => {
+    localStorage.setItem(OSFRAME_KEY, osFrame ? '1' : '0')
+  }, [osFrame])
 
   useEffect(() => {
     const el = chatScrollRef.current
@@ -1989,6 +1998,7 @@ export default function App() {
   }, [totalUnread])
 
   return (
+    <OSChrome theme={theme} enabled={osFrame && !wails}>
     <div className={`app theme-${theme}${wails ? ' desktop-app' : ''}`}>
       {wails && (
         <DesktopTitleBar
@@ -2079,6 +2089,11 @@ export default function App() {
                         </button>
                       ))}
                       <div className="skype-menu-sep" />
+                      <button
+                        type="button"
+                        onClick={() => { setOsFrame((v) => !v); setMenuOpen(null) }}
+                        title="Frame the app in the desktop OS this Skype era shipped on"
+                      >{osFrame ? 'Hide desktop frame' : 'Show desktop frame'}</button>
                       <button type="button" onClick={() => { setSnow((s) => !s); setMenuOpen(null) }}>{snow ? 'Turn off snow' : 'Let it snow'}</button>
                     </>
                   )}
@@ -3271,5 +3286,6 @@ export default function App() {
         </div>
       </footer>
     </div>
+    </OSChrome>
   )
 }
