@@ -3,7 +3,7 @@ module phaze-nexus
 go 1.25.0
 
 require (
-	firebase.google.com/go/v4 v4.20.0
+	firebase.google.com/go/v4 v4.21.0
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/getsentry/sentry-go v0.46.2
 	github.com/gorilla/websocket v1.5.3
