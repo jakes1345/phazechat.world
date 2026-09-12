@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import QRCode from 'qrcode'
 import type { NexusMessage } from './nexusTypes'
-import { bumpAvatarVersion } from './AvatarImg'
+import { bumpAvatarVersion } from './avatarVersions'
 import './settings.css'
 
 type Tab = 'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite' | 'import'

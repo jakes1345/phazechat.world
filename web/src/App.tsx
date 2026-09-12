@@ -666,7 +666,11 @@ export default function App() {
   const moodFetchedRef = useRef<Set<string>>(new Set())
   const shownStatus = effectiveStatus(myStatus, idle)
   const dnd = myStatus === 'Do Not Disturb'
-  dndRef.current = dnd
+  // Mirrored into a ref so the websocket handlers below can read the current
+  // value without being re-created on every status change. Assigned in an
+  // effect rather than during render — the consumers are all async callbacks,
+  // so post-commit is soon enough, and writing refs mid-render is a lint error.
+  useEffect(() => { dndRef.current = dnd }, [dnd])
   const [unread, setUnread] = useState<Record<string, number>>({})
   const [emojiOpen, setEmojiOpen] = useState(false)
   const unreadRef = useRef<Record<string, number>>({})
@@ -711,7 +715,14 @@ export default function App() {
   // Server-reported last-activity time per friend, from friend_status.ts.
   // Only consulted when there's no local chat history to sort by (fresh
   // browser/device) — real local history always wins.
-  const friendLastTsRef = useRef<Record<string, number>>({})
+  //
+  // State rather than a ref because the Recent list reads it while rendering,
+  // and reading a ref during render is both a lint error and genuinely
+  // non-reactive — a fresh timestamp wouldn't reorder the list until some
+  // unrelated render happened to come along. The one writer already calls
+  // setFriends on the same message, so React batches the two together and
+  // this costs no extra render.
+  const [friendLastTs, setFriendLastTs] = useState<Record<string, number>>({})
   useLayoutEffect(() => { selectedConvoRef.current = selectedConvo }, [selectedConvo])
 
   useEffect(() => {
@@ -1044,7 +1055,11 @@ export default function App() {
         case 'friend_status':
           if (msg.sender) {
             setFriends((f) => ({ ...f, [msg.sender!]: msg.status || 'Offline' }))
-            if (msg.ts) friendLastTsRef.current[msg.sender] = msg.ts
+            if (msg.ts) {
+              const sender = msg.sender
+              const ts = msg.ts
+              setFriendLastTs((m) => (m[sender] === ts ? m : { ...m, [sender]: ts }))
+            }
             if (msg.status === 'Offline' && callStateRef.current?.peer === msg.sender) {
               tearDownCall()
             }
@@ -2751,7 +2766,7 @@ export default function App() {
                       const rows = Object.entries(friends)
                         .map(([u, st]) => ({
                           u, st,
-                          last: lastLineFor(me, u) ?? (friendLastTsRef.current[u] ? { text: st, ts: friendLastTsRef.current[u] } : null),
+                          last: lastLineFor(me, u) ?? (friendLastTs[u] ? { text: st, ts: friendLastTs[u] } : null),
                         }))
                         .filter(({ u }) => !contactFilter.trim() || u.toLowerCase().includes(contactFilter.toLowerCase()))
                         .sort((a, b) => (b.last?.ts ?? 0) - (a.last?.ts ?? 0))
