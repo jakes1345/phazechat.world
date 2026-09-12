@@ -4550,3 +4550,272 @@ button.link-btn:hover,
   border-bottom-color: #316AC5;
   color: #0046A8;
 }
+
+
+/* =============================================================
+   Skype 4 (2009) — interior layout.
+
+   Skype 4 was the controversial wide redesign, and it inverted almost
+   every choice Skype 3 made. Where 3 was a dense 22px list with a 16px
+   status glyph and no photo, 4 went roomy: ~52px rows built around a
+   large photo avatar, with the mood message promoted to its own second
+   line instead of being crammed in beside the name.
+
+   Visually it's Vista's house style — Aero gradients, glossy highlights,
+   softly rounded corners, Segoe UI instead of Tahoma — and selection is
+   a gradient wash with a border rather than Skype 3's hard XP block.
+
+   The signature element is the big green call button. Skype 4 made
+   calling the primary action in the conversation toolbar rather than one
+   small icon among many, so the audio-call button is promoted here while
+   its siblings stay secondary.
+
+   Message log stays flat and left-aligned (isClassicSkype handles that);
+   it just gets more room and a larger avatar than Skype 3's.
+   ============================================================= */
+
+.app.theme-skype4 { font-family: 'Segoe UI', Tahoma, sans-serif; }
+
+/* ── Contact list: roomy, photo-led ────────────────────────── */
+.app.theme-skype4 .friend-row {
+  padding: 5px 8px;
+  gap: 9px;
+  min-height: 52px;
+  border-radius: 4px;
+  margin: 1px 3px;
+  align-items: center;
+  border: 1px solid transparent;
+}
+.app.theme-skype4 .friend-row:hover {
+  background: linear-gradient(180deg, #F4F9FE 0%, #DCEAF8 100%);
+  border-color: #B4D2EC;
+}
+.app.theme-skype4 .friend-row.sel,
+.app.theme-skype4 .friend-row.sel:hover {
+  background: linear-gradient(180deg, #DCEBF9 0%, #BDD9F2 50%, #A9CCEC 100%);
+  border-color: #7BA7CE;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+/* The photo is the point of this era — show it large, and keep the
+   presence glyph as a badge pinned to its corner. */
+.app.theme-skype4 .friend-row .avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  font-size: 17px;
+  border: 1px solid #9FB8CE;
+  box-shadow: 0 1px 2px rgba(20, 60, 110, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  overflow: visible;
+}
+.app.theme-skype4 .friend-row .avatar img {
+  border-radius: 2px;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.app.theme-skype4 .friend-row .avatar-presence {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid #9FB8CE;
+  border-radius: 2px;
+}
+
+/* Name line, then mood on its own line below. */
+.app.theme-skype4 .friend-meta { gap: 2px; min-width: 0; }
+.app.theme-skype4 .friend-line { display: flex; gap: 6px; align-items: baseline; }
+.app.theme-skype4 .friend-line:last-child { display: flex; }
+.app.theme-skype4 .friend-name {
+  font: 600 12.5px 'Segoe UI', Tahoma, sans-serif;
+  color: #12314F;
+}
+.app.theme-skype4 .friend-preview {
+  font: 400 11.5px 'Segoe UI', Tahoma, sans-serif;
+  color: #5E7287;
+  font-style: italic;
+}
+.app.theme-skype4 .friend-time { font-size: 10.5px; color: #7E93A6; }
+.app.theme-skype4 .unread-badge {
+  background: linear-gradient(180deg, #F08A6B 0%, #D4481F 100%);
+  border-radius: 8px;
+  font-size: 10px;
+  padding: 0 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* ── Message log: flat but roomier than Skype 3 ────────────── */
+.app.theme-skype4 .bubble-row,
+.app.theme-skype4 .bubble-row.me {
+  flex-direction: row;
+  gap: 9px;
+  margin: 0 0 11px;
+  align-items: flex-start;
+  animation: none;
+}
+.app.theme-skype4 .bubble,
+.app.theme-skype4 .bubble.me {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  max-width: 100%;
+  color: #1A1A1A;
+}
+.app.theme-skype4 .bubble-avatar,
+.app.theme-skype4 .bubble-avatar-spacer {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 3px;
+  font-size: 13px;
+  border: 1px solid #9FB8CE;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+.app.theme-skype4 .bubble-text {
+  font: 400 12.5px 'Segoe UI', Tahoma, sans-serif;
+  line-height: 1.5;
+  color: #1A1A1A;
+}
+.app.theme-skype4 .skype-msg-head { gap: 10px; margin-bottom: 2px; }
+.app.theme-skype4 .skype-msg-head .who {
+  font: 600 12px 'Segoe UI', Tahoma, sans-serif;
+  color: #1A5D9E;
+}
+.app.theme-skype4 .bubble.me .skype-msg-head .who { color: #8A4200; }
+.app.theme-skype4 .skype-msg-head-ts { font-size: 10.5px; color: #8295A6; }
+
+/* ── Aero chrome ───────────────────────────────────────────── */
+.app.theme-skype4 .hub-sidebar { border-right: 1px solid #A5B8CC; }
+.app.theme-skype4 .chat-header-bar {
+  background: linear-gradient(180deg, #FAFCFE 0%, #E4EEF8 48%, #D3E3F2 52%, #E8F1F9 100%);
+  border-bottom: 1px solid #A5B8CC;
+  padding: 7px 10px;
+  gap: 9px;
+}
+.app.theme-skype4 .chat-peer-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 3px;
+  border: 1px solid #9FB8CE;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+.app.theme-skype4 .chat-peer-name {
+  font: 600 13.5px 'Segoe UI', Tahoma, sans-serif;
+  color: #12314F;
+}
+.app.theme-skype4 .chat-peer-status { font-size: 11px; color: #5E7287; }
+.app.theme-skype4 .chat-peer-mood { font-style: italic; color: #6E8296; }
+
+.app.theme-skype4 .sidebar-tabs {
+  height: 30px;
+  background: linear-gradient(180deg, #F2F8FD 0%, #DDE9F5 100%);
+  border-bottom: 1px solid #A5B8CC;
+}
+.app.theme-skype4 .sidebar-tabs button { font-size: 12px; padding: 0 12px; }
+.app.theme-skype4 .sidebar-tabs button.on {
+  background: linear-gradient(180deg, #FFFFFF 0%, #E8F2FB 100%);
+  border-bottom-color: #4A90E2;
+  color: #1A5D9E;
+  font-weight: 600;
+}
+
+/* ── Vista glossy controls ─────────────────────────────────── */
+.app.theme-skype4 .send-btn,
+.app.theme-skype4 .send-pill,
+.app.theme-skype4 .hub-side-bottom button {
+  border: 1px solid #8FAEC9;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #FDFEFF 0%, #EAF3FB 47%, #D4E6F5 53%, #E6F0F9 100%);
+  color: #12314F;
+  font: 600 12px 'Segoe UI', Tahoma, sans-serif;
+  padding: 5px 15px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 1px 2px rgba(20, 60, 110, 0.12);
+}
+.app.theme-skype4 .send-btn:hover,
+.app.theme-skype4 .send-pill:hover,
+.app.theme-skype4 .hub-side-bottom button:hover {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F0F8FF 47%, #C9E2F8 53%, #DDEEFB 100%);
+  border-color: #5B9BD5;
+}
+.app.theme-skype4 .send-btn:active,
+.app.theme-skype4 .send-pill:active {
+  background: linear-gradient(180deg, #C9DCEE 0%, #DCE9F6 100%);
+  box-shadow: inset 0 1px 3px rgba(20, 60, 110, 0.25);
+}
+
+.app.theme-skype4 .draft-wrap textarea,
+.app.theme-skype4 .draft-wrap input,
+.app.theme-skype4 .hub-add-friend input {
+  border: 1px solid #8FAEC9;
+  border-radius: 3px;
+  background: #fff;
+  font: 400 12.5px 'Segoe UI', Tahoma, sans-serif;
+  box-shadow: inset 0 1px 2px rgba(20, 60, 110, 0.09);
+}
+.app.theme-skype4 .draft-wrap textarea:focus,
+.app.theme-skype4 .hub-add-friend input:focus {
+  border-color: #4A90E2;
+  outline: none;
+  box-shadow: inset 0 1px 2px rgba(20, 60, 110, 0.09), 0 0 4px rgba(74, 144, 226, 0.45);
+}
+
+/* ── The signature green call button ──────────────────────────
+   Skype 4 promoted calling to the primary action in the conversation
+   toolbar. Its siblings stay small and secondary. */
+.app.theme-skype4 .chat-call-btn-audio {
+  width: auto;
+  min-width: 74px;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 4px;
+  border: 1px solid #4E8B1E;
+  background: linear-gradient(180deg, #A8DC6E 0%, #74BE33 47%, #5CA81F 53%, #82C73E 100%);
+  color: #fff;
+  font: 600 12px 'Segoe UI', Tahoma, sans-serif;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.app.theme-skype4 .chat-call-btn-audio::after {
+  content: 'Call';
+  margin-left: 5px;
+}
+.app.theme-skype4 .chat-call-btn-audio:hover {
+  background: linear-gradient(180deg, #B8E884 0%, #84CE43 47%, #6AB82A 53%, #92D74E 100%);
+  border-color: #3F7318;
+}
+.app.theme-skype4 .chat-call-btn-audio:disabled {
+  background: linear-gradient(180deg, #D6E6C4 0%, #BCD4A4 100%);
+  border-color: #A3BD8C;
+  text-shadow: none;
+}
+.app.theme-skype4 .chat-call-btn-video {
+  border: 1px solid #8FAEC9;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #FDFEFF 0%, #E6F0F9 50%, #D4E6F5 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.app.theme-skype4 .hub-side-bottom {
+  background: linear-gradient(180deg, #EFF6FC 0%, #DCE8F4 100%);
+  border-top: 1px solid #A5B8CC;
+  padding: 7px 8px;
+  gap: 6px;
+}
+.app.theme-skype4 .online-strip { font-size: 11px; color: #5E7287; }
+
+.app.theme-skype4 .convo-date-header {
+  background: linear-gradient(180deg, #E8F1F9 0%, #D8E6F3 100%);
+  border: 1px solid #BCD2E5;
+  border-radius: 3px;
+  font: 600 10.5px 'Segoe UI', Tahoma, sans-serif;
+  color: #4A6378;
+  padding: 3px 8px;
+}

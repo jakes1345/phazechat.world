@@ -2903,14 +2903,14 @@ export default function App() {
                           >{selected && mutedPeers.has(selected) ? '🔕' : '🔔'}</button>
                           <button
                             type="button"
-                            className="chat-call-btn"
+                            className="chat-call-btn chat-call-btn-audio"
                             title="Audio call"
                             onClick={() => void startCall('audio')}
                             disabled={!me}
                           >☎</button>
                           <button
                             type="button"
-                            className="chat-call-btn"
+                            className="chat-call-btn chat-call-btn-video"
                             title="Video call"
                             onClick={() => void startCall('video')}
                             disabled={!me}
