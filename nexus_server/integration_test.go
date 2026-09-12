@@ -31,7 +31,7 @@ func newTestServer(t *testing.T) (*NexusServer, *httptest.Server, string) {
 	db.Exec("PRAGMA busy_timeout=5000")
 	t.Cleanup(func() { db.Close() })
 
-	srv := &NexusServer{DB: db, Clients: map[string]*Client{}}
+	srv := &NexusServer{DB: db, Clients: map[string][]*Client{}}
 	srv.initDB()
 
 	mux := http.NewServeMux()

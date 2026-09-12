@@ -174,17 +174,12 @@ func (s *NexusServer) storiesItemHandler(w http.ResponseWriter, r *http.Request)
 		}
 		// Relay as a regular DM. Author sees it as a normal incoming msg
 		// with the body prefixed so they know which story it references.
-		s.Mu.RLock()
-		c, ok := s.Clients[author]
-		s.Mu.RUnlock()
 		text := "↩ reply to your story: " + strings.TrimSpace(body.Body)
-		if ok {
-			c.Send(NexusMessage{
-				Type: "msg", Sender: user, Recipient: author, Body: text,
-			})
-		}
+		delivered := s.sendTo(author, NexusMessage{
+			Type: "msg", Sender: user, Recipient: author, Body: text,
+		})
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"ok":true,"delivered":` + map[bool]string{true: "true", false: "false"}[ok] + `}`))
+		w.Write([]byte(`{"ok":true,"delivered":` + map[bool]string{true: "true", false: "false"}[delivered] + `}`))
 		return
 	}
 

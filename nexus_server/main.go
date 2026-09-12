@@ -204,6 +204,11 @@ type Client struct {
 	// established, a single authed client could otherwise flood the read
 	// loop unbounded.
 	msgLimiter *rate.Limiter
+	// SessionToken is the session this connection authenticated with. Two
+	// connections sharing a token are the same sign-in (a second tab in the
+	// same browser); a different token means a genuinely separate sign-in,
+	// which is the distinction new-device checks need.
+	SessionToken string
 	// InCall is true while the client has an active call session.
 	// Used to send call_busy back to new callers instead of letting them wait.
 	InCall bool
@@ -238,8 +243,19 @@ func (c *Client) Send(m NexusMessage) error {
 }
 
 type NexusServer struct {
-	DB        *sql.DB
-	Clients   map[string]*Client
+	DB *sql.DB
+	// Clients maps a username to every live connection that user has open.
+	//
+	// This is a slice rather than a single *Client because a person is
+	// legitimately connected from several places at once — a couple of browser
+	// tabs, the desktop app, their phone. The server previously kept one
+	// connection per user and force-closed the old one on every new connect,
+	// which meant opening a second tab logged the first one out.
+	//
+	// Use the helpers (clientsOf / sendTo / isOnline / addClient /
+	// removeClient) rather than touching this map directly, so locking and
+	// fan-out stay consistent.
+	Clients   map[string][]*Client
 	Mu        sync.RWMutex
 	fcmClient *messaging.Client
 
@@ -1284,12 +1300,13 @@ func (s *NexusServer) broadcastChannelMsg(serverID string, payload NexusMessage)
 		pushTitle = payload.Sender + " in " + serverName + " #" + channelName
 	}
 
-	s.Mu.RLock()
-	defer s.Mu.RUnlock()
 	for _, u := range recipients {
-		if c, ok := s.Clients[u]; ok {
-			c.Send(payload)
-		} else if u != payload.Sender {
+		// Push only when nothing took it live — a user reading on one device
+		// shouldn't get a phone notification for the same message.
+		if s.sendTo(u, payload) {
+			continue
+		}
+		if u != payload.Sender {
 			go s.sendWebPush(u, pushTitle, payload.Body)
 			go s.sendFCMPush(u, pushTitle, payload.Body)
 		}
@@ -1707,11 +1724,15 @@ func (s *NexusServer) exportUserData(username string) map[string]interface{} {
 	return out
 }
 
-func (s *NexusServer) deliverOfflineMessages(username string) {
-	s.Mu.RLock()
-	client, online := s.Clients[username]
-	s.Mu.RUnlock()
-	if !online {
+// deliverOfflineMessages drains the queue to the connection that just
+// authenticated.
+//
+// Takes the specific *Client rather than looking the user up: it's always
+// called immediately after one connection comes online, and that's the one
+// that needs the backlog. Fanning out to the user's other sessions would
+// re-deliver messages those sessions already received live.
+func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
+	if client == nil {
 		return
 	}
 
@@ -1751,18 +1772,13 @@ func (s *NexusServer) deliverOfflineMessages(username string) {
 func (s *NexusServer) broadcastPresence(username, status string) {
 	friends := s.getFriends(username)
 	supporter := s.isSupporter(username)
-	s.Mu.RLock()
-	defer s.Mu.RUnlock()
-
 	for _, friend := range friends {
-		if client, ok := s.Clients[friend]; ok {
-			client.Send(NexusMessage{
-				Type:      "presence",
-				Sender:    username,
-				Status:    publicStatus(status),
-				Supporter: supporter,
-			})
-		}
+		s.sendTo(friend, NexusMessage{
+			Type:      "presence",
+			Sender:    username,
+			Status:    publicStatus(status),
+			Supporter: supporter,
+		})
 	}
 }
 
@@ -1878,12 +1894,7 @@ func (s *NexusServer) streamStop(host string) {
 	}
 	// Tell every active viewer the stream ended.
 	for v := range st.Viewers {
-		s.Mu.RLock()
-		c, ok := s.Clients[v]
-		s.Mu.RUnlock()
-		if ok {
-			c.Send(NexusMessage{Type: "stream_ended", Sender: host})
-		}
+		s.sendTo(v, NexusMessage{Type: "stream_ended", Sender: host})
 	}
 }
 
@@ -1947,11 +1958,7 @@ func (s *NexusServer) streamAreParticipants(a, b string) bool {
 // "Live now" banner can appear in real time.
 func (s *NexusServer) streamBroadcastList() {
 	list := s.streamList()
-	s.Mu.RLock()
-	defer s.Mu.RUnlock()
-	for _, c := range s.Clients {
-		c.Send(NexusMessage{Type: "stream_list_result", Status: "ok", Results: list})
-	}
+	s.broadcastAll(NexusMessage{Type: "stream_list_result", Status: "ok", Results: list})
 }
 
 // streamEvictUser called on disconnect: end the user's own stream and remove
@@ -1972,12 +1979,7 @@ func (s *NexusServer) streamEvictUser(username string) {
 	}
 	s.VoiceRoomsMu.Unlock()
 	for _, h := range notifyHosts {
-		s.Mu.RLock()
-		c, ok := s.Clients[h]
-		s.Mu.RUnlock()
-		if ok {
-			c.Send(NexusMessage{Type: "stream_viewer_leave", Sender: username, Recipient: h})
-		}
+		s.sendTo(h, NexusMessage{Type: "stream_viewer_leave", Sender: username, Recipient: h})
 	}
 	if endedAsHost {
 		s.streamBroadcastList()
@@ -2113,11 +2115,8 @@ func (s *NexusServer) voiceRoomPeers(channelID string) []string {
 func (s *NexusServer) voiceRoomBroadcastPeers(channelID string) {
 	peers := s.voiceRoomPeers(channelID)
 	for _, u := range peers {
-		s.Mu.RLock()
-		c, ok := s.Clients[u]
-		s.Mu.RUnlock()
-		if ok {
-			c.Send(NexusMessage{
+		{
+			s.sendTo(u, NexusMessage{
 				Type:      "voice_peers",
 				Status:    "ok",
 				ChannelID: channelID,
@@ -2924,17 +2923,11 @@ func (s *NexusServer) adminBanHandler(w http.ResponseWriter, r *http.Request) {
 		// Revoke all live sessions so the user is logged out everywhere.
 		s.DB.Exec(`UPDATE session_tokens SET revoked = 1 WHERE username = ?`, target)
 		// Kick connected session, if any.
-		s.Mu.Lock()
-		if c, ok := s.Clients[target]; ok {
-			body := "Account suspended"
-			if reason != "" {
-				body += ": " + reason
-			}
-			c.Send(NexusMessage{Type: "kicked", Body: body})
-			c.Conn.Close()
-			delete(s.Clients, target)
+		body := "Account suspended"
+		if reason != "" {
+			body += ": " + reason
 		}
-		s.Mu.Unlock()
+		s.dropAllClients(target, NexusMessage{Type: "kicked", Body: body})
 		log.Printf("[admin] %s banned %s (reason=%q)", admin, target, reason)
 	case "unban":
 		res, err := s.DB.Exec(
@@ -2993,13 +2986,7 @@ func (s *NexusServer) adminBanHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "delete failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		s.Mu.Lock()
-		if c, ok := s.Clients[target]; ok {
-			c.Send(NexusMessage{Type: "kicked", Body: "Account deleted by admin"})
-			c.Conn.Close()
-			delete(s.Clients, target)
-		}
-		s.Mu.Unlock()
+		s.dropAllClients(target, NexusMessage{Type: "kicked", Body: "Account deleted by admin"})
 		log.Printf("[admin] %s deleted account %s", admin, target)
 	default:
 		http.Error(w, "expected /ban, /unban, /role, or /delete", http.StatusBadRequest)
@@ -3212,18 +3199,14 @@ func (s *NexusServer) adminBroadcastHandler(w http.ResponseWriter, r *http.Reque
 	id, _ := res.LastInsertId()
 	created := time.Now().UTC().Format(time.RFC3339)
 	// Push to every connected client subscribed to the global channel.
-	s.Mu.RLock()
-	for _, c := range s.Clients {
-		c.Send(NexusMessage{
-			Type:      "channel_msg_in",
-			ChannelID: "global-announcements",
-			ServerID:  globalSpaceID,
-			Messages: []ChannelMsg{{
-				ID: id, ChannelID: "global-announcements", Sender: u, Body: strings.TrimSpace(body.Message), CreatedAt: created,
-			}},
-		})
-	}
-	s.Mu.RUnlock()
+	s.broadcastAll(NexusMessage{
+		Type:      "channel_msg_in",
+		ChannelID: "global-announcements",
+		ServerID:  globalSpaceID,
+		Messages: []ChannelMsg{{
+			ID: id, ChannelID: "global-announcements", Sender: u, Body: strings.TrimSpace(body.Message), CreatedAt: created,
+		}},
+	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"id": id, "ok": true})
 }
@@ -3263,13 +3246,19 @@ func (s *NexusServer) adminIPBlockHandler(w http.ResponseWriter, r *http.Request
 		s.blockIP(body.IP)
 		log.Printf("[admin] %s blocked IP %s", admin, body.IP)
 		s.Mu.RLock()
-		for _, c := range s.Clients {
-			if c.IP == body.IP {
-				c.Send(NexusMessage{Type: "kicked", Body: "Your IP has been blocked"})
-				c.Conn.Close()
+		var doomed []*Client
+		for _, conns := range s.Clients {
+			for _, c := range conns {
+				if c.IP == body.IP {
+					doomed = append(doomed, c)
+				}
 			}
 		}
 		s.Mu.RUnlock()
+		for _, c := range doomed {
+			c.Send(NexusMessage{Type: "kicked", Body: "Your IP has been blocked"})
+			c.Conn.Close()
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
@@ -3292,11 +3281,7 @@ func (s *NexusServer) adminGlobalNoticeHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 	log.Printf("[admin] %s sent global notice: %s", admin, body.Message)
-	s.Mu.RLock()
-	for _, c := range s.Clients {
-		c.Send(NexusMessage{Type: "global_notice", Body: body.Message, Sender: admin})
-	}
-	s.Mu.RUnlock()
+	s.broadcastAll(NexusMessage{Type: "global_notice", Body: body.Message, Sender: admin})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"ok": "true"})
 }
@@ -3891,7 +3876,7 @@ func main() {
 
 	server := &NexusServer{
 		DB:          db,
-		Clients:     make(map[string]*Client),
+		Clients:     make(map[string][]*Client),
 		VoiceRooms:  make(map[string]map[string]struct{}),
 		Streams:     make(map[string]*liveStream),
 		RemoteCodes: make(map[string]remoteCodeEntry),
@@ -4221,10 +4206,17 @@ func (s *NexusServer) broadcastProfileUpdate(username, displayName, mood string)
 		DisplayName: displayName,
 		Mood:        mood,
 	}
-	for _, client := range s.Clients {
-		if client.Username != username {
-			client.Send(msg)
+	s.Mu.RLock()
+	var others []*Client
+	for u, conns := range s.Clients {
+		if u == username {
+			continue
 		}
+		others = append(others, conns...)
+	}
+	s.Mu.RUnlock()
+	for _, c := range others {
+		c.Send(msg)
 	}
 }
 
