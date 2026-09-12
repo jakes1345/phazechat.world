@@ -473,6 +473,12 @@ export default function App() {
   const [loginPass, setLoginPass] = useState('')
   const [loginTotp, setLoginTotp] = useState('')
   const [needsTotp, setNeedsTotp] = useState(false)
+  // A sign-in from an unrecognised device is held until it's approved. This
+  // holds the prompt on the NEW device (enter the emailed code); deviceAsk
+  // below holds the prompt on sessions that are already signed in.
+  const [deviceVerify, setDeviceVerify] = useState<null | { label: string; codeSent: boolean }>(null)
+  const [deviceCode, setDeviceCode] = useState('')
+  const [deviceAsk, setDeviceAsk] = useState<null | { id: number; label: string; ip: string; ts: number }>(null)
   const [addFriend, setAddFriend] = useState('')
   const [addOpen, setAddOpen] = useState(false)
   const [addStatus, setAddStatus] = useState<string | null>(null)
@@ -1406,6 +1412,28 @@ export default function App() {
           }
           break
 
+        case 'device_challenge':
+          // Someone signed in from a device this account hasn't approved.
+          // Their session is held; we get to approve or deny it.
+          if (msg.challenge_id) {
+            setDeviceAsk({
+              id: msg.challenge_id,
+              label: msg.body || 'an unrecognised device',
+              ip: msg.status || '',
+              ts: msg.ts || Date.now(),
+            })
+          }
+          break
+
+        case 'device_result':
+          // Resolved — possibly from one of our other sessions, so clear the
+          // prompt regardless of which tab answered it.
+          if (msg.error) { setErr(msg.error); break }
+          setDeviceAsk((cur) => (cur && msg.challenge_id && cur.id !== msg.challenge_id ? cur : null))
+          if (msg.status === 'approved') setGlobalNotice({ from: 'Phaze', msg: `Approved sign-in from ${msg.body || 'a new device'}.` })
+          if (msg.status === 'denied') setGlobalNotice({ from: 'Phaze', msg: `Blocked sign-in from ${msg.body || 'a new device'}.` })
+          break
+
         case 'kicked':
           localStorage.removeItem(SESSION_KEY)
           peerKeysRef.current = {}
@@ -1620,8 +1648,45 @@ export default function App() {
         setErr(text || 'Login failed')
         return
       }
+      const data = await res.json().catch(() => ({})) as {
+        status?: string; device_label?: string; code_sent?: boolean
+      }
+      if (data.status === 'device_verification_required') {
+        // The session cookie is set but inert until this is approved, so
+        // don't reconnect yet — there's nothing to authenticate with.
+        setDeviceVerify({ label: data.device_label || 'this device', codeSent: !!data.code_sent })
+        setDeviceCode('')
+        setErr('')
+        return
+      }
       // Cookie is set by the server (HttpOnly — never accessible to JS).
       // Reconnect the WS so the server can pre-auth from the cookie.
+      setWsRetry((n) => n + 1)
+    } catch {
+      setErr('Network error — please try again')
+    }
+  }
+
+  // Completes a sign-in that's waiting on new-device approval. The session
+  // cookie is already set but inert; this is what lifts the hold.
+  const submitDeviceCode = async (code: string) => {
+    if (!code.trim()) return
+    try {
+      const res = await fetch('/api/v1/auth/verify-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code: code.trim() }),
+      })
+      const data = await res.json().catch(() => ({})) as { status?: string; error?: string }
+      if (!res.ok || data.status !== 'ok') {
+        setErr(data.error || 'That code was not accepted')
+        return
+      }
+      setDeviceVerify(null)
+      setDeviceCode('')
+      setErr('')
+      // Now that the hold is lifted the cookie authenticates, so reconnect.
       setWsRetry((n) => n + 1)
     } catch {
       setErr('Network error — please try again')
@@ -2156,6 +2221,36 @@ export default function App() {
 
       {err && <div className="banner">{err}</div>}
 
+      {/* Someone signed in from an unrecognised device; their session is
+          held until this is answered. */}
+      {deviceAsk && (
+        <div className="device-ask" role="alertdialog" aria-label="New sign-in attempt">
+          <div className="device-ask-body">
+            <strong>New sign-in to your account</strong>
+            <span className="device-ask-detail">
+              {deviceAsk.label}
+              {deviceAsk.ip ? ` · ${deviceAsk.ip}` : ''}
+              {` · ${new Date(deviceAsk.ts).toLocaleTimeString()}`}
+            </span>
+            <span className="device-ask-hint">
+              If this wasn't you, deny it — they stay locked out and you stay signed in.
+            </span>
+          </div>
+          <div className="device-ask-actions">
+            <button
+              type="button"
+              className="device-ask-deny"
+              onClick={() => { send({ type: 'device_deny', challenge_id: deviceAsk.id }); setDeviceAsk(null) }}
+            >Deny</button>
+            <button
+              type="button"
+              className="device-ask-approve"
+              onClick={() => { send({ type: 'device_approve', challenge_id: deviceAsk.id }); setDeviceAsk(null) }}
+            >It's me</button>
+          </div>
+        </div>
+      )}
+
 
       {settingsOpen && me && (
         <Settings
@@ -2496,8 +2591,40 @@ export default function App() {
                 <p className="auth-hero-sub">Chat, calls, and spaces. End-to-end encrypted.</p>
               </div>
               <section className="panel">
-                <h2>Sign in to Phaze</h2>
-                {mode === 'login' ? (
+                {deviceVerify ? (
+                  <>
+                    <h2>Approve this device</h2>
+                    <p className="device-verify-copy">
+                      This is the first time you've signed in from <strong>{deviceVerify.label}</strong>.
+                      {deviceVerify.codeSent
+                        ? ' We emailed you a 6-digit code.'
+                        : ' Approve it from a device where you\u2019re already signed in.'}
+                    </p>
+                    <form className="form" onSubmit={(e) => { e.preventDefault(); submitDeviceCode(deviceCode) }}>
+                      <input
+                        placeholder="6-digit code"
+                        value={deviceCode}
+                        onChange={(e) => setDeviceCode(e.target.value)}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        maxLength={6}
+                        autoFocus
+                      />
+                      <button type="submit" disabled={deviceCode.trim().length < 6}>Verify</button>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => { setDeviceVerify(null); setDeviceCode(''); setErr('') }}
+                      >Back to sign in</button>
+                    </form>
+                    <p className="device-verify-note">
+                      Your other sessions are still signed in and unaffected. If this wasn't you,
+                      ignore this and change your password.
+                    </p>
+                  </>
+                ) : mode === 'login' ? (
+                  <>
+                  <h2>Sign in to Phaze</h2>
                   <form className="form" onSubmit={(e) => { e.preventDefault(); doAuth(loginUser.trim(), loginPass, loginTotp.trim()) }}>
                     <input placeholder="Username" value={loginUser} onChange={(e) => setLoginUser(e.target.value)} autoComplete="username" />
                     <input type="password" placeholder="Password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password" />
@@ -2507,6 +2634,7 @@ export default function App() {
                     <button type="button" className="link-btn" onClick={() => { setMode('forgot'); setErr(''); setNeedsTotp(false) }}>Forgot password?</button>
                     <button type="button" className="link-btn" onClick={() => { setMode('link'); setErr(''); setNeedsTotp(false) }}>Sign in with a link code from another device</button>
                   </form>
+                  </>
                 ) : mode === 'forgot' ? (
                   <div className="form">
                     <p className="muted small">Enter the email address on your account. We'll send a reset link.</p>

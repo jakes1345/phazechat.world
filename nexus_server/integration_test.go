@@ -36,6 +36,12 @@ func newTestServer(t *testing.T) (*NexusServer, *httptest.Server, string) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", srv.handleConnections)
+	// Account-facing auth, so tests can exercise sign-in over HTTP the way a
+	// browser does — cookies included — rather than only over the WebSocket.
+	mux.HandleFunc("/api/v1/auth/login", srv.httpLoginHandler)
+	mux.HandleFunc("/api/v1/auth/verify-device", srv.httpVerifyDeviceHandler)
+	mux.HandleFunc("/api/v1/auth/logout", srv.httpLogoutHandler)
+	mux.HandleFunc("/api/v1/auth/me", srv.httpMeHandler)
 	mux.HandleFunc("/api/v1/admin/login", srv.adminLoginHandler)
 	mux.HandleFunc("/api/v1/admin/me", srv.adminMeHandler)
 	mux.HandleFunc("/api/v1/admin/logout", srv.adminLogoutHandler)

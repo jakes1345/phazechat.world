@@ -120,6 +120,13 @@ type NexusMessage struct {
 	Ts int64 `json:"ts,omitempty"`
 	// Duration is call length in seconds, set on "call_log" (0 for missed).
 	Duration int `json:"duration,omitempty"`
+
+	// --- New-device verification ---
+	// ChallengeID identifies a pending sign-in awaiting approval; DeviceID is
+	// the browser/install it came from. Set on "device_challenge" going out,
+	// and echoed back on "device_approve" / "device_deny".
+	ChallengeID int64  `json:"challenge_id,omitempty"`
+	DeviceID    string `json:"device_id,omitempty"`
 }
 
 // ServerSummary is the slim view a client gets for the server-list pane.
@@ -669,6 +676,37 @@ func (s *NexusServer) initDB() {
 		`ALTER TABLE users ADD COLUMN last_login_at DATETIME`,
 		`ALTER TABLE users ADD COLUMN signup_ip TEXT DEFAULT ''`,
 		`ALTER TABLE users ADD COLUMN phone_verification_code TEXT`,
+		// New-device verification. A session created from a device this
+		// account hasn't approved is held with pending_device = 1: it exists,
+		// but sessionUsername() refuses it until the sign-in is approved
+		// either in-app from an existing session or with an emailed code.
+		`ALTER TABLE session_tokens ADD COLUMN pending_device INTEGER DEFAULT 0`,
+		`CREATE TABLE IF NOT EXISTS known_devices (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL,
+			device_id TEXT NOT NULL,
+			label TEXT DEFAULT '',
+			first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+			last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+			last_ip TEXT DEFAULT '',
+			UNIQUE(username, device_id)
+		)`,
+		`CREATE TABLE IF NOT EXISTS device_challenges (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL,
+			device_id TEXT NOT NULL,
+			session_token TEXT NOT NULL,
+			code TEXT NOT NULL,
+			label TEXT DEFAULT '',
+			ip TEXT DEFAULT '',
+			attempts INTEGER DEFAULT 0,
+			approved INTEGER DEFAULT 0,
+			consumed INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_device_challenges_session ON device_challenges(session_token)`,
+		`CREATE INDEX IF NOT EXISTS idx_known_devices_user ON known_devices(username)`,
 		// Presence: the status the user picked (Online/Away/Do Not Disturb/
 		// Invisible). Friends only ever see it through publicStatus().
 		`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Online'`,
@@ -4136,6 +4174,7 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 	http.HandleFunc("/api/v1/import/skype/invite-link", rateLimit(server.skypeInviteHandler))
 
 	http.HandleFunc("/api/v1/auth/login", rateLimit(server.httpLoginHandler))
+	http.HandleFunc("/api/v1/auth/verify-device", rateLimit(server.httpVerifyDeviceHandler))
 	http.HandleFunc("/api/v1/auth/logout", rateLimit(server.httpLogoutHandler))
 	http.HandleFunc("/api/v1/auth/me", rateLimit(server.httpMeHandler))
 

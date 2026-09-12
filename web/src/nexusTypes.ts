@@ -68,6 +68,13 @@ export interface NexusMessage {
   // Referral tracking
   ref_by?: string
 
+  // New-device verification. challenge_id identifies a sign-in awaiting
+  // approval; device_id is the browser/install it came from. On an inbound
+  // device_challenge, `body` is the human-readable device label and `status`
+  // carries the IP.
+  challenge_id?: number
+  device_id?: string
+
   // PIN-encrypted NaCl keypair backup blob (key_backup_put / key_backup).
   key_backup?: KeyBackup
 

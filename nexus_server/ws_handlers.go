@@ -855,6 +855,42 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				})
 			}
 
+		// ── New-device approval, from a session that's already trusted ──
+		// A sign-in from an unrecognised device is held pending and every
+		// existing session is sent a "device_challenge". Approving here is
+		// the fast path — no waiting for email.
+		case "device_approve", "device_deny":
+			if username == "" || msg.ChallengeID == 0 {
+				continue
+			}
+			// Scoped to the requester's own account, so one user can never
+			// act on another's pending sign-in.
+			deviceID, sessionToken, label, chIP, ok := s.lookupDeviceChallenge(msg.ChallengeID, username)
+			if !ok {
+				client.Send(NexusMessage{
+					Type:  "device_result",
+					Error: "that sign-in request has already been handled or expired",
+				})
+				continue
+			}
+			if msg.Type == "device_approve" {
+				s.approveDeviceChallenge(msg.ChallengeID, username, deviceID, sessionToken, label, chIP)
+			} else {
+				s.denyDeviceChallenge(msg.ChallengeID, username, sessionToken)
+			}
+			// Tell every session of theirs how it was resolved, so a prompt
+			// open on three tabs doesn't need answering three times.
+			status := "approved"
+			if msg.Type == "device_deny" {
+				status = "denied"
+			}
+			s.sendTo(username, NexusMessage{
+				Type:        "device_result",
+				Status:      status,
+				Body:        label,
+				ChallengeID: msg.ChallengeID,
+			})
+
 		case "block":
 			if username == "" {
 				continue
