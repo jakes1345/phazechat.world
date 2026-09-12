@@ -4296,7 +4296,6 @@ button.link-btn:hover,
   font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
   font-size: 14px;
 }
-.app.theme-skype8 .bubble { border-radius: 16px !important; }
 
 /* ── Theme picker (rendered inside the Skype menubar's View submenu) ── */
 .skype-menu-sectionlabel {
@@ -5133,4 +5132,225 @@ button.link-btn:hover,
 .app.theme-skype6 .skype-menubar {
   background: #F5F5F5;
   border-bottom: 1px solid #D0D0D0;
+}
+
+
+/* =============================================================
+   Skype 8+ (2018) — modern Fluent.
+
+   The release that broke with everything before it. Skype 8 is the only
+   era here that keeps the modern message layout — isClassicSkype()
+   deliberately excludes it, so outgoing messages stay right-aligned in
+   bubbles instead of joining the flat left-aligned log that 3 through 7
+   share. It also has no menu bar (dropped in this release) and no
+   sidebar tab strip, so it uses the floating pill nav, which is the
+   correct modern chrome rather than a fallback.
+
+   Against Skype 6 it inverts Metro point for point: rounded not square,
+   soft elevation not flat, sentence case not uppercase tracking, dark
+   not light. Against Skype 7 the giveaway is shape — every Skype from 3
+   to 7 used square avatars; 8 made them circular.
+
+   Palette is already dark Fluent (see the theme block above); this is
+   shape, depth and typography.
+   ============================================================= */
+
+.app.theme-skype8 {
+  font-family: 'Segoe UI Variable', 'Segoe UI', -apple-system, system-ui, sans-serif;
+}
+
+/* ── Circular avatars — the clearest break from 3-7 ─────────── */
+.app.theme-skype8 .avatar,
+.app.theme-skype8 .bubble-avatar,
+.app.theme-skype8 .bubble-avatar-spacer,
+.app.theme-skype8 .chat-peer-avatar {
+  border-radius: 50%;
+  border: none;
+  overflow: hidden;
+}
+.app.theme-skype8 .avatar img,
+.app.theme-skype8 .bubble-avatar img { border-radius: 50%; }
+.app.theme-skype8 .friend-row .avatar { width: 44px; height: 44px; font-size: 16px; }
+.app.theme-skype8 .friend-row .avatar-presence,
+.app.theme-skype8 .avatar-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+}
+
+/* ── Contact list: rounded rows, soft hover ────────────────── */
+.app.theme-skype8 .friend-row {
+  min-height: 56px;
+  padding: 7px 11px;
+  gap: 12px;
+  margin: 1px 7px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+}
+.app.theme-skype8 .friend-row:hover { background: var(--list-hover); }
+.app.theme-skype8 .friend-row.sel,
+.app.theme-skype8 .friend-row.sel:hover { background: var(--list-sel); }
+.app.theme-skype8 .friend-meta { gap: 2px; }
+.app.theme-skype8 .friend-name {
+  font: 600 14px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--text);
+}
+.app.theme-skype8 .friend-preview {
+  font: 400 12.5px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--muted);
+  font-style: normal;
+}
+.app.theme-skype8 .friend-time { font-size: 11px; color: var(--muted); }
+.app.theme-skype8 .unread-badge {
+  background: var(--brand);
+  border-radius: 10px;
+  font: 600 11px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  padding: 1px 7px;
+}
+
+/* Sentence case, not Metro's uppercase tracking. */
+.app.theme-skype8 .sidebar-section-label {
+  text-transform: none;
+  letter-spacing: 0;
+  font: 600 12px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--muted);
+  padding: 12px 14px 6px;
+  background: transparent;
+}
+
+/* ── Bubbles: rounded, solid accent, squared tail corner ───── */
+.app.theme-skype8 .bubble {
+  border-radius: 18px 18px 18px 4px;
+  padding: 9px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+/* The shared base paints outgoing bubbles with a blue-to-purple Phaze
+   gradient. Skype 8 used a flat accent fill, so override it outright. */
+.app.theme-skype8 .bubble.me {
+  background: var(--brand);
+  border-radius: 18px 18px 4px 18px;
+  color: var(--bubble-text-out);
+}
+.app.theme-skype8 .bubble-row { gap: 9px; margin-bottom: 9px; }
+.app.theme-skype8 .bubble-avatar,
+.app.theme-skype8 .bubble-avatar-spacer {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  font-size: 13px;
+}
+.app.theme-skype8 .bubble-ts,
+.app.theme-skype8 .bubble .who { font-size: 11px; color: var(--muted); }
+.app.theme-skype8 .bubble.me .bubble-ts { color: rgba(255, 255, 255, 0.72); }
+
+/* ── Chat chrome: acrylic-ish, soft elevation ──────────────── */
+.app.theme-skype8 .chat-header-bar {
+  background: var(--chrome);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 10px 16px;
+  gap: 12px;
+}
+.app.theme-skype8 .chat-peer-avatar { width: 38px; height: 38px; }
+.app.theme-skype8 .chat-peer-name {
+  font: 600 16px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--text);
+}
+.app.theme-skype8 .chat-peer-status { font-size: 12px; color: var(--muted); }
+.app.theme-skype8 .hub-sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--glass-border);
+}
+
+/* ── Pill controls ─────────────────────────────────────────── */
+.app.theme-skype8 .draft-wrap textarea,
+.app.theme-skype8 .draft-wrap input,
+.app.theme-skype8 .hub-add-friend input {
+  border: 1px solid var(--input-border);
+  border-radius: 20px;
+  background: var(--input-bg);
+  color: var(--text);
+  font: 400 14px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  padding: 9px 15px;
+}
+.app.theme-skype8 .draft-wrap textarea:focus,
+.app.theme-skype8 .hub-add-friend input:focus {
+  border-color: var(--brand);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--input-focus);
+}
+
+.app.theme-skype8 .send-btn,
+.app.theme-skype8 .send-pill,
+.app.theme-skype8 .hub-side-bottom button {
+  background: var(--brand);
+  border: none;
+  border-radius: 18px;
+  color: #fff;
+  font: 600 13px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 8px 18px;
+  box-shadow: var(--shadow-sm);
+}
+.app.theme-skype8 .send-btn:hover,
+.app.theme-skype8 .send-pill:hover,
+.app.theme-skype8 .hub-side-bottom button:hover {
+  background: var(--brand-hover);
+  box-shadow: var(--shadow-md);
+}
+.app.theme-skype8 .send-btn:disabled { background: #3A3A3A; color: var(--muted); box-shadow: none; }
+
+/* Circular icon buttons; the call button is not promoted the way
+   Skype 4/5 promoted it — 8 treats the toolbar as peers again. */
+.app.theme-skype8 .chat-call-btn {
+  border-radius: 50%;
+  width: 2.3rem;
+  height: 2.3rem;
+  color: var(--text-secondary);
+}
+.app.theme-skype8 .chat-call-btn:hover { background: var(--list-hover); color: var(--text); }
+.app.theme-skype8 .chat-call-btn-audio,
+.app.theme-skype8 .chat-call-btn-video {
+  width: 2.3rem;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+}
+.app.theme-skype8 .chat-call-btn-audio::after { content: none; }
+
+.app.theme-skype8 .hub-side-bottom {
+  background: var(--panel);
+  border-top: 1px solid var(--glass-border);
+  padding: 10px 12px;
+  gap: 8px;
+}
+.app.theme-skype8 .online-strip {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.app.theme-skype8 .convo-date-header {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font: 600 11.5px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--muted);
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 10px 0;
+  text-align: center;
 }
