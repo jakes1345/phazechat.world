@@ -80,14 +80,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			username = u
 			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", clientIP(r), username)
 			s.autoJoinGlobalSpace(username)
+			// Register alongside any sessions the user already has open
+			// instead of evicting them. Signing in on a second tab, the
+			// desktop app or a phone used to close the previous connection
+			// and send it "kicked", which the web client treats as a full
+			// sign-out — so opening a second tab logged the first one out.
 			s.Mu.Lock()
-			if existing, ok := s.Clients[username]; ok {
-				existing.Send(NexusMessage{Type: "kicked", Body: "Logged in from another location"})
-				existing.Conn.Close()
-			}
 			client.Username = username
 			client.Status = "Online"
-			s.Clients[username] = client
+			s.addClientLocked(username, client)
 			s.Mu.Unlock()
 			log.Printf("User %s pre-authed via cookie from %s", username, clientIP(r))
 			client.Send(NexusMessage{
@@ -97,13 +98,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				TurnConfig: s.generateMediaToken(username),
 			})
 			s.announcePresence(username)
-			s.deliverOfflineMessages(username)
+			s.deliverOfflineMessages(username, client)
 			friends := s.getFriends(username)
 			for _, f := range friends {
 				status := "Offline"
 				s.Mu.RLock()
-				if c, ok := s.Clients[f]; ok {
-					status = publicStatus(c.Status)
+				if conns := s.Clients[f]; len(conns) > 0 {
+					// Status is mirrored across a user's connections, so any
+					// of them reports the same value.
+					status = publicStatus(conns[0].Status)
 				}
 				s.Mu.RUnlock()
 				var lastSec int64
@@ -131,25 +134,18 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 		if err != nil {
 			log.Printf("Read error: %v", err)
 			if username != "" {
-				// Compare-and-swap delete: only remove the map entry if it
-				// still points at *this* connection. A concurrent login from
-				// the same user kicks the previous session via Conn.Close(),
-				// which wakes *this* read-loop with an error — without the
-				// guard below we'd delete the freshly-installed new session
-				// and mark the user offline even though they're online on
-				// another device.
+				// Drop just this connection. The user may still have others
+				// open — another tab, the desktop app, their phone — and only
+				// goes offline when the last one closes.
 				s.Mu.Lock()
-				current, ok := s.Clients[username]
-				weWereReplaced := ok && current != client
-				var callPartner string
-				if ok && current == client {
-					callPartner = client.CallPartner
-					delete(s.Clients, username)
-				}
+				remaining := s.removeClientLocked(username, client)
+				callPartner := client.CallPartner
 				// Notify call partner before releasing the lock so we can
 				// look up their client while still holding it.
 				if callPartner != "" {
-					if partner, ok := s.Clients[callPartner]; ok {
+					// The peer's call lives on one specific connection of
+					// theirs, not on all of them — find that one.
+					if partner := s.callPeerLocked(callPartner, username); partner != nil {
 						partner.InCall = false
 						partner.CallPartner = ""
 						partner.Send(NexusMessage{Type: "call_end", Sender: username})
@@ -178,13 +174,13 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					}
 				}
 				s.Mu.Unlock()
-				if !weWereReplaced {
+				if remaining == 0 {
 					s.broadcastPresence(username, "Offline")
 					s.voiceRoomEvictUser(username)
 					s.streamEvictUser(username)
-					log.Printf("User %s disconnected", username)
+					log.Printf("User %s disconnected (last session closed)", username)
 				} else {
-					log.Printf("User %s old session closed (replaced by newer login)", username)
+					log.Printf("User %s closed a session, %d still open", username, remaining)
 				}
 			}
 			return
@@ -301,7 +297,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			s.DB.Exec("UPDATE users SET status = ? WHERE username = ?", msg.Body, username)
 			s.Mu.Lock()
-			if c, ok := s.Clients[username]; ok {
+			for _, c := range s.Clients[username] {
 				c.Status = msg.Body
 			}
 			s.Mu.Unlock()
@@ -427,14 +423,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
 			s.autoJoinGlobalSpace(username)
 			sessTok, _ := s.issueSessionToken(username, msg.DeviceInfo)
+			// Register alongside any sessions the user already has open
+			// instead of evicting them. Signing in on a second tab, the
+			// desktop app or a phone used to close the previous connection
+			// and send it "kicked", which the web client treats as a full
+			// sign-out — so opening a second tab logged the first one out.
 			s.Mu.Lock()
-			if existing, ok := s.Clients[username]; ok {
-				existing.Send(NexusMessage{Type: "kicked", Body: "Logged in from another location"})
-				existing.Conn.Close()
-			}
 			client.Username = username
 			client.Status = "Online"
-			s.Clients[username] = client
+			s.addClientLocked(username, client)
 			s.Mu.Unlock()
 			log.Printf("User %s authenticated", username)
 
@@ -447,7 +444,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			})
 
 			s.announcePresence(username)
-			s.deliverOfflineMessages(username)
+			s.deliverOfflineMessages(username, client)
 
 			pending := s.getPendingRequests(username)
 			if len(pending) > 0 {
@@ -463,8 +460,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			for _, f := range friends {
 				status := "Offline"
 				s.Mu.RLock()
-				if c, ok := s.Clients[f]; ok {
-					status = publicStatus(c.Status)
+				if conns := s.Clients[f]; len(conns) > 0 {
+					// Status is mirrored across a user's connections, so any
+					// of them reports the same value.
+					status = publicStatus(conns[0].Status)
 				}
 				s.Mu.RUnlock()
 				var lastSec int64
@@ -517,14 +516,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			username = u
 			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
 			s.autoJoinGlobalSpace(username)
+			// Register alongside any sessions the user already has open
+			// instead of evicting them. Signing in on a second tab, the
+			// desktop app or a phone used to close the previous connection
+			// and send it "kicked", which the web client treats as a full
+			// sign-out — so opening a second tab logged the first one out.
 			s.Mu.Lock()
-			if existing, ok := s.Clients[username]; ok {
-				existing.Send(NexusMessage{Type: "kicked", Body: "Logged in from another location"})
-				existing.Conn.Close()
-			}
 			client.Username = username
 			client.Status = "Online"
-			s.Clients[username] = client
+			s.addClientLocked(username, client)
 			s.Mu.Unlock()
 			log.Printf("User %s resumed via session token from %s", username, client.IP)
 			client.Send(NexusMessage{
@@ -535,14 +535,16 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				TurnConfig: s.generateMediaToken(username),
 			})
 			s.announcePresence(username)
-			s.deliverOfflineMessages(username)
+			s.deliverOfflineMessages(username, client)
 
 			// same as the auth path below
 			for _, f := range s.getFriends(username) {
 				status := "Offline"
 				s.Mu.RLock()
-				if c, ok := s.Clients[f]; ok {
-					status = publicStatus(c.Status)
+				if conns := s.Clients[f]; len(conns) > 0 {
+					// Status is mirrored across a user's connections, so any
+					// of them reports the same value.
+					status = publicStatus(conns[0].Status)
 				}
 				s.Mu.RUnlock()
 				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status})
@@ -583,9 +585,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			s.broadcastPresence(username, "Offline")
 			client.Send(NexusMessage{Type: "delete_account_result", Status: "ok"})
 			s.Mu.Lock()
-			if cur, ok := s.Clients[username]; ok && cur == client {
-				delete(s.Clients, username)
-			}
+			delete(s.Clients, username)
 			s.Mu.Unlock()
 			ws.Close()
 			return
@@ -792,14 +792,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			authTracker.recordSuccess(client.IP, u)
 			// Promote this socket onto the approved session.
 			username = u
+			// Register alongside any sessions the user already has open
+			// instead of evicting them. Signing in on a second tab, the
+			// desktop app or a phone used to close the previous connection
+			// and send it "kicked", which the web client treats as a full
+			// sign-out — so opening a second tab logged the first one out.
 			s.Mu.Lock()
-			if existing, ok := s.Clients[username]; ok {
-				existing.Send(NexusMessage{Type: "kicked", Body: "Logged in from another location"})
-				existing.Conn.Close()
-			}
 			client.Username = username
 			client.Status = "Online"
-			s.Clients[username] = client
+			s.addClientLocked(username, client)
 			s.Mu.Unlock()
 			log.Printf("User %s logged in via QR", username)
 			client.Send(NexusMessage{
@@ -810,7 +811,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				TurnConfig: s.generateMediaToken(username),
 			})
 			s.announcePresence(username)
-			s.deliverOfflineMessages(username)
+			s.deliverOfflineMessages(username, client)
 
 		case "msg":
 			if username == "" {
@@ -841,11 +842,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			// safe. Both ends fetch this via "dm_history" on chat open.
 			s.persistDM(msg.MsgID, msg.Sender, msg.Recipient, msg.Body)
 			s.Mu.RLock()
-			recipientClient, online := s.Clients[msg.Recipient]
 			s.Mu.RUnlock()
 
-			if online {
-				recipientClient.Send(msg)
+			if s.sendTo(msg.Recipient, msg) {
+				// delivered live to at least one of their sessions
 			} else {
 				s.storeOfflineMessage(msg.Sender, msg.Recipient, msg.Body, "msg", msg.MsgID)
 				client.Send(NexusMessage{
@@ -991,14 +991,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if !s.areFriends(username, msg.Recipient) {
 				continue
 			}
-			s.Mu.RLock()
-			if recipientClient, ok := s.Clients[msg.Recipient]; ok {
-				recipientClient.Send(NexusMessage{
-					Type:   "typing",
-					Sender: username,
-				})
-			}
-			s.Mu.RUnlock()
+			s.sendTo(msg.Recipient, NexusMessage{
+				Type:   "typing",
+				Sender: username,
+			})
 
 		// Edit / delete / react are best-effort live relays for DMs. The body
 		// (for msg_edit) and emoji (for msg_react) are still E2EE-encrypted
@@ -1029,11 +1025,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					s.toggleReaction(msg.MsgID, username, msg.Reaction)
 				}
 			}
-			s.Mu.RLock()
-			if recipientClient, ok := s.Clients[msg.Recipient]; ok {
-				recipientClient.Send(msg)
-			}
-			s.Mu.RUnlock()
+			s.sendTo(msg.Recipient, msg)
 
 		case "dm_history":
 			if username == "" || msg.Recipient == "" {
@@ -1179,20 +1171,16 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if msg.Recipient != "" {
 				if len(msg.PublicKey) == 32 && s.areFriends(username, msg.Recipient) {
 					msg.Sender = username
-					s.Mu.RLock()
-					if peer, ok := s.Clients[msg.Recipient]; ok {
-						if err := peer.Send(msg); err != nil {
-							log.Printf("[presence] key forward to %s: %v", msg.Recipient, err)
-						}
+					if !s.sendTo(msg.Recipient, msg) {
+						log.Printf("[presence] key forward to %s: not connected", msg.Recipient)
 					}
-					s.Mu.RUnlock()
 				}
 				continue
 			}
 			log.Printf("User %s is now %s", username, msg.Status)
 			s.Mu.Lock()
-			if client, ok := s.Clients[username]; ok {
-				client.Status = msg.Status
+			for _, c := range s.Clients[username] {
+				c.Status = msg.Status
 			}
 			s.Mu.Unlock()
 			s.broadcastPresence(username, msg.Status)
@@ -1232,14 +1220,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			client.Send(NexusMessage{Type: "friend_request_sent", Recipient: msg.Recipient})
 			log.Printf("Friend request: %s -> %s", username, msg.Recipient)
-			s.Mu.RLock()
-			if recipientClient, ok := s.Clients[msg.Recipient]; ok {
-				recipientClient.Send(NexusMessage{
-					Type:   "friend_request",
-					Sender: username,
-				})
-			}
-			s.Mu.RUnlock()
+			s.sendTo(msg.Recipient, NexusMessage{
+				Type:   "friend_request",
+				Sender: username,
+			})
 
 		case "friend_accept":
 			if username == "" {
@@ -1257,14 +1241,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			log.Printf("Friend accepted: %s accepted %s", username, requester)
 			client.Send(NexusMessage{Type: "friend_accepted", Sender: requester})
-			s.Mu.RLock()
-			if requesterClient, ok := s.Clients[requester]; ok {
-				requesterClient.Send(NexusMessage{
-					Type:   "friend_accepted",
-					Sender: username,
-				})
-			}
-			s.Mu.RUnlock()
+			s.sendTo(requester, NexusMessage{
+				Type:   "friend_accepted",
+				Sender: username,
+			})
 
 		case "friend_reject":
 			if username == "" {
@@ -1279,11 +1259,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			_ = s.removeFriend(username, msg.Recipient)
 			log.Printf("Friend removed: %s <-> %s", username, msg.Recipient)
-			s.Mu.RLock()
-			if peer, ok := s.Clients[msg.Recipient]; ok {
-				peer.Send(NexusMessage{Type: "friend_removed", Sender: username})
-			}
-			s.Mu.RUnlock()
+			s.sendTo(msg.Recipient, NexusMessage{Type: "friend_removed", Sender: username})
 
 		case "convo_create":
 			if username == "" {
@@ -1326,13 +1302,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				Members:   members,
 				Sender:    username,
 			}
-			s.Mu.RLock()
 			for _, m := range members {
-				if c, ok := s.Clients[m]; ok {
-					c.Send(notice)
-				}
+				s.sendTo(m, notice)
 			}
-			s.Mu.RUnlock()
 			log.Printf("Conversation %s (%s) created by %s with %d members", convoID, msg.ConvoName, username, len(members))
 
 		case "convo_msg":
@@ -1387,9 +1359,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					Body:    body,
 					ConvoID: msg.ConvoID,
 				}
-				if c, ok := s.Clients[m]; ok {
-					c.Send(fanout)
-				} else {
+				if !s.sendTo(m, fanout) {
 					s.DB.Exec(`INSERT INTO offline_messages (sender, recipient, body, msg_type, convo)
 						VALUES (?, ?, ?, 'convo_msg', ?)`, username, m, body, msg.ConvoID)
 					go s.sendWebPush(m, pushTitle, pushBody)
@@ -1412,15 +1382,11 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			_ = s.leaveConversation(msg.ConvoID, username)
 			members := s.conversationMembers(msg.ConvoID)
-			s.Mu.RLock()
 			for _, m := range members {
-				if c, ok := s.Clients[m]; ok {
-					c.Send(NexusMessage{
-						Type: "convo_left", Sender: username, ConvoID: msg.ConvoID,
-					})
-				}
+				s.sendTo(m, NexusMessage{
+					Type: "convo_left", Sender: username, ConvoID: msg.ConvoID,
+				})
 			}
-			s.Mu.RUnlock()
 
 		case "convo_history":
 			if username == "" || msg.ConvoID == "" {
@@ -1464,13 +1430,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if !s.areFriends(username, msg.Recipient) {
 				continue
 			}
-			s.Mu.RLock()
-			if peer, ok := s.Clients[msg.Recipient]; ok {
-				peer.Send(NexusMessage{
-					Type: "read_receipt", Sender: username, Body: msg.Body,
-				})
-			}
-			s.Mu.RUnlock()
+			s.sendTo(msg.Recipient, NexusMessage{
+				Type: "read_receipt", Sender: username, Body: msg.Body,
+			})
 
 		// Pairwise public-key handoff for NaCl box E2EE. Desktop clients send
 		// this when they need a peer's key; the recipient answers with a
@@ -1484,11 +1446,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			metrics.keyRequests.Add(1)
 			msg.Sender = username
-			s.Mu.RLock()
-			if recipientClient, ok := s.Clients[msg.Recipient]; ok {
-				recipientClient.Send(msg)
-			}
-			s.Mu.RUnlock()
+			s.sendTo(msg.Recipient, msg)
 
 		case "call_offer":
 			if username == "" {
@@ -1499,16 +1457,19 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "call_error", Error: "You can only call friends"})
 				continue
 			}
-			s.Mu.Lock()
-			recipientClient, online := s.Clients[msg.Recipient]
-			if online && recipientClient.InCall {
-				s.Mu.Unlock()
+			// Busy if they're on a call from any of their devices — the
+			// question is about the person, not one particular tab.
+			if _, busy := s.anyClientInCall(msg.Recipient); busy {
 				client.Send(NexusMessage{Type: "call_busy", Sender: msg.Recipient})
+				continue
+			}
+			ring := s.clientsOf(msg.Recipient)
+			if len(ring) == 0 {
+				client.Send(NexusMessage{Type: "call_error", Error: msg.Recipient + " is not available"})
 				continue
 			}
 			roomID, err := randHex(12)
 			if err != nil {
-				s.Mu.Unlock()
 				client.Send(NexusMessage{Type: "call_error", Error: "server error"})
 				continue
 			}
@@ -1521,20 +1482,19 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				callKind = "audio"
 			}
 			callID, startedAt := s.recordCallStart(username, msg.Recipient, callKind)
-			if callerClient, ok := s.Clients[username]; ok {
-				callerClient.PendingCallRoom = roomID
-				callerClient.PendingCallID = callID
-				callerClient.PendingCallStarted = startedAt
-			}
-			msg.RoomID = roomID
-			if online {
-				recipientClient.Send(msg)
-			} else {
-				s.Mu.Unlock()
-				client.Send(NexusMessage{Type: "call_error", Error: msg.Recipient + " is not available"})
-				continue
-			}
+			// Pending state belongs to the connection that actually dialled,
+			// so a second tab of the caller's isn't mistaken for the caller.
+			s.Mu.Lock()
+			client.PendingCallRoom = roomID
+			client.PendingCallID = callID
+			client.PendingCallStarted = startedAt
 			s.Mu.Unlock()
+			msg.RoomID = roomID
+			// Ring every session they have open — laptop and phone at once,
+			// whichever picks up takes the call.
+			for _, c := range ring {
+				c.Send(msg)
+			}
 
 		case "call_answer":
 			if username == "" {
@@ -1543,23 +1503,35 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			msg.Sender = username
 			s.Mu.Lock()
 			var roomID string
-			if callerClient, ok := s.Clients[msg.Recipient]; ok {
-				roomID = callerClient.PendingCallRoom
-				callerClient.PendingCallRoom = ""
-				callerClient.PendingCallAnswered = true
-				callerClient.InCall = true
-				callerClient.CallPartner = username
+			caller := s.pendingCallerLocked(msg.Recipient)
+			if caller != nil {
+				roomID = caller.PendingCallRoom
+				caller.PendingCallRoom = ""
+				caller.PendingCallAnswered = true
+				caller.InCall = true
+				caller.CallPartner = username
 			}
-			if c, ok := s.Clients[username]; ok {
-				c.InCall = true
-				c.CallPartner = msg.Recipient
+			// This connection takes the call; the caller talks to this one.
+			client.InCall = true
+			client.CallPartner = msg.Recipient
+			// Our other sessions are still ringing for a call that's now
+			// answered — collect them so we can call them off.
+			var stillRinging []*Client
+			for _, c := range s.Clients[username] {
+				if c != client {
+					stillRinging = append(stillRinging, c)
+				}
 			}
+			s.Mu.Unlock()
+
 			jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: msg.Body}
-			if callerClient, ok := s.Clients[msg.Recipient]; ok {
-				callerClient.Send(jitsiMsg)
+			if caller != nil {
+				caller.Send(jitsiMsg)
 			}
 			client.Send(jitsiMsg)
-			s.Mu.Unlock()
+			for _, c := range stillRinging {
+				c.Send(NexusMessage{Type: "call_end", Sender: msg.Recipient, Body: "answered_elsewhere"})
+			}
 
 		case "ice_candidate":
 			// No-op: WebRTC ICE negotiation replaced by Jitsi.
@@ -1569,16 +1541,21 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			s.Mu.Lock()
-			selfClient, selfOK := s.Clients[username]
-			peerClient, peerOK := s.Clients[msg.Recipient]
+			// The peer's side of this call lives on one specific connection.
+			// If they haven't answered yet it's still only pending, so fall
+			// back to whichever of their connections holds the pending call.
+			peerClient := s.callPeerLocked(msg.Recipient, username)
+			if peerClient == nil {
+				peerClient = s.pendingCallerLocked(msg.Recipient)
+			}
 
 			// The call row lives on whichever side placed the call — find
 			// it before either client's state gets cleared below.
 			var pendingClient *Client
 			var logCaller, logCallee string
-			if selfOK && selfClient.PendingCallID != 0 {
-				pendingClient, logCaller, logCallee = selfClient, username, msg.Recipient
-			} else if peerOK && peerClient.PendingCallID != 0 {
+			if client.PendingCallID != 0 {
+				pendingClient, logCaller, logCallee = client, username, msg.Recipient
+			} else if peerClient != nil && peerClient.PendingCallID != 0 {
 				pendingClient, logCaller, logCallee = peerClient, msg.Recipient, username
 			}
 			var logMsg *NexusMessage
@@ -1595,24 +1572,23 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				logMsg = &m
 			}
 
-			if selfOK {
-				selfClient.InCall = false
-				selfClient.CallPartner = ""
-			}
-			if peerOK {
+			client.InCall = false
+			client.CallPartner = ""
+			if peerClient != nil {
 				peerClient.InCall = false
 				peerClient.CallPartner = ""
-				peerClient.Send(msg)
-			}
-			if logMsg != nil {
-				if selfOK {
-					selfClient.Send(*logMsg)
-				}
-				if peerOK {
-					peerClient.Send(*logMsg)
-				}
 			}
 			s.Mu.Unlock()
+
+			if peerClient != nil {
+				peerClient.Send(msg)
+			}
+			// The call log is history, not signalling — every session on both
+			// sides should see it so their call lists agree.
+			if logMsg != nil {
+				s.sendTo(username, *logMsg)
+				s.sendTo(msg.Recipient, *logMsg)
+			}
 
 		case "call_invite":
 			if username == "" || msg.Recipient == "" || msg.ChannelID == "" {
@@ -1623,11 +1599,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			msg.Sender = username
-			s.Mu.RLock()
-			if recipientClient, ok := s.Clients[msg.Recipient]; ok {
-				recipientClient.Send(msg)
-			}
-			s.Mu.RUnlock()
+			s.sendTo(msg.Recipient, msg)
 
 		case "remote_register":
 			if username == "" {
@@ -1695,13 +1667,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				}
 				s.RemoteCodesMu.Unlock()
 			}
-			s.Mu.RLock()
-			if recipientClient, ok := s.Clients[msg.Recipient]; ok {
-				recipientClient.Send(msg)
-			} else if msg.Type == "remote_offer" {
+			if !s.sendTo(msg.Recipient, msg) && msg.Type == "remote_offer" {
 				client.Send(NexusMessage{Type: "remote_error", Error: msg.Recipient + " is not online"})
 			}
-			s.Mu.RUnlock()
 
 		case "server_create":
 			if username == "" {
@@ -2271,11 +2239,8 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if !s.voiceRoomHas(msg.ChannelID, username) || !s.voiceRoomHas(msg.ChannelID, msg.Recipient) {
 				continue
 			}
-			s.Mu.RLock()
-			peer, ok := s.Clients[msg.Recipient]
-			s.Mu.RUnlock()
-			if ok {
-				peer.Send(NexusMessage{
+			{
+				s.sendTo(msg.Recipient, NexusMessage{
 					Type:      "voice_signal",
 					Sender:    username,
 					Recipient: msg.Recipient,
@@ -2322,12 +2287,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			s.streamAddViewer(msg.Recipient, username)
-			s.Mu.RLock()
-			host, ok := s.Clients[msg.Recipient]
-			s.Mu.RUnlock()
-			if ok {
-				host.Send(NexusMessage{Type: "stream_viewer_join", Sender: username, Recipient: msg.Recipient})
-			}
+			s.sendTo(msg.Recipient, NexusMessage{Type: "stream_viewer_join", Sender: username, Recipient: msg.Recipient})
 			client.Send(NexusMessage{Type: "stream_join_result", Status: "ok", Recipient: msg.Recipient})
 
 		case "stream_leave":
@@ -2335,12 +2295,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			s.streamRemoveViewer(msg.Recipient, username)
-			s.Mu.RLock()
-			host, ok := s.Clients[msg.Recipient]
-			s.Mu.RUnlock()
-			if ok {
-				host.Send(NexusMessage{Type: "stream_viewer_leave", Sender: username, Recipient: msg.Recipient})
-			}
+			s.sendTo(msg.Recipient, NexusMessage{Type: "stream_viewer_leave", Sender: username, Recipient: msg.Recipient})
 
 		case "stream_signal":
 			// Relay WebRTC signaling between broadcaster and a specific viewer.
@@ -2353,11 +2308,8 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if !s.streamAreParticipants(username, msg.Recipient) {
 				continue
 			}
-			s.Mu.RLock()
-			peer, ok := s.Clients[msg.Recipient]
-			s.Mu.RUnlock()
-			if ok {
-				peer.Send(NexusMessage{
+			{
+				s.sendTo(msg.Recipient, NexusMessage{
 					Type:      "stream_signal",
 					Sender:    username,
 					Recipient: msg.Recipient,

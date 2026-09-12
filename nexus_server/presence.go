@@ -31,8 +31,10 @@ func publicStatus(s string) string {
 func (s *NexusServer) announcePresence(username string) {
 	st := "Online"
 	s.DB.QueryRow("SELECT COALESCE(status, 'Online') FROM users WHERE username = ?", username).Scan(&st)
+	// Status is mirrored onto every one of the user's connections: it's a
+	// property of the person, not of whichever tab happens to be newest.
 	s.Mu.Lock()
-	if c, ok := s.Clients[username]; ok {
+	for _, c := range s.Clients[username] {
 		c.Status = st
 	}
 	s.Mu.Unlock()
