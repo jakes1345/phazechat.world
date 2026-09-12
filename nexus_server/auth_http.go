@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -88,7 +90,63 @@ func (s *NexusServer) httpLoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", ip, body.Username)
 
-	setSessionCookie(w, tok)
+	// ── New-device check ────────────────────────────────────────────────
+	// The password was right, but that alone no longer finishes the job on a
+	// device this account hasn't approved. The session is issued either way —
+	// it just stays inert until approved, so the sessions already signed in
+	// are untouched and a stranger with the password can't displace them.
+	deviceID := deviceIDFromRequest(r)
+	label := deviceLabel(r.UserAgent(), body.Device)
+	if deviceVerificationEnabled() && !s.isKnownDevice(body.Username, deviceID) && s.canDeliverChallenge(body.Username) {
+		if deviceID == "" {
+			newID, idErr := randHex(16)
+			if idErr != nil {
+				http.Error(w, "session error", http.StatusInternalServerError)
+				return
+			}
+			deviceID = newID
+		}
+		setDeviceCookie(w, deviceID)
+		setSessionCookie(w, tok)
+
+		if err := s.markSessionPendingDevice(tok); err != nil {
+			http.Error(w, "session error", http.StatusInternalServerError)
+			return
+		}
+		challengeID, codeSent := s.createDeviceChallenge(body.Username, deviceID, tok, label, ip)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":       "device_verification_required",
+			"username":     body.Username,
+			"device_label": label,
+			"challenge_id": challengeID,
+			// False means approve from a session you already have open — the
+			// code never went anywhere.
+			"code_sent": codeSent,
+		})
+		return
+	} else {
+		// Either a device we already trust, verification switched off, or —
+		// the case worth being loud about — no channel at all to challenge
+		// through, where holding the sign-in would be a permanent lockout.
+		if deviceVerificationEnabled() && !s.isKnownDevice(body.Username, deviceID) {
+			log.Printf("[device] %s: no session open and no mail transport — allowing %q unverified",
+				body.Username, label)
+		}
+		if deviceID == "" {
+			if newID, idErr := randHex(16); idErr == nil {
+				deviceID = newID
+				s.rememberDevice(body.Username, deviceID, label, ip)
+			}
+		} else {
+			s.touchDevice(body.Username, deviceID, ip)
+		}
+		if deviceID != "" {
+			setDeviceCookie(w, deviceID)
+		}
+		setSessionCookie(w, tok)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	var displayName, mood string
 	s.DB.QueryRow("SELECT COALESCE(display_name,''), COALESCE(mood,'') FROM users WHERE username=?", body.Username).Scan(&displayName, &mood)
@@ -98,6 +156,62 @@ func (s *NexusServer) httpLoginHandler(w http.ResponseWriter, r *http.Request) {
 		"display_name": displayName,
 		"mood":         mood,
 	})
+}
+
+// httpVerifyDeviceHandler completes a sign-in that's waiting on new-device
+// approval, using the code emailed to the account address.
+//
+// Reads the session from the cookie set at login: the token is already in the
+// browser, just inert. sessionUsername deliberately refuses it, so this uses
+// sessionState to find the pending session it's gating.
+func (s *NexusServer) httpVerifyDeviceHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST required", http.StatusMethodNotAllowed)
+		return
+	}
+	tok := tokenFromRequest(r)
+	username, pending := s.sessionState(tok)
+	if username == "" {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
+	if !pending {
+		// Already approved — most likely they approved from another session
+		// while this page sat open. Nothing to do, and saying so beats an
+		// error the user can't act on.
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		return
+	}
+
+	ip := clientIP(r)
+	if authTracker.isIPThrottled(ip) {
+		http.Error(w, "Too many attempts. Try again later.", http.StatusTooManyRequests)
+		return
+	}
+
+	var body struct {
+		Code string `json:"code"`
+	}
+	if json.NewDecoder(r.Body).Decode(&body) != nil || strings.TrimSpace(body.Code) == "" {
+		http.Error(w, "code required", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := s.verifyDeviceChallenge(tok, body.Code); err != nil {
+		authTracker.recordFail(ip, username)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "invalid_code",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	authTracker.recordSuccess(ip, username)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "username": username})
 }
 
 func (s *NexusServer) httpLogoutHandler(w http.ResponseWriter, r *http.Request) {

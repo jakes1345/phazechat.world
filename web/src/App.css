@@ -5416,3 +5416,53 @@ button.link-btn:hover,
   border: none;
   background: transparent;
 }
+
+
+/* ── New-device approval ──────────────────────────────────────
+   Shown on sessions that are already trusted when someone signs in from a
+   device this account hasn't approved. Sits above everything because the
+   other session is held waiting on the answer. */
+.device-ask {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-left: 4px solid #e6920a;
+  border-radius: var(--radius-md, 12px);
+  box-shadow: var(--shadow-lg);
+}
+.device-ask-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.device-ask-body strong { font-size: 0.95rem; }
+.device-ask-detail { font-size: 0.82rem; color: var(--text-secondary); }
+.device-ask-hint { font-size: 0.76rem; color: var(--muted); }
+.device-ask-actions { display: flex; gap: 8px; margin-left: auto; flex-shrink: 0; }
+.device-ask-actions button {
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm, 8px);
+  padding: 7px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.device-ask-approve { background: var(--brand); color: #fff; border-color: transparent; }
+.device-ask-approve:hover { background: var(--brand-hover); }
+.device-ask-deny { background: transparent; color: var(--text); }
+.device-ask-deny:hover { background: var(--list-hover); }
+
+/* Copy on the held device itself, where the code gets entered. */
+.device-verify-copy { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.55; }
+.device-verify-note { font-size: 0.78rem; color: var(--muted); margin-top: 14px; line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .device-ask { flex-direction: column; align-items: stretch; gap: 12px; }
+  .device-ask-actions { margin-left: 0; }
+  .device-ask-actions button { flex: 1; }
+}

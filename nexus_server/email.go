@@ -13,6 +13,21 @@ import (
 	"time"
 )
 
+// mailConfigured reports whether a real transport is wired up.
+//
+// Needed because sendEmail deliberately *succeeds* with no provider set: it
+// logs a [MAIL-SIM] line and returns nil so local development doesn't need an
+// SMTP server. That's helpful for signup, but dangerous for anything that
+// gates access on delivery — a nil error would look like the mail went out
+// when the code only ever reached the server log. Callers that hold a user
+// out until they receive something must check this first.
+func mailConfigured() bool {
+	if os.Getenv("RESEND_API_KEY") != "" || os.Getenv("BREVO_API_KEY") != "" {
+		return true
+	}
+	return os.Getenv("SMTP_HOST") != "" && os.Getenv("SMTP_USER") != "" && os.Getenv("SMTP_PASS") != ""
+}
+
 func (s *NexusServer) sendEmail(to, subject, body string) error {
 	// Preference order: Resend (no IP allowlist) → Brevo → SMTP. Each one
 	// is opt-in via its env var; users can run with whichever they have.
