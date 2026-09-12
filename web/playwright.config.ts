@@ -31,9 +31,18 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run preview -- --port 4173 --strictPort',
-    url: 'http://127.0.0.1:4173',
+    // Bind explicitly to 127.0.0.1. `vite preview` otherwise listens on
+    // "localhost", which on dual-stack CI runners resolves to ::1 first — the
+    // server comes up fine but Playwright's 127.0.0.1 poll never connects and
+    // the run dies on "Timed out waiting 120000ms from config.webServer".
+    //
+    // Invoked via npx rather than `npm run preview -- …` so the flags reach
+    // vite directly instead of through npm's argument forwarding.
+    command: 'npx vite preview --port 4173 --strictPort --host 127.0.0.1',
+    url: 'http://127.0.0.1:4173/',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 })
