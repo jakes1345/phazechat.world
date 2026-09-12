@@ -2552,7 +2552,7 @@ button.link-btn:hover,
 
 /* ── Auth page: animated mesh gradient background ── */
 .app.theme-dark .hub-auth,
-.app:not(.theme-light):not(.theme-skype7) .hub-auth {
+.app:is(.theme-dark,.theme-skype8) .hub-auth {
   background:
     radial-gradient(ellipse 80% 60% at 20% 0%,   rgba(124, 58, 237, 0.18) 0%, transparent 60%),
     radial-gradient(ellipse 60% 50% at 80% 100%,  rgba(99,  102, 241, 0.14) 0%, transparent 60%),
@@ -2566,7 +2566,7 @@ button.link-btn:hover,
 
 /* Auth panel: glass with purple tint */
 .app.theme-dark .hub-auth .panel,
-.app:not(.theme-light):not(.theme-skype7) .hub-auth .panel {
+.app:is(.theme-dark,.theme-skype8) .hub-auth .panel {
   background: rgba(15, 5, 30, 0.75);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -2591,7 +2591,7 @@ button.link-btn:hover,
 /* ── Sidebar: purple-tinted glass ── */
 @media (min-width: 960px) {
   .app.theme-dark .hub-sidebar,
-  .app:not(.theme-light):not(.theme-skype7) .hub-sidebar {
+  .app:is(.theme-dark,.theme-skype8) .hub-sidebar {
     background: linear-gradient(180deg, rgba(15, 5, 35, 0.98) 0%, rgba(10, 5, 25, 0.98) 100%);
     border-right: 1px solid rgba(124, 58, 237, 0.15);
   }
@@ -2599,7 +2599,7 @@ button.link-btn:hover,
 
 /* ── Top bar: colored in dark mode ── */
 .app.theme-dark .top,
-.app:not(.theme-light):not(.theme-skype7) .top {
+.app:is(.theme-dark,.theme-skype8) .top {
   background: linear-gradient(90deg, rgba(10, 5, 25, 0.95) 0%, rgba(15, 8, 35, 0.95) 100%);
   border-bottom: 1px solid rgba(124, 58, 237, 0.2);
   backdrop-filter: blur(20px);
@@ -2608,17 +2608,16 @@ button.link-btn:hover,
 
 /* ── Chat area: subtle depth ── */
 .app.theme-dark .hub-chat-view,
-.app:not(.theme-light):not(.theme-skype7) .hub-chat-view {
+.app:is(.theme-dark,.theme-skype8) .hub-chat-view {
   background: linear-gradient(160deg, rgba(8, 4, 20, 1) 0%, rgba(5, 3, 15, 1) 100%);
 }
 
 /* ── Message bubbles: more depth + glow on outgoing ── */
-.app:not(.theme-skype7) .bubble.me {
+.app:is(.theme-light,.theme-dark) .bubble.me {
   background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 50%, #4f46e5 100%);
   box-shadow: 0 4px 20px rgba(124, 58, 237, 0.35), 0 1px 4px rgba(0, 0, 0, 0.3);
 }
-.app.theme-dark .bubble:not(.me),
-.app:not(.theme-light):not(.theme-skype7) .bubble:not(.me) {
+.app.theme-dark .bubble:not(.me) {
   background: rgba(30, 20, 55, 0.9);
   border: 1px solid rgba(124, 58, 237, 0.12);
 }
@@ -2657,12 +2656,12 @@ button.link-btn:hover,
 
 /* ── Friend row: hover glow ── */
 .app.theme-dark button.friend-row:hover,
-.app:not(.theme-light):not(.theme-skype7) button.friend-row:hover {
+.app:is(.theme-dark,.theme-skype8) button.friend-row:hover {
   background: linear-gradient(90deg, rgba(124, 58, 237, 0.12), rgba(99, 102, 241, 0.06));
   border-radius: var(--radius-md);
 }
 .app.theme-dark button.friend-row.active,
-.app:not(.theme-light):not(.theme-skype7) button.friend-row.active {
+.app:is(.theme-dark,.theme-skype8) button.friend-row.active {
   background: linear-gradient(90deg, rgba(124, 58, 237, 0.18), rgba(99, 102, 241, 0.1));
   border-left: 2px solid #7c3aed;
 }
@@ -2671,9 +2670,9 @@ button.link-btn:hover,
 .app.theme-dark .form input,
 .app.theme-dark .draft-wrap input,
 .app.theme-dark .draft-wrap textarea,
-.app:not(.theme-light):not(.theme-skype7) .form input,
-.app:not(.theme-light):not(.theme-skype7) .draft-wrap input,
-.app:not(.theme-light):not(.theme-skype7) .draft-wrap textarea {
+.app:is(.theme-dark,.theme-skype8) .form input,
+.app:is(.theme-dark,.theme-skype8) .draft-wrap input,
+.app:is(.theme-dark,.theme-skype8) .draft-wrap textarea {
   background: rgba(20, 10, 40, 0.8);
   border: 1px solid rgba(124, 58, 237, 0.2);
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -2681,9 +2680,9 @@ button.link-btn:hover,
 .app.theme-dark .form input:focus,
 .app.theme-dark .draft-wrap input:focus,
 .app.theme-dark .draft-wrap textarea:focus,
-.app:not(.theme-light):not(.theme-skype7) .form input:focus,
-.app:not(.theme-light):not(.theme-skype7) .draft-wrap input:focus,
-.app:not(.theme-light):not(.theme-skype7) .draft-wrap textarea:focus {
+.app:is(.theme-dark,.theme-skype8) .form input:focus,
+.app:is(.theme-dark,.theme-skype8) .draft-wrap input:focus,
+.app:is(.theme-dark,.theme-skype8) .draft-wrap textarea:focus {
   border-color: rgba(124, 58, 237, 0.6);
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12), 0 0 20px rgba(124, 58, 237, 0.08);
   outline: none;
@@ -2691,7 +2690,7 @@ button.link-btn:hover,
 
 /* ── Send row: glass footer ── */
 .app.theme-dark .row.send,
-.app:not(.theme-light):not(.theme-skype7) .row.send {
+.app:is(.theme-dark,.theme-skype8) .row.send {
   background: rgba(8, 4, 20, 0.9);
   border-top: 1px solid rgba(124, 58, 237, 0.12);
   backdrop-filter: blur(12px);
@@ -2700,7 +2699,7 @@ button.link-btn:hover,
 
 /* ── Chat header bar: glass ── */
 .app.theme-dark .chat-header-bar,
-.app:not(.theme-light):not(.theme-skype7) .chat-header-bar {
+.app:is(.theme-dark,.theme-skype8) .chat-header-bar {
   background: rgba(10, 5, 25, 0.92);
   border-bottom: 1px solid rgba(124, 58, 237, 0.15);
   backdrop-filter: blur(16px);
@@ -2709,13 +2708,13 @@ button.link-btn:hover,
 
 /* ── Home hero (no chat selected): more colorful ── */
 .app.theme-dark .hub-home-hero,
-.app:not(.theme-light):not(.theme-skype7) .hub-home-hero {
+.app:is(.theme-dark,.theme-skype8) .hub-home-hero {
   background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(124, 58, 237, 0.1) 0%, transparent 70%);
 }
 
 /* ── Section labels: colored ── */
 .app.theme-dark .sidebar-section-label,
-.app:not(.theme-light):not(.theme-skype7) .sidebar-section-label {
+.app:is(.theme-dark,.theme-skype8) .sidebar-section-label {
   color: rgba(167, 139, 250, 0.6);
   letter-spacing: 0.1em;
 }
@@ -2816,19 +2815,15 @@ button.link-btn:hover,
 }
 
 /* ── Hide the modern Phaze top bar + floating nav ────────────── */
-.app.theme-skype7 .top          { display: none !important; }
-.app.theme-skype7 .floating-nav { display: none !important; }
+.app.classic-era .top          { display: none !important; }
+.app.classic-era .floating-nav { display: none !important; }
 .app.theme-skype7 .banner       { margin: 0; border-radius: 0; }
 
 /* ── Classic menu bar (Skype/Contacts/Conversation/Call/View/Tools/Help) ── */
 /* Every Skype from 3 through 7 shipped a classic menu bar; Skype 8 dropped it.
    The base rule hides it, and each era that had one opts back in below. */
 .skype-menubar { display: none; }
-.app.theme-skype3 .skype-menubar,
-.app.theme-skype4 .skype-menubar,
-.app.theme-skype5 .skype-menubar,
-.app.theme-skype6 .skype-menubar,
-.skype-menubar .skype-menubar {
+.app.classic-era .skype-menubar {
   display: flex;
   align-items: stretch;
   height: 24px;
@@ -2895,11 +2890,7 @@ button.link-btn:hover,
    The children below are scoped to .sidebar-tabs, so this one rule
    is what gates the whole strip per era. */
 .sidebar-tabs { display: none; }
-.app.theme-skype3 .sidebar-tabs,
-.app.theme-skype4 .sidebar-tabs,
-.app.theme-skype5 .sidebar-tabs,
-.app.theme-skype6 .sidebar-tabs,
-.app.theme-skype7 .sidebar-tabs {
+.app.classic-era .sidebar-tabs {
   display: flex;
   align-items: center;
   height: 34px;
@@ -3239,7 +3230,7 @@ button.link-btn:hover,
 }
 
 /* ── Section labels ──────────────────────────────────────────── */
-.app.theme-skype7 .sidebar-section-label { display: none; }
+.app.classic-era .sidebar-section-label { display: none; }
 
 /* ── Me bar (top of sidebar, matching Skymu's profile row) ───── */
 .hub-me-bar {
@@ -3430,7 +3421,7 @@ button.link-btn:hover,
   background: var(--shell, #d4e2f2);
 }
 /* The classic bottom strip replaces the floating "+ New group" under skype7. */
-.app.theme-skype7 .new-group-btn { display: none; }
+.app.classic-era .new-group-btn { display: none; }
 /* Skymu-style date bands: normal case on a soft gradient strip, and the
    two bottom actions share one row with the online count underneath. */
 .app.theme-skype7 .contacts-letter,
@@ -3641,7 +3632,7 @@ button.link-btn:hover,
 .app.theme-skype7 .chat-peer-avatar .avatar-dot {
   border-color: #EBF3FA;
 }
-.app.theme-skype7 .status-dot { display: none; }
+.app.classic-era .status-dot { display: none; }
 
 /* Call buttons in header: Skype-style icon buttons */
 .app.theme-skype7 .chat-call-btns {
@@ -3738,7 +3729,6 @@ button.link-btn:hover,
   color: var(--bubble-text);
 }
 .app.theme-skype7 .bubble:not(.me):not(.skype-hist-bubble),
-.app.theme-skype7 .app:not(.theme-skype7) .bubble.me,
 .app.theme-skype7 .bubble.me:not(.skype-hist-bubble) {
   background: transparent;
   color: var(--bubble-text);
@@ -3750,8 +3740,8 @@ button.link-btn:hover,
    JSX/logic (receipt ticks, etc.) stays untouched for other themes.
    Skype-history-import bubbles keep the original name label — they
    never render .skype-msg-head. */
-.app.theme-skype7 .bubble:not(.skype-hist-bubble) > .who,
-.app.theme-skype7 .bubble:not(.skype-hist-bubble) > .bubble-ts {
+.app.classic-era .bubble:not(.skype-hist-bubble) > .who,
+.app.classic-era .bubble:not(.skype-hist-bubble) > .bubble-ts {
   display: none;
 }
 .skype-msg-head {
@@ -3903,13 +3893,13 @@ button.link-btn:hover,
 /* ── Misc ────────────────────────────────────────────────────── */
 .app.theme-skype7 .friends-empty { padding: 24px 16px; color: var(--muted); }
 .app.theme-skype7 .friends-empty-icon { font-size: 2rem; margin-bottom: 8px; }
-.app:not(.theme-skype7) .bubble.me {
+.app:is(.theme-light,.theme-dark) .bubble.me {
   background: linear-gradient(135deg, var(--bubble-out), #9b5de5);
 }
 
 /* ── Hide chrome that doesn't belong in Skype7 ───────────────── */
-.app.theme-skype7 .foot                { display: none !important; }
-.app.theme-skype7 .support-fab { display: none !important; }
+.app.classic-era .foot                { display: none !important; }
+.app.classic-era .support-fab { display: none !important; }
 
 /* ── Welcome screen: blue logo instead of purple ────────────── */
 .app.theme-skype7 .hub-home-hero-logo {
@@ -3982,7 +3972,7 @@ button.link-btn:hover,
 
 /* ── Back button: desktop only hide ─────────────────────────── */
 @media (min-width: 960px) {
-  .app.theme-skype7 .chat-back-btn { display: none !important; }
+  .app.classic-era .chat-back-btn { display: none !important; }
 }
 
 /* ── Typing indicator: skype-style ──────────────────────────── */
@@ -4013,7 +4003,7 @@ button.link-btn:hover,
   background: rgba(0,175,240,0.1);
   box-shadow: 0 0 40px rgba(0,175,240,0.12);
 }
-.app.theme-skype7 .chat-empty-art img { display: none; }
+.app.classic-era .chat-empty-art img { display: none; }
 .app.theme-skype7 .chat-empty-art::after {
   content: '💬';
   font-size: 2.6rem;
@@ -4021,7 +4011,7 @@ button.link-btn:hover,
 }
 .app.theme-skype7 .chat-empty h3 { color: #1B2733; font-weight: 600; font-size: 1.1rem; }
 .app.theme-skype7 .chat-empty p { color: #6E7E8A; font-size: 0.83rem; }
-.app.theme-skype7 .chat-empty-hints { display: none; }
+.app.classic-era .chat-empty-hints { display: none; }
 
 /* ── Auth hero logo: blue tint ───────────────────────────────── */
 .app.theme-skype7 .auth-hero-logo {
@@ -5353,4 +5343,76 @@ button.link-btn:hover,
   letter-spacing: 0;
   padding: 10px 0;
   text-align: center;
+}
+
+
+/* =============================================================
+   Classic-era message log corrections.
+
+   Found by rendering the themes rather than reasoning about them —
+   three bugs that only show up on a real page:
+
+   1. Own messages inherited `justify-content: flex-end` from the shared
+      .bubble-row.me, so they sat on the right. No Skype before 8 did
+      that: the whole log was left-aligned regardless of author, which
+      is the entire point of the flat-log format.
+
+   2. .bubble-row carries `align-items: flex-end` for bubble layouts.
+      With flat rows that pushed each line's avatar and text apart
+      vertically and opened large gaps between messages.
+
+   3. The chat header ran the peer name straight into their status
+      ("aliceOffline · mood") because .chat-peer-info had no column
+      direction of its own.
+   ============================================================= */
+
+.app.classic-era .bubble-row,
+.app.classic-era .bubble-row.me {
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 0;
+}
+
+/* Flat rows are top-aligned blocks, not bottom-aligned bubbles. */
+.app.classic-era .bubble {
+  display: block;
+  min-height: 0;
+}
+
+/* Applies to every theme: without an explicit column the peer name runs
+   straight into the status line ("aliceOffline · mood"). */
+.chat-peer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+
+/* A 2025 "What's new" banner has no business in a 2007 Skype window. */
+.app.classic-era .wn-banner { display: none !important; }
+
+/* Composer icon buttons ship as modern blue circles. Square them off for the
+   classic eras; Metro flattens them entirely. */
+.app.classic-era .emoji-btn,
+.app.classic-era .attach-btn,
+.app.classic-era .voice-btn,
+.app.classic-era .composer-icon-btn {
+  border-radius: var(--radius-sm, 3px);
+  background: var(--button-bg, transparent);
+  box-shadow: none;
+}
+.app.theme-skype3 .emoji-btn,
+.app.theme-skype3 .attach-btn,
+.app.theme-skype3 .voice-btn {
+  border-radius: 0;
+  border: 1px solid #7F9DB9;
+  background: linear-gradient(180deg, #FDFEFF 0%, #E3E9F0 48%, #D2DCE7 52%, #E8EDF3 100%);
+}
+.app.theme-skype6 .emoji-btn,
+.app.theme-skype6 .attach-btn,
+.app.theme-skype6 .voice-btn {
+  border-radius: 0;
+  border: none;
+  background: transparent;
 }

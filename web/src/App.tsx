@@ -1999,7 +1999,7 @@ export default function App() {
 
   return (
     <OSChrome theme={theme} enabled={osFrame && !wails}>
-    <div className={`app theme-${theme}${wails ? ' desktop-app' : ''}`}>
+    <div className={`app theme-${theme}${isClassicSkype(theme) ? ' classic-era' : ''}${wails ? ' desktop-app' : ''}`}>
       {wails && (
         <DesktopTitleBar
           onMinimise={() => wails.WindowMinimise()}
