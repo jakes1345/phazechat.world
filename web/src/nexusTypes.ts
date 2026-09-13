@@ -46,7 +46,7 @@ export interface NexusMessage {
   server_name?: string
   channel_name?: string
   topic?: string
-  kind?: 'text' | 'voice'
+  kind?: 'text' | 'voice' | 'whiteboard'
   role?: 'owner' | 'admin' | 'member'
   visibility?: 'public' | 'private'
   invite_code?: string
@@ -74,6 +74,13 @@ export interface NexusMessage {
   // carries the IP.
   challenge_id?: number
   device_id?: string
+
+  // Whiteboard. `stroke` is one mark as JSON; `strokes` is a whole board,
+  // replayed in order on join. `stroke_id` identifies a stroke for undo.
+  stroke?: string
+  strokes?: string[]
+  stroke_id?: number
+  stroke_uid?: string
 
   // PIN-encrypted NaCl keypair backup blob (key_backup_put / key_backup).
   key_backup?: KeyBackup
@@ -118,7 +125,7 @@ export interface ChannelInfo {
   server_id: string
   name: string
   topic?: string
-  kind: 'text' | 'voice'
+  kind: 'text' | 'voice' | 'whiteboard'
   position: number
 }
 

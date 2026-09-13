@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChannelInfo, ChannelMsg, NexusMessage, ServerSummary, TurnConfig } from './nexusTypes'
 import VoiceRoom from './VoiceRoom'
+import Whiteboard from './Whiteboard'
 import './spaces.css'
 
 interface FileAttachment {
@@ -41,6 +42,14 @@ function isVideo(mime: string, name: string): boolean {
   if (mime?.startsWith('video/')) return true
   return /\.(mp4|mov|webm|mkv)$/i.test(name)
 }
+// One place deciding what a channel type looks like, so the sidebar and the
+// header can't drift apart.
+function channelGlyph(kind: ChannelInfo['kind']): string {
+  if (kind === 'voice') return '🎙'
+  if (kind === 'whiteboard') return '✏️'
+  return '#'
+}
+
 const CHANNEL_EMOJIS = ['😀','😂','😍','😎','🤔','😢','😡','👍','👎','❤️','🔥','🎉','🙏','👀','💯','✨','😅','🥹','😴','🤝','🚀','👋','🤣','😭','🥲','😏','💀','🤡','🫡','🫶']
 
 function fmtBytes(b: number): string {
@@ -99,6 +108,7 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
   const [membersOpen, setMembersOpen] = useState(false)
   const [newChannelOpen, setNewChannelOpen] = useState(false)
   const [newChannelName, setNewChannelName] = useState('')
+  const [newChannelKind, setNewChannelKind] = useState<'text' | 'voice' | 'whiteboard'>('text')
   const [toasts, setToasts] = useState<Toast[]>([])
   const chatBottomRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -243,6 +253,7 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
             setActiveChannel(m.channel_id)
             setNewChannelOpen(false)
             setNewChannelName('')
+            setNewChannelKind('text')
           } else if (m.error) {
             toast(m.error, 'error')
           }
@@ -368,7 +379,7 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
       type: 'channel_create',
       server_id: activeServer,
       channel_name: newChannelName.trim().toLowerCase().replace(/\s+/g, '-'),
-      kind: 'text',
+      kind: newChannelKind,
     })
   }
 
@@ -468,7 +479,7 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
                   className={`channel-row ${activeChannel === c.id ? 'active' : ''} kind-${c.kind}`}
                   onClick={() => setActiveChannel(c.id)}
                 >
-                  <span className="channel-hash">{c.kind === 'voice' ? '🎙' : '#'}</span>
+                  <span className="channel-hash">{channelGlyph(c.kind)}</span>
                   <span className="channel-name">{c.name}</span>
                 </button>
               ))}
@@ -489,6 +500,16 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
                           }
                         }}
                       />
+                      <select
+                        className="new-channel-kind"
+                        value={newChannelKind}
+                        onChange={(e) => setNewChannelKind(e.target.value as 'text' | 'voice' | 'whiteboard')}
+                        aria-label="Channel type"
+                      >
+                        <option value="text">#  Text</option>
+                        <option value="voice">🎙 Voice</option>
+                        <option value="whiteboard">✏️ Whiteboard</option>
+                      </select>
                       <button type="button" className="mini-btn" onClick={createChannel}>
                         Add
                       </button>
@@ -533,7 +554,17 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
       </section>
 
       <section className="chat-pane">
-        {activeChannelInfo && activeChannelInfo.kind === 'voice' ? (
+        {activeChannelInfo && activeChannelInfo.kind === 'whiteboard' ? (
+          <Whiteboard
+            key={activeChannelInfo.id}
+            me={me}
+            channelId={activeChannelInfo.id}
+            channelName={activeChannelInfo.name}
+            canClear={activeServerInfo?.role === 'owner' || activeServerInfo?.role === 'admin'}
+            send={send}
+            subscribe={subscribe}
+          />
+        ) : activeChannelInfo && activeChannelInfo.kind === 'voice' ? (
           <VoiceRoom
             key={activeChannelInfo.id}
             me={me}
@@ -547,7 +578,7 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
           <>
             <header className="chat-head">
               <h2>
-                <span className="hash">{activeChannelInfo.kind === 'voice' ? '🎙' : '#'}</span>
+                <span className="hash">{channelGlyph(activeChannelInfo.kind)}</span>
                 {activeChannelInfo.name}
               </h2>
               {activeChannelInfo.topic && <p className="chat-topic">{activeChannelInfo.topic}</p>}
