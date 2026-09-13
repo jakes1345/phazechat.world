@@ -1,0 +1,110 @@
+/* Shared whiteboard.
+   Deliberately light-surfaced on every theme: a drawing board is paper, and
+   the colour palette below assumes dark ink on a pale ground. */
+
+.wb {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--chat-bg-2, #fff);
+}
+
+.wb-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  background: var(--chrome, #f5f5f5);
+  border-bottom: 1px solid var(--panel-edge, #d0d0d0);
+  flex-shrink: 0;
+}
+.wb-title { font-weight: 600; font-size: 0.92rem; margin-right: auto; }
+
+.wb-tools, .wb-colors, .wb-actions { display: flex; align-items: center; gap: 4px; }
+.wb-colors { gap: 6px; }
+
+.wb-tool {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.wb-tool:hover { background: var(--list-hover, rgba(0,0,0,0.06)); }
+.wb-tool.on {
+  background: var(--brand-soft, rgba(0,175,240,0.12));
+  border-color: var(--brand, #00aff0);
+}
+
+.wb-color {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+.wb-color.on { border-color: var(--text, #222); transform: scale(1.15); }
+
+.wb-btn {
+  border: 1px solid var(--panel-edge, #d0d0d0);
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text, #222);
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.wb-btn:hover { background: var(--list-hover, rgba(0,0,0,0.06)); }
+.wb-btn-danger { color: #d0021b; border-color: rgba(208,2,27,0.35); }
+.wb-btn-danger:hover { background: rgba(208,2,27,0.08); }
+
+.wb-error {
+  padding: 8px 14px;
+  background: rgba(208, 2, 27, 0.1);
+  color: #a00;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.wb-surface {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  /* Faint grid, so an empty board reads as a surface rather than a blank
+     pane the app failed to render. */
+  background-color: #fdfdfb;
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.045) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.wb-canvas {
+  position: absolute;
+  inset: 0;
+  /* Stops the browser panning/zooming instead of drawing on touch. */
+  touch-action: none;
+}
+.wb-canvas.pen { cursor: crosshair; }
+.wb-canvas.highlighter { cursor: cell; }
+.wb-canvas.eraser { cursor: grab; }
+
+.wb-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted, #888);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .wb-bar { gap: 10px; padding: 8px 10px; }
+  .wb-title { width: 100%; margin-right: 0; }
+}

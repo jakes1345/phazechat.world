@@ -1169,3 +1169,13 @@
 .discover-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .discover-sub { font-size: 0.78rem; color: var(--muted, #888); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .discover-row button { flex: 0 0 auto; }
+
+/* Channel-type picker in the create-channel row. */
+.new-channel-kind {
+  background: var(--input-bg, #fff);
+  color: var(--text);
+  border: 1px solid var(--input-border, #d0d0d0);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.8rem;
+  padding: 4px 6px;
+}

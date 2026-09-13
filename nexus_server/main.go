@@ -127,6 +127,17 @@ type NexusMessage struct {
 	// and echoed back on "device_approve" / "device_deny".
 	ChallengeID int64  `json:"challenge_id,omitempty"`
 	DeviceID    string `json:"device_id,omitempty"`
+
+	// --- Whiteboard ---
+	// Stroke is one mark as JSON; Strokes is a whole board, replayed in order
+	// when a client joins. StrokeID identifies a stroke for undo.
+	Stroke   string   `json:"stroke,omitempty"`
+	Strokes  []string `json:"strokes,omitempty"`
+	StrokeID int64    `json:"stroke_id,omitempty"`
+	// StrokeUID is the client-generated id inside the stroke. Undo names the
+	// exact stroke to remove rather than "my most recent", which is ambiguous
+	// once the same person has the board open on two devices.
+	StrokeUID string `json:"stroke_uid,omitempty"`
 }
 
 // ServerSummary is the slim view a client gets for the server-list pane.
@@ -707,6 +718,19 @@ func (s *NexusServer) initDB() {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_device_challenges_session ON device_challenges(session_token)`,
 		`CREATE INDEX IF NOT EXISTS idx_known_devices_user ON known_devices(username)`,
+		// Whiteboard: append-only strokes per channel. Stored as strokes
+		// rather than a rendered image so late joiners can replay the board,
+		// undo is just dropping a row, and the server never rasterises.
+		`CREATE TABLE IF NOT EXISTS whiteboard_strokes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			channel_id TEXT NOT NULL,
+			author TEXT NOT NULL,
+			stroke_uid TEXT NOT NULL DEFAULT '',
+			stroke TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_whiteboard_uid ON whiteboard_strokes(channel_id, stroke_uid)`,
+		`CREATE INDEX IF NOT EXISTS idx_whiteboard_channel ON whiteboard_strokes(channel_id, id)`,
 		// Presence: the status the user picked (Online/Away/Do Not Disturb/
 		// Invisible). Friends only ever see it through publicStatus().
 		`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Online'`,
@@ -2740,7 +2764,7 @@ func (s *NexusServer) adminMessagesHandler(w http.ResponseWriter, r *http.Reques
 }
 
 // adminBMCPaymentsHandler lists bmc_payments rows — unmatched payments show
-// matched_username=''. Admin can match them manually via grant-supporter CLI
+// matched_username=”. Admin can match them manually via grant-supporter CLI
 // or the direct-grant input in the portal.
 func (s *NexusServer) adminBMCPaymentsHandler(w http.ResponseWriter, r *http.Request) {
 	if s.adminFromRequest(w, r) == "" {

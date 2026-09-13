@@ -855,6 +855,114 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				})
 			}
 
+		// ── Whiteboard ──────────────────────────────────────────────
+		// A board belongs to a channel, the way a Skype for Business
+		// whiteboard belonged to a meeting. Every handler re-checks that the
+		// channel really is a whiteboard and that the sender is in the space,
+		// so a channel id alone is never enough to read or scribble on one.
+		case "wb_join":
+			if username == "" || msg.ChannelID == "" {
+				continue
+			}
+			serverID, isWB := s.channelIsWhiteboard(msg.ChannelID)
+			if !isWB || !s.isServerMember(serverID, username) {
+				client.Send(NexusMessage{Type: "wb_state", Error: "no such whiteboard"})
+				continue
+			}
+			// Hand the joiner the whole board so they can replay it. Only to
+			// this connection — the others already have it.
+			client.Send(NexusMessage{
+				Type:      "wb_state",
+				Status:    "ok",
+				ChannelID: msg.ChannelID,
+				Strokes:   s.whiteboardState(msg.ChannelID),
+			})
+
+		case "wb_stroke":
+			if username == "" || msg.ChannelID == "" || msg.Stroke == "" {
+				continue
+			}
+			serverID, isWB := s.channelIsWhiteboard(msg.ChannelID)
+			if !isWB || !s.isServerMember(serverID, username) {
+				continue
+			}
+			// Validate before storing or relaying: a malformed stroke would
+			// otherwise be replayed into every other member's canvas.
+			clean, ok := validateStroke(msg.Stroke)
+			if !ok {
+				client.Send(NexusMessage{Type: "wb_error", ChannelID: msg.ChannelID, Error: "malformed stroke"})
+				continue
+			}
+			id, stored := s.appendStroke(msg.ChannelID, username, clean)
+			if !stored {
+				continue
+			}
+			s.broadcastChannelMsg(serverID, NexusMessage{
+				Type:      "wb_stroke",
+				Sender:    username,
+				ChannelID: msg.ChannelID,
+				Stroke:    clean,
+				StrokeID:  id,
+			})
+
+		case "wb_undo":
+			if username == "" || msg.ChannelID == "" {
+				continue
+			}
+			serverID, isWB := s.channelIsWhiteboard(msg.ChannelID)
+			if !isWB || !s.isServerMember(serverID, username) {
+				continue
+			}
+			// The client names the stroke it wants back. Falling back to
+			// "my most recent" keeps older clients working, but the named
+			// form is what makes undo unambiguous across two devices.
+			var (
+				id      int64
+				removed string
+				ok      bool
+			)
+			if msg.StrokeUID != "" {
+				id, removed, ok = s.undoStroke(msg.ChannelID, username, msg.StrokeUID)
+			} else {
+				id, removed, ok = s.undoLastStroke(msg.ChannelID, username)
+			}
+			if !ok {
+				continue
+			}
+			undoneUID, _, _ := validateStrokeWithUID(removed)
+			s.broadcastChannelMsg(serverID, NexusMessage{
+				Type:      "wb_undo",
+				Sender:    username,
+				ChannelID: msg.ChannelID,
+				StrokeID:  id,
+				StrokeUID: undoneUID,
+			})
+
+		case "wb_clear":
+			if username == "" || msg.ChannelID == "" {
+				continue
+			}
+			serverID, isWB := s.channelIsWhiteboard(msg.ChannelID)
+			if !isWB || !s.isServerMember(serverID, username) {
+				continue
+			}
+			// Clearing wipes everyone's work, so it's limited to people who
+			// can already administer the space.
+			if role := s.userServerRole(serverID, username); role != "owner" && role != "admin" {
+				client.Send(NexusMessage{
+					Type:      "wb_error",
+					ChannelID: msg.ChannelID,
+					Error:     "only space admins can clear the board",
+				})
+				continue
+			}
+			s.clearWhiteboard(msg.ChannelID)
+			s.broadcastChannelMsg(serverID, NexusMessage{
+				Type:      "wb_clear",
+				Sender:    username,
+				ChannelID: msg.ChannelID,
+			})
+
 		// ── New-device approval, from a session that's already trusted ──
 		// A sign-in from an unrecognised device is held pending and every
 		// existing session is sent a "device_challenge". Approving here is
@@ -1925,7 +2033,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			kind := strings.ToLower(strings.TrimSpace(msg.Kind))
-			if kind != "text" && kind != "voice" {
+			if kind != "text" && kind != "voice" && kind != "whiteboard" {
 				kind = "text"
 			}
 			cid, err := randHex(12)
