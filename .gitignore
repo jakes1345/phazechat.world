@@ -64,6 +64,12 @@ android/app/phaze-release.keystore
 .DS_Store
 __pycache__/
 docs/*.md
+# ...except the era notes. These are the record of what was measured off a
+# real screenshot versus what's still written from memory, so they have to
+# travel with the CSS they describe — without them the next person can't
+# tell a sampled colour from a guessed one.
+!docs/skype-era-reference.md
+!docs/skype-era-research.md
 infra/coturn/README.md
 web/README.md
 kai_bot/

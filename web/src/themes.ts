@@ -23,10 +23,20 @@ export interface ThemeMeta {
   icon: string
   /** true when the theme aims to recreate a real Skype release. */
   era?: boolean
+  /**
+   * Kept working, but not offered to anyone.
+   *
+   * The two plain Phaze themes are shelved: the goal is a faithful
+   * recreation of each Skype release, and an invented house theme sitting
+   * in the same picker invites exactly the generalisation that makes the
+   * eras blur into each other. They stay in the type and in the CSS so
+   * nothing breaks and so they can come back once the six releases are
+   * actually right — but nothing selects them.
+   */
+  hidden?: boolean
 }
 
-/** Display order — put the era themes first so the picker reads chronologically,
- *  then the plain Phaze themes at the end. */
+/** Display order — chronological, oldest first. */
 export const THEMES: ThemeMeta[] = [
   { id: 'skype3', label: 'Skype 3',  hint: '2007 · XP Luna',       icon: '💠', era: true },
   { id: 'skype4', label: 'Skype 4',  hint: '2009 · Vista Aero',    icon: '🔷', era: true },
@@ -34,9 +44,15 @@ export const THEMES: ThemeMeta[] = [
   { id: 'skype6', label: 'Skype 6',  hint: '2012 · Metro',         icon: '⬛', era: true },
   { id: 'skype7', label: 'Skype 7',  hint: '2014 · Aero blue',     icon: '💙', era: true },
   { id: 'skype8', label: 'Skype 8+', hint: '2018 · Fluent',        icon: '🩶', era: true },
-  { id: 'light',  label: 'Phaze Light',                              icon: '☀' },
-  { id: 'dark',   label: 'Phaze Dark',                               icon: '🌙' },
+  { id: 'light',  label: 'Phaze Light',                              icon: '☀', hidden: true },
+  { id: 'dark',   label: 'Phaze Dark',                               icon: '🌙', hidden: true },
 ]
+
+/** The themes a person can actually pick. */
+export const SELECTABLE_THEMES: ThemeMeta[] = THEMES.filter(t => !t.hidden)
+
+/** What to fall back to — the release the app's layout was built around. */
+export const DEFAULT_THEME: ThemeId = 'skype7'
 
 const THEME_IDS = new Set<ThemeId>(THEMES.map(t => t.id))
 
@@ -45,7 +61,11 @@ export function isThemeId(v: unknown): v is ThemeId {
 }
 
 export function themeMeta(id: ThemeId): ThemeMeta {
-  return THEMES.find(t => t.id === id) ?? THEMES[THEMES.length - 1]
+  // Fall back to the default rather than the last entry in the array —
+  // the tail of THEMES is now a shelved theme, so "last" would hand back
+  // something nothing is allowed to select.
+  return THEMES.find(t => t.id === id)
+    ?? THEMES.find(t => t.id === DEFAULT_THEME)!
 }
 
 export function themeIcon(id: ThemeId): string {
@@ -56,11 +76,21 @@ export function themeLabel(id: ThemeId): string {
   return themeMeta(id).label
 }
 
-/** Cycle helper for the quick toggle button in the header. */
+/** Cycle helper for the quick toggle button in the header.
+ *  Walks the selectable themes only, so a shelved one can never be
+ *  cycled into even if it's somehow the current theme. */
 export function nextTheme(current: ThemeId): ThemeId {
-  const idx = THEMES.findIndex(t => t.id === current)
-  const next = THEMES[(idx + 1) % THEMES.length]
+  const idx = SELECTABLE_THEMES.findIndex(t => t.id === current)
+  const next = SELECTABLE_THEMES[(idx + 1) % SELECTABLE_THEMES.length]
   return next.id
+}
+
+/** Resolve a stored or incoming theme id to one that's actually offered.
+ *  Anyone whose browser still remembers a shelved theme lands on the
+ *  default instead of being stuck on something with no way back. */
+export function resolveTheme(v: unknown): ThemeId {
+  if (!isThemeId(v)) return DEFAULT_THEME
+  return themeMeta(v).hidden ? DEFAULT_THEME : v
 }
 
 /** True for any theme that recreates a real Skype release. The main app has

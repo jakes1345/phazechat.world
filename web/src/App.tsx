@@ -21,7 +21,7 @@ import { tokenize as tokenizeEmoticons } from './emoticons'
 import { Emoticon } from './emoticonArt'
 import { EmoticonPicker } from './EmoticonPicker'
 import { CallScreen } from './CallScreen'
-import { THEMES, type ThemeId, isThemeId, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype } from './themes'
+import { SELECTABLE_THEMES, type ThemeId, isThemeId, resolveTheme, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype, isSkypeEra } from './themes'
 import OSChrome from './OSChrome'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
@@ -649,10 +649,11 @@ export default function App() {
     { icon: '🎨', title: 'Skype 7 theme', desc: 'Classic blue Skype skin is now the default. Dark and light themes still available.', color: '#a855f7' },
   ]
   const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
-  const [theme, setTheme] = useState<ThemeId>(() => {
-    const raw = localStorage.getItem(THEME_KEY)
-    return isThemeId(raw) ? raw : 'skype7'
-  })
+  const [theme, setTheme] = useState<ThemeId>(() =>
+    // resolveTheme, not isThemeId: a browser that still remembers one of
+    // the shelved Phaze themes gets moved to the default rather than being
+    // left on a theme the picker no longer lists.
+    resolveTheme(localStorage.getItem(THEME_KEY)))
   const [snow, setSnow] = useState<boolean>(() => localStorage.getItem(SNOW_KEY) === '1')
   // Period-accurate desktop window frame around the app. Off by default —
   // it costs screen space, so it's opt-in from the View menu.
@@ -1487,8 +1488,10 @@ export default function App() {
 
         case 'settings_result':
           if (msg.status === 'ok' && msg.envelopes) {
+            // A theme synced down from another device may predate the
+            // shelving, so resolve it the same way a stored one is.
             const t = msg.envelopes['theme']
-            if (isThemeId(t)) setTheme(t)
+            if (isThemeId(t)) setTheme(resolveTheme(t))
           }
           break
 
@@ -2032,11 +2035,16 @@ export default function App() {
     }
   }
 
+  // @mentions are a Skype 8 feature. Gating the match list rather than just
+  // the popover switches off the keyboard handling too — an empty list makes
+  // Tab and Enter fall through to their normal behaviour, which is what they
+  // did before mentions existed.
+  const mentionsOn = hasFeature(theme, 'mentions')
   const mentionMatches = useMemo(() => {
-    if (mentionQuery === null) return [] as string[]
+    if (!mentionsOn || mentionQuery === null) return [] as string[]
     const q = mentionQuery
     return Object.keys(friends).filter((u) => u.toLowerCase().startsWith(q)).slice(0, 6)
-  }, [mentionQuery, friends])
+  }, [mentionsOn, mentionQuery, friends])
 
   const completeMention = useCallback((username: string) => {
     const inp = draftInputRef.current
@@ -2079,7 +2087,15 @@ export default function App() {
 
   return (
     <OSChrome theme={theme} enabled={osFrame && !wails}>
-    <div className={`app theme-${theme}${isClassicSkype(theme) ? ' classic-era' : ''}${wails ? ' desktop-app' : ''}`}>
+    {/* Two era classes, because they answer different questions.
+        `skype-era` means "this is a recreation of a real Skype release",
+        and switches off the Phaze chrome — the branded top bar, the
+        floating nav, the footer, the support button — for all six.
+        `classic-era` is the narrower Skype 3-7 house style: menu bar,
+        compact list, no right-aligned bubbles. Skype 8 is an era but not
+        a classic one, which is exactly the case the old single class
+        couldn't express. */}
+    <div className={`app theme-${theme}${isSkypeEra(theme) ? ' skype-era' : ''}${isClassicSkype(theme) ? ' classic-era' : ''}${wails ? ' desktop-app' : ''}`}>
       {wails && (
         <DesktopTitleBar
           onMinimise={() => wails.WindowMinimise()}
@@ -2154,7 +2170,7 @@ export default function App() {
                   {label === 'View' && (
                     <>
                       <div className="skype-menu-sectionlabel">Theme</div>
-                      {THEMES.map((t) => (
+                      {SELECTABLE_THEMES.map((t) => (
                         <button
                           key={t.id}
                           type="button"
@@ -2962,14 +2978,24 @@ export default function App() {
                       </li>
                     ))}
                   </ul>
-                  <button type="button" className="new-group-btn" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>+ New group</button>
+                  {/* Group chat landed in Skype 5. Skype 3 and 4 could only
+                      hold a one-to-one conversation, so the era themes for
+                      those two don't offer a way to start a group. */}
+                  {hasFeature(theme, 'group_chat') && (
+                    <button type="button" className="new-group-btn" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>+ New group</button>
+                  )}
                   </>
                   )}
                 </div>
                 {isClassicSkype(theme) && (
                   <div className="hub-side-bottom">
                     <button type="button" onClick={() => { setAddOpen(true); setAddFriend(''); setAddStatus(null) }}>Add a contact</button>
-                    <button type="button" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>Create a group</button>
+                    {/* Same Skype 5 cutoff as the modern "+ New group": the
+                        classic strip is a different control for the same
+                        feature, so it has to be gated the same way. */}
+                    {hasFeature(theme, 'group_chat') && (
+                      <button type="button" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>Create a group</button>
+                    )}
                     <div className="online-strip">{Object.values(friends).filter((s) => s !== 'Offline').length} people online</div>
                   </div>
                 )}
@@ -3234,7 +3260,13 @@ export default function App() {
                               <span className="bubble-text"><RichText text={line.text} me={me} />{line.edited && <span className="edited-tag"> (edited)</span>}</span>
                             )}
                             <span className="bubble-ts">{formatTime(line.ts)}{line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}</span>
-                            {line.reactions && Object.keys(line.reactions).length > 0 && (
+                            {/* Reactions arrived with Skype 8. A 2007 chat log
+                                that sprouts emoji chips is the giveaway that
+                                this is a modern app wearing a costume, so the
+                                existing reactions are hidden along with the
+                                ability to add one — the data is still there
+                                and comes back when the era does. */}
+                            {hasFeature(theme, 'reactions') && line.reactions && Object.keys(line.reactions).length > 0 && (
                               <div className="reactions">
                                 {Object.entries(line.reactions).map(([e, users]) => (
                                   <button
@@ -3249,14 +3281,17 @@ export default function App() {
                             )}
                             {!line.deleted && (
                               <div className="bubble-actions">
-                                {REACTION_EMOJIS.map((e) => (
+                                {hasFeature(theme, 'reactions') && REACTION_EMOJIS.map((e) => (
                                   <button key={e} type="button" className="action-btn react" onClick={() => reactTo(line, e)} title={`React ${e}`}>{e}</button>
                                 ))}
                                 <button type="button" className="action-btn" onClick={() => togglePin(line)} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? '📍' : '📌'}</button>
-                                {line.me && !line.file && (
+                                {/* Editing a sent message is a Skype 8 feature;
+                                    before that a message was gone the moment
+                                    you pressed Enter. */}
+                                {hasFeature(theme, 'edit_message') && line.me && !line.file && (
                                   <button type="button" className="action-btn" onClick={() => beginEdit(line)} title="Edit">✏️</button>
                                 )}
-                                {line.me && (
+                                {hasFeature(theme, 'delete_message') && line.me && (
                                   <button type="button" className="action-btn" onClick={() => deleteMessage(line)} title="Delete">🗑</button>
                                 )}
                               </div>
