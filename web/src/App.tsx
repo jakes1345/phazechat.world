@@ -2446,7 +2446,12 @@ export default function App() {
           onHangUp={hangUp}
         />
       )}
-      {callState && theme !== 'skype7' && (
+      {/* !isClassicSkype, not `theme !== 'skype7'`.
+          This condition dates from when only Skype 7 had the classic call
+          screen above. Widening that one to every classic era left this one
+          untouched, so Skype 3, 4, 5 and 6 rendered BOTH call UIs stacked
+          on top of each other for the whole duration of a call. */}
+      {callState && !isClassicSkype(theme) && (
         <div className="call-overlay">
           {callState.status === 'active' && jitsiRoom && (
             <iframe

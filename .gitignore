@@ -70,6 +70,7 @@ docs/*.md
 # tell a sampled colour from a guessed one.
 !docs/skype-era-reference.md
 !docs/skype-era-research.md
+!docs/skype-era-gaps.md
 infra/coturn/README.md
 web/README.md
 kai_bot/
