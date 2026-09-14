@@ -2831,6 +2831,20 @@ button.link-btn:hover,
   position: relative;
   z-index: 40;
 }
+
+/* Seven menus don't fit in 400px — measured at a phone viewport, the last
+   one ran to x=418 and was simply cut off. The View menu is the only way
+   to change era, so a clipped bar is a dead end rather than a cosmetic
+   loss.
+
+   Tightening the items is the fix, NOT overflow-x on the bar: setting
+   either overflow axis to something other than visible forces the other
+   to compute as auto, which would clip the absolutely-positioned
+   dropdowns and break every menu on every screen size. */
+@media (max-width: 560px) {
+  .app.classic-era .skype-menubar { font-size: 11px; }
+  .app.classic-era .skype-menubar .skype-menu > button { padding: 0 5px; }
+}
 .skype-menubar .skype-menu { position: relative; }
 .skype-menubar .skype-menu > button {
   height: 100%;

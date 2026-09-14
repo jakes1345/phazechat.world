@@ -164,6 +164,12 @@ Listing these rather than letting them pass as finished work:
 * Skype 4's two-column message layout (name in the left gutter, text beside
   it, timestamp right-aligned) is not implemented; the app stacks name over
   text in every era.
-* Every measurement above was taken at 1280×820. **Phone width (~400px) has
-  never been checked in any era.**
+* The measurements above were taken at 1280×820. Phone width (400×780)
+  has now been checked in all six: none scrolls sideways, and the classic
+  menu bar tightens below 560px so all seven menus still fit — before
+  that, "Help" ran to x=418 on a 400px viewport and was simply cut off,
+  which matters because those menus are the only route to the era picker.
+  What has *not* been checked is whether each era's proportions are still
+  period-accurate at that size: real Skype had no phone layout to copy,
+  so the narrow view is our invention in every era.
 * Skype 8's light theme is unmeasured — only the dark one has a reference.
