@@ -47,7 +47,61 @@ Calling *was* Skype. A pixel-perfect project that recreates the contact
 list and then shows a third-party conferencing UI the moment someone picks
 up has recreated the quiet half.
 
-## 3. Era-specific UI described but not built
+## 3. Group chats are create-only — no management at all, in any era
+
+Found while researching whether "group_chat" (dated to Skype 3, per the
+last correction) was actually as capable as the real thing. It isn't, and
+not because of era-gating — the capability is simply absent from the
+whole app.
+
+Real Skype group chats, since their earliest days, let a member:
+
+* **Add someone to an existing group** — `/add`, and a GUI equivalent
+* **Remove someone** — `/kick`
+* **Grant/see roles** — `/setrole <user> ADMIN` / `MASTER`, `/showmembers`
+* **Rename the group**
+
+Checked `nexus_server/ws_handlers.go` and `web/src/GroupChat.tsx` for the
+wire protocol: a group chat supports exactly two operations after
+creation — `convo_msg` (send) and `convo_leave` (leave). There is no
+`convo_add_member`, no `convo_remove_member`, no role of any kind, and no
+rename. `createConversation()` takes a fixed member list at creation and
+nothing ever changes it. The membership picker in the "New group" modal
+is the *only* point in the group's entire lifetime where membership can
+be set.
+
+This is not an era-gating bug — it's core Skype functionality that was
+never built, in Skype 8/light/dark included. It's the single largest gap
+found in this pass, larger than any of the call-window or CSS issues,
+because it's a capability gap rather than a presentation one.
+
+**Not started. Flagging for a decision on scope** — this is a real
+feature to build (add/remove member, a creator-or-admin concept, rename),
+not a CSS fix, and it touches the wire protocol, the DB schema, and both
+clients.
+
+## 4. Chat history retention has no model of its own
+
+Real Skype's retention differed sharply by era and was a genuinely
+user-visible policy, not an implementation detail:
+
+* **Classic Skype** (3–7): local history, configurable retention,
+  effectively "keep forever" as an option. A joiner added to a group could
+  see up to 400 messages or two weeks of prior history, whichever came
+  first.
+* **Skype 8**: history moved to the cloud, retained ~2 years there, with
+  the classic local/forever model gone.
+
+The app has no retention model at all — `convo_history` just returns
+whatever's in the database with no cap and no distinction between eras.
+Given it's a self-hosted service rather than a scraped Microsoft service,
+recreating the exact retention *mechanics* has no real payoff — but the
+**400-message-or-two-weeks new-joiner cutoff** is a genuine, visible
+behavioural difference worth having once group membership can change at
+all (see #3 — right now nobody ever joins a group after it's created, so
+the rule has nothing to apply to).
+
+## 5. Era-specific UI described but not built
 
 From `skype-era-reference.md`, where the reference shows something the app
 doesn't have:
@@ -61,7 +115,7 @@ doesn't have:
 * **Skype 8** — the title bar, and composer icons sitting *inside* the
   compose box rather than outside it.
 
-## 4. Real Skype features never implemented in any era
+## 6. Real Skype features never implemented in any era
 
 Sourced in `skype-era-research.md` but absent from the app entirely.
 Listed so they're a decision rather than an oversight:
@@ -81,7 +135,7 @@ The paid layer — SkypeOut / SkypeIn / Skype Credit / Skype Number — is
 deliberately absent: the brief was to replace the phone-dialling side with
 Discord-style calling, not to recreate it.
 
-## 5. Fixed while compiling this list
+## 7. Fixed while compiling this list
 
 * **Two call UIs rendered at once in Skype 3, 4, 5 and 6.** One block was
   gated on `isClassicSkype(theme)` and the next on `theme !== 'skype7'`.

@@ -20,7 +20,7 @@ date, it says so — an unmarked guess in a reference doc is worse than no doc.
 | 5.x | 2010 | **Group video calling** (up to 10). **Facebook integration.** Automatic call recovery. |
 | 6.x | 2012 | **Microsoft account sign-in.** MSN/Windows Live Messenger retired into Skype. |
 | 7.x | 2014–18 | **Mojis. Skype Translator.** Separate chat windows, per-contact notifications, full-history search. The one people fought to keep. |
-| 8.x | 2018– | Electron. @mentions, reactions, 300MB file sharing. **Highlights** added then removed. Bots. |
+| 8.x | 2018– | Electron. @mentions, reactions. **Highlights** added then removed. Bots. |
 
 Skype itself was retired on **5 May 2025** and folded into Microsoft Teams.
 The Dial Pad survives for users with paid credit.
@@ -100,6 +100,9 @@ The version people actually loved, and the one our reference theme targets.
 - **Ctrl+F searched the entire history**, back to the beginning
 - **Chats could open in separate windows**
 - **Per-contact notification settings**
+- **File sharing limit raised to 300MB** (July 2016) — this had briefly been
+  capped at 100MB earlier the same year. Not an 8.x feature; corrected from
+  an earlier version of this doc, which had it dated to Skype 8
 
 Microsoft announced on 1 September 2018 that Skype 7 would be shut down. The
 backlash was severe enough — including a Change.org petition from professional
@@ -117,7 +120,6 @@ onto centralised Azure infrastructure.
 
 Added at launch (16 July 2018):
 - Free HD video calls and screen sharing, **up to 24 people**
-- Drag-and-drop file sharing up to **300MB**
 - **@mentions** and emoji **reactions**
 - **Quoted messages** — note: quoting, *not* pinning. Pinned messages
   are a Phaze original with no Skype equivalent.
