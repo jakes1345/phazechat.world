@@ -157,6 +157,7 @@
                     <div class="platform-name">Windows</div>
                     <div class="platform-detail">Windows 10 / 11 · 64-bit · native desktop app</div>
                     <a href="#" class="platform-btn loading" data-dl="windows">Download</a>
+                    <p style="font-size:0.75rem;color:var(--text-light);margin-top:10px;">No build published yet — <a href="https://github.com/jakes1345/phazechat.world" target="_blank" rel="noopener" style="color:var(--brand);">build it from source</a> or use the web app.</p>
                 </div>
 
                 <div class="platform-card" id="card-macos">
@@ -164,6 +165,7 @@
                     <div class="platform-name">macOS</div>
                     <div class="platform-detail">macOS 12+ · Apple Silicon &amp; Intel · native desktop app</div>
                     <a href="#" class="platform-btn loading" data-dl="macos">Download</a>
+                    <p style="font-size:0.75rem;color:var(--text-light);margin-top:10px;">No native build yet — <a href="https://github.com/jakes1345/phazechat.world" target="_blank" rel="noopener" style="color:var(--brand);">vote for it on GitHub</a> or use the web app.</p>
                 </div>
 
                 <div class="platform-card" id="card-linux">
@@ -171,6 +173,7 @@
                     <div class="platform-name">Linux</div>
                     <div class="platform-detail">x86-64 &amp; ARM64 · tar.gz archive · any modern distro</div>
                     <a href="#" class="platform-btn loading" data-dl="linux">Download</a>
+                    <p style="font-size:0.75rem;color:var(--text-light);margin-top:10px;">No build published yet — <a href="https://github.com/jakes1345/phazechat.world" target="_blank" rel="noopener" style="color:var(--brand);">build it from source</a> or use the web app.</p>
                 </div>
 
                 <div class="platform-card" id="card-android">
@@ -235,15 +238,23 @@
 
     <script>
         (function () {
-            const REPO = 'jakes1345/phaze';
+            const REPO = 'jakes1345/phazechat.world';
             const API_LATEST = 'https://api.github.com/repos/' + REPO + '/releases/latest';
             const RELEASES_PAGE = 'https://github.com/' + REPO + '/releases/latest';
 
-            // Fallbacks if the API call fails.
-            // macOS has no native binary yet — null triggers "Coming soon".
+            // Fallbacks if the API call fails, or if it succeeds but the
+            // release has no matching asset.
+            //
+            // Windows and Linux used to fall back to RELEASES_PAGE, which
+            // pointed at a repo that didn't exist. Fixing the repo name
+            // alone doesn't fix this: that repo has never had a release
+            // published (checked directly — zero tags, zero releases), so
+            // /releases/latest 404s there too. null is the honest state —
+            // it triggers "Coming soon" the same way macOS already does —
+            // until a build actually gets published.
             const fallback = {
-                windows: RELEASES_PAGE,
-                linux: RELEASES_PAGE,
+                windows: null,
+                linux: null,
                 android: '/downloads/Phaze.apk',
                 macos: null
             };
@@ -291,6 +302,12 @@
                 if (!card) return;
                 var a = card.querySelector('a.platform-btn[data-dl]');
                 if (!a) return;
+                // The "no build published yet" hint under Windows/Linux/macOS
+                // is static HTML so it reads correctly even with JS disabled,
+                // but it has to disappear the moment a real asset resolves —
+                // otherwise the day a build finally ships, this line quietly
+                // starts lying instead of the repo name.
+                var hint = card.querySelector('p');
                 var finalUrl = url || fb;
                 a.classList.remove('loading');
                 if (!finalUrl) {
@@ -299,6 +316,7 @@
                     a.style.pointerEvents = 'none';
                     return;
                 }
+                if (hint) hint.style.display = 'none';
                 a.href = finalUrl;
                 if (finalUrl.indexOf('http') === 0) {
                     a.target = '_blank';
