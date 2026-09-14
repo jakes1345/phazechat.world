@@ -80,6 +80,30 @@ feature to build (add/remove member, a creator-or-admin concept, rename),
 not a CSS fix, and it touches the wire protocol, the DB schema, and both
 clients.
 
+### The real thing was bigger than "add/kick/rename"
+
+A follow-up research pass (see `skype-era-research.md`'s new chat-commands
+appendix) turned up that classic Skype's group chat management wasn't a
+loose handful of actions — it was a proper role system:
+
+* **A five-level role hierarchy** — Creator, Master, Helper, User,
+  Listener — with Master able to promote/demote, Listener able to read
+  but not send, and a pending "applicant" state for chats that required
+  approval to join
+* **Chat-wide settings** — a topic, a description, posted guidelines, an
+  optional password, and behavioural flags like "history visible to new
+  joiners" or "topic/picture locked to admins only"
+* **A ban list and an allow list**, separate from simple membership
+* **`/poll`** — an inline poll command, a real dateable Skype feature in
+  its own right (separate from any Phaze poll idea, if one ever gets
+  built)
+
+None of this needs to be built to close the gap — a minimal add/remove/
+rename/single-admin model would already close most of the practical
+distance from where the app is now (nothing) to where real Skype was.
+But it's worth knowing the ceiling is a full permission system, not just
+three missing buttons, when scoping how much of it to build.
+
 ## 4. Chat history retention has no model of its own
 
 Real Skype's retention differed sharply by era and was a genuinely
@@ -118,22 +142,61 @@ doesn't have:
 ## 6. Real Skype features never implemented in any era
 
 Sourced in `skype-era-research.md` but absent from the app entirely.
-Listed so they're a decision rather than an oversight:
+Listed so they're a decision rather than an oversight. Expanded
+substantially after the deep-research pass:
 
-* Contact groups in the contact list
-* Chat commands — `/me`, `/topic`, `/alertson` and friends
-* Hidden emoticons — undocumented shortcodes, genuinely part of the culture
+* Contact groups/categories in the contact list
+* The full chat command layer and role system — `/me`, `/topic`,
+  `/alertson`, `/setrole`, `/poll` and ~80 others. See gap #3 above; this
+  is the same gap, viewed from the "what commands existed" angle rather
+  than "what buttons are missing"
+* Hidden emoticons — undocumented shortcodes, genuinely part of the
+  culture, including the Marvel-themed batch added in 6.14 and pulled by
+  6.20
 * Per-contact notification settings (Skype 7)
 * Chats opening in separate windows (Skype 7)
 * Full-history search — Ctrl+F back to the beginning (Skype 7)
 * Skype Translator (Skype 7)
+* Bots — a whole category of automated contacts, group-chat-capable from
+  mid-2016
 * Quoted messages, chat media gallery, call recording (Skype 8)
-* Voicemail, call quality indicators
-* `Skype Me` presence, distinct from Online
+* Message drafts, bookmarks, split view, scheduled group calls (Skype 8,
+  2019)
+* Voicemail, call quality indicators, a call-transfer button
+* `Skype Me` presence — now dateable: hidden from the status picker at
+  Skype 4, removed completely at Skype 5. Distinct from plain Online.
+* Video messages (record up to 3 minutes, send to an offline contact) —
+  launched February 2013, inside the Skype 6.x window
+* **Mojis specifically cannot be reproduced** — they were licensed film
+  and TV clips, not something a recreation can legally include. This is a
+  permanent gap, not a "not built yet" one; `mojis` should probably stay
+  declared-but-unimplementable rather than ever expected to close.
+* The 2017-18 Highlights/Reactions/colourful redesign that briefly
+  shipped under the Skype 7 version number and was then reverted — an
+  entire visual sub-era with no representation in any theme. Not
+  recommending it be built (it was itself a mistake Skype walked back),
+  but noting it exists as a real, dateable, and currently invisible slice
+  of Skype's history.
 
 The paid layer — SkypeOut / SkypeIn / Skype Credit / Skype Number — is
 deliberately absent: the brief was to replace the phone-dialling side with
 Discord-style calling, not to recreate it.
+
+## 6a. One open dating question: does `mentions` belong at Skype 7 or 8?
+
+The 2017 Highlights-era redesign shipped @mentions under the Skype-7
+version number — roughly a year before Skype 8.0 existed. Our `skype7`
+theme visually targets the earlier, more commonly remembered 2014-2016
+"Skype Classic" blue look rather than that 2017-18 redesign (which was
+itself reverted). So there's a real argument either way, and this is
+flagged rather than changed:
+
+* Keep `mentions` at Skype 8 (current behaviour) if `skype7` means
+  "Skype Classic as people remember it" — pre-redesign.
+* Move it to Skype 7 if strict release-date accuracy should win
+  regardless of which visual sub-era the theme represents.
+
+Not changed in this pass — this is a decision to make, not a bug to fix.
 
 ## 7. Fixed while compiling this list
 
