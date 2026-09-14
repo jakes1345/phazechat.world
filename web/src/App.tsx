@@ -3239,7 +3239,7 @@ export default function App() {
                                 <span className="who clickable" onClick={() => !line.me && setProfileUser(line.from)}>{line.me ? 'You' : line.from}</span>
                                 <span className="skype-msg-head-ts">
                                   {formatTime(line.ts)}
-                                  {line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}
+                                  {hasFeature(theme, 'read_receipts') && line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}
                                 </span>
                               </div>
                             )}
@@ -3270,7 +3270,7 @@ export default function App() {
                             ) : (
                               <span className="bubble-text"><RichText text={line.text} me={me} />{line.edited && <span className="edited-tag"> (edited)</span>}</span>
                             )}
-                            <span className="bubble-ts">{formatTime(line.ts)}{line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}</span>
+                            <span className="bubble-ts">{formatTime(line.ts)}{hasFeature(theme, 'read_receipts') && line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}</span>
                             {/* Reactions arrived with Skype 8. A 2007 chat log
                                 that sprouts emoji chips is the giveaway that
                                 this is a modern app wearing a costume, so the
@@ -3295,7 +3295,9 @@ export default function App() {
                                 {hasFeature(theme, 'reactions') && REACTION_EMOJIS.map((e) => (
                                   <button key={e} type="button" className="action-btn react" onClick={() => reactTo(line, e)} title={`React ${e}`}>{e}</button>
                                 ))}
-                                <button type="button" className="action-btn" onClick={() => togglePin(line)} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? '📍' : '📌'}</button>
+                                {hasFeature(theme, 'pinned_messages') && (
+                                  <button type="button" className="action-btn" onClick={() => togglePin(line)} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? '📍' : '📌'}</button>
+                                )}
                                 {/* Editing a sent message is a Skype 8 feature;
                                     before that a message was gone the moment
                                     you pressed Enter. */}
@@ -3307,7 +3309,7 @@ export default function App() {
                                 )}
                               </div>
                             )}
-                            {isPinned && <span className="pin-indicator" title="Pinned">📌</span>}
+                            {hasFeature(theme, 'pinned_messages') && isPinned && <span className="pin-indicator" title="Pinned">📌</span>}
                           </div>
                         </div>
                         )}

@@ -105,16 +105,33 @@ Microsoft announced on 1 September 2018 that Skype 7 would be shut down. The
 backlash was severe enough — including a Change.org petition from professional
 users — that the shutdown was delayed to November 2018.
 
+### What 7.x did *not* have, and the app must not show in this era
+
+- Reactions on messages, @mentions, editing or deleting a sent message
+- Read receipts (delivered/seen ticks)
+
 ## 8.x — 2018 onward
 
 Electron-based rewrite. April 2017 had already moved Skype off peer-to-peer
 onto centralised Azure infrastructure.
 
-Added:
-- Free HD video calls
+Added at launch (16 July 2018):
+- Free HD video calls and screen sharing, **up to 24 people**
 - Drag-and-drop file sharing up to **300MB**
-- **@mentions** and emoji reactions
+- **@mentions** and emoji **reactions**
+- **Quoted messages** — note: quoting, *not* pinning. Pinned messages
+  are a Phaze original with no Skype equivalent.
+- **Chat media gallery** for photos and links
+- Personalised chat themes, notification panel
 - **Bots**
+
+Shipped over summer 2018:
+- **Read receipts** — the reader's avatar appears beneath the message
+- **Call recording**
+- **Private conversations** with end-to-end encryption
+- Profile invites and group links
+
+Also:
 - **Highlights** — a Stories clone added in the 2017 Snapchat-inspired
   redesign, removed in 2018 because it "didn't resonate with a majority of
   users"
@@ -193,25 +210,64 @@ Collected here because they came up in research and would otherwise get lost.
 
 `web/src/themes.ts` gates features per era. Checked against the research:
 
-| Feature | Correct earliest era | Notes |
+| Feature | Earliest era | Basis |
 |---|---|---|
-| Text chat, voice, file transfer | 3 | Present well before our earliest theme |
-| Video calling | 3 | Shipped in 2.x |
-| Mood messages | 3 | Introduced in 3.0 |
-| Screen sharing | **4** | 4.1, 2009 — matches what we ship |
-| Group chat / group calls | **5** | Group video, up to 10 — matches |
-| Remote control | 6 | Approximate; Skype's remote assist is later and we
-  treat it as a 6-era convenience rather than a dated claim |
-| Mojis | **7** | 2015 — matches |
-| Reactions, @mentions, edit/delete | **8** | Matches |
+| Text chat, voice, file transfer | 3 | 1.x — long before our earliest theme |
+| Video calling | 3 | 2.x, 2005 |
+| **Group text chat** | **3** | Skype was designing multi-person chat in 2004; Public Chats in 3.0 are described as distinct from "the group chat Skype already had" |
+| **Group audio / conference calls** | **3** | Skypecasts in 3.0 carried up to 100 people |
+| Mood messages | 3 | 3.0 |
+| Screen sharing | **4** | 4.1, 2009 |
+| **Group video calling** | **5** | 5.0 beta, Oct 2010 — 5 participants at launch, later 10 |
+| Mojis | **7** | Announced 15 Sept 2015 |
+| Reactions, @mentions, edit/delete | **8** | 8.0, July 2018 — all at launch |
+| Read receipts | **8** | 8.0, shipped summer 2018 |
 | Stories | 8 | Skype's Highlights, 2017, removed 2018 |
+| Pinned messages | 8 | Phaze original — Skype 8 had *quoted* messages, not pins |
+| Remote control | 8 | Phaze original — see below |
 | Spaces, livestreams | 8 | Phaze originals, no Skype equivalent |
 | Whiteboard | 8 | From Skype for Business, not consumer Skype |
 
-The one I'd flag as soft is **remote control**. Our table puts it at era 6;
-I could not pin down a precise Skype release for remote desktop control, and
-it may belong to the Skype for Business lineage like the whiteboard. Treat it
-as a product decision rather than a historical claim until confirmed.
+### Two corrections to the earlier version of this table
+
+**Group chat was gated at Skype 5. That was wrong.** The old row read
+"Group chat / group calls — 5", which conflated three different things.
+Group *video* calling is the genuine 5.0 milestone; group *text* chat and
+audio conferencing both predate Skype 3 entirely. The evidence was
+already in this document — the 3.x section describes Public Chats as
+distinct from "the group chat Skype already had" — and the table
+contradicted it. Skype 3 and 4 were being denied capabilities they
+really had. `group_video` is now its own feature so the 5.0 boundary is
+preserved without that side effect.
+
+**Remote control was gated at Skype 6 on an admitted guess**, and the
+previous version of this file said as much. Checked: no consumer Skype
+release shipped remote desktop control. "Give control" during a screen
+share belongs to the Skype for Business lineage, the same place the
+whiteboard comes from. Third-party tools like SkyRemote bolted it onto
+Skype's API, which is not the same as Skype having shipped it. It is now
+classified as a Phaze original rather than dated to a release.
+
+### What Skype 6 actually added
+
+Nothing that belongs in this table, and that is a finding rather than an
+oversight. Skype 6's headline changes were Microsoft account sign-in and
+the retirement of Windows Live Messenger into Skype — account plumbing
+and a migration, not new conversation features. Its feature set is
+therefore identical to Skype 5's. The era is still visually distinct
+(Metro flat design), which is where its differences live.
+
+### Participant limits over time
+
+Worth recording since "group call" means different things by era:
+
+| When | Limit |
+|---|---|
+| Skypecasts, 3.0 (2006) | ~100, moderated public voice |
+| Group video, 5.0 beta (2010) | 5, later 10 |
+| Skype 8 launch (2018) | 24 for HD video + screen share |
+| 5 April 2019 | 50 |
+| October 2020 | 100 |
 
 ---
 
