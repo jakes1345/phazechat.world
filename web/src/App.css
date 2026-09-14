@@ -2895,6 +2895,8 @@ button.link-btn:hover,
   border-bottom: 1px solid #B2C8D8;
   flex-shrink: 0;
 }
+/* The classic eras are icon-only; only Skype 8 labelled its tabs. */
+.tab-label { display: none; }
 .sidebar-tabs button {
   background: transparent;
   border: none;
@@ -3802,7 +3804,11 @@ button.link-btn:hover,
   background: #ffffff;
 }
 /* Send button */
-.app.theme-skype7 .row.send > button:last-child {
+/* :not(.send-pill) because the classic eras label this button
+   "Send message" rather than showing a glyph. Forcing a 34px square
+   around that text left it overflowing the window's right edge. The
+   square is for the icon-only form. */
+.app.theme-skype7 .row.send > button:last-child:not(.send-pill) {
   width: 34px;
   height: 34px;
   min-width: 34px;
@@ -5372,6 +5378,100 @@ button.link-btn:hover,
   padding: 1px 7px;
 }
 
+/* ── Sidebar head: profile row, then search, then the nav strip ──
+   All three exist in the markup but were gated to other eras, so Skype 8
+   was rendering a sidebar that started at the search box. Geometry is
+   measured off the reference: the profile row is 59px (y 34-93), the
+   search row 31px (y 96-127), the nav strip 63px (y 129-192). */
+.app.theme-skype8 .hub-me-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 59px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: none;
+  flex-shrink: 0;
+}
+.app.theme-skype8 .hub-me-avatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  font-size: 13px;
+}
+.app.theme-skype8 .hub-me-name {
+  font: 600 15px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--text);
+}
+.app.theme-skype8 .hub-me-status {
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.app.theme-skype8 .hub-me-settings {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 17px;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.app.theme-skype8 .hub-me-settings:hover { background: var(--list-hover); color: var(--text); }
+
+/* Four equal tabs, icon over label. The active one is tinted #1686D9 —
+   measured at the first tab's icon, whose centres sit at x=41, 128, 216
+   and 303 across a 347px sidebar, i.e. one quarter each. */
+.app.theme-skype8 .sidebar-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 63px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--separator);
+  flex-shrink: 0;
+}
+.app.theme-skype8 .sidebar-tabs button {
+  flex: 1 1 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 15px;
+  padding: 0;
+}
+.app.theme-skype8 .sidebar-tabs button .tab-label {
+  display: block;
+  font: 400 11px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  line-height: 1;
+}
+.app.theme-skype8 .sidebar-tabs button:hover { background: var(--list-hover); color: var(--text); }
+.app.theme-skype8 .sidebar-tabs button.on {
+  color: var(--brand);
+  background: transparent;
+  border-bottom: 2px solid var(--brand);
+}
+/* Source order is profile, mood, tabs, search — which is Skype 7's
+   layout. Skype 8 puts the search box directly under the profile row and
+   the nav strip below it, so reorder rather than move the markup and
+   disturb the other five eras. The mood bar goes: Skype 8 dropped the
+   classic mood message from the sidebar entirely.
+
+   Orders are negative because everything else in the sidebar sits at the
+   default order:0 — positive values would push these three below the
+   contact list instead of above it. */
+.app.theme-skype8 .hub-me-bar     { order: -3; }
+.app.theme-skype8 .hub-add-friend { order: -2; border-bottom: none; padding: 0 14px 10px; }
+.app.theme-skype8 .sidebar-tabs   { order: -1; }
+.app.theme-skype8 .hub-mood-bar   { display: none; }
+
+
 /* Uppercase with a little tracking.
    This block used to say "sentence case, not Metro's uppercase tracking"
    — the reference disagrees: RECENT CHATS, ONGOING CALL, FAVORITES and
@@ -5443,12 +5543,28 @@ button.link-btn:hover,
 }
 
 /* ── Pill controls ─────────────────────────────────────────── */
+/* The control at the right of the search box is a flat glyph in the
+   reference, not a filled disc — same treatment as the composer icons.
+   The base .form button rule sets both a --brand background AND a
+   --brand border, so both have to be stated here; overriding only the
+   background leaves a blue ring behind. */
 .app.theme-skype8 .hub-add-friend button {
   width: 28px;
   height: 28px;
   padding: 0;
-  border-radius: 50%;
+  border: none;
+  border-radius: 4px;
   font-size: 15px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+.app.theme-skype8 .hub-add-friend button:hover {
+  background: var(--list-hover);
+  border: none;
+  color: var(--text);
+  transform: none;
+  box-shadow: none;
 }
 /* Both the search field and the compose box are shallow rectangles in the
    reference — a 4px radius, not the 20px pill. The search field also sits

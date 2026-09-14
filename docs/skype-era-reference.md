@@ -149,10 +149,13 @@ Listing these rather than letting them pass as finished work:
   least visible — and least verified.
 * Skype 4's right-hand profile pane and its twin green call buttons are
   described above but not built.
-* Skype 8 has no title bar, no nav tab strip (Chats / Calls / Contacts /
-  Notifications) and no profile row at the top of its sidebar. Its
-  composer icons also sit outside the compose box rather than inside it.
-  All four are markup changes, not CSS.
+* Skype 8 has no title bar, and its composer icons sit outside the
+  compose box rather than inside it. (The nav tab strip and the sidebar
+  profile row are built — both already existed in the markup but were
+  gated to other eras, so the sidebar had been starting at the search
+  box. The tab set is the app's own views, labelled, rather than Skype's
+  literal Chats / Calls / Contacts / Notifications, since inventing nav
+  that goes nowhere would be worse than a faithful-looking strip.)
 * The in-chat date separator is measured for Skype 8 only. Skype 3-6 now
   get a plain centred date line, which is period-plausible and legible,
   but it is not taken from a reference. (It previously had no rule at all

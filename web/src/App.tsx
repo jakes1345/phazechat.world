@@ -2757,14 +2757,25 @@ export default function App() {
                     <MoodEditor value={myMood} onSave={saveMood} />
                   </div>
                 )}
+                {/* Each tab carries a label as well as its icon. The classic
+                    eras hide the label and show icons only; Skype 8 stacks
+                    the label under the icon, the way its nav strip did. */}
                 <div className="sidebar-tabs">
-                  <button type="button" title="Contacts" className={view === 'contacts' ? 'on' : ''} onClick={() => setView('contacts')}><IconPerson /></button>
-                  <button type="button" title="Recent" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}><IconClock /></button>
+                  <button type="button" title="Contacts" className={view === 'contacts' ? 'on' : ''} onClick={() => setView('contacts')}>
+                    <IconPerson /><span className="tab-label">Contacts</span>
+                  </button>
+                  <button type="button" title="Recent" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}>
+                    <IconClock /><span className="tab-label">Chats</span>
+                  </button>
                   {hasFeature(theme, 'spaces') && (
-                    <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
+                    <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>
+                      #<span className="tab-label">Spaces</span>
+                    </button>
                   )}
                   {hasFeature(theme, 'live_streams') && (
-                    <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}><IconLive /></button>
+                    <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}>
+                      <IconLive /><span className="tab-label">Live</span>
+                    </button>
                   )}
                 </div>
                 <div className="hub-add-friend">
