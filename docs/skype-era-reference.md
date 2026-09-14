@@ -103,6 +103,19 @@ Sampled from the 1107×869 native screenshot. These are exact.
 | Sidebar width | 347px |
 | Contact row pitch | ~62px, 32px avatar |
 | Search field height | 31px |
+| Message column | x=435..1020 of a 759px pane — ~77%, even gutters |
+| Date separator rule | `#444446` hairline either side of a centred label |
+| Search / compose corner radius | 4px (not a pill) |
+| Section labels | small grey **capitals** with slight tracking |
+
+Layout notes from the same image:
+
+* A one-to-one conversation shows **no avatar and no sender name** beside
+  a bubble. Two people, so alignment carries it. (Group chats keep the
+  coloured sender name — different markup, so they're unaffected.)
+* **Nothing in the compose row is accent-filled.** The emoji glyph at the
+  left of the box and the two icons at its right are all the same grey as
+  the box. There is no blue send disc.
 
 Three things measuring corrected, the first two guessed the other way
 round and the third not a guess at all but an accident:
@@ -136,6 +149,15 @@ Listing these rather than letting them pass as finished work:
   least visible — and least verified.
 * Skype 4's right-hand profile pane and its twin green call buttons are
   described above but not built.
+* Skype 8 has no title bar, no nav tab strip (Chats / Calls / Contacts /
+  Notifications) and no profile row at the top of its sidebar. Its
+  composer icons also sit outside the compose box rather than inside it.
+  All four are markup changes, not CSS.
+* The in-chat date separator is measured for Skype 8 only. Skype 3-6 now
+  get a plain centred date line, which is period-plausible and legible,
+  but it is not taken from a reference. (It previously had no rule at all
+  outside Skype 7, so it rendered as unstyled text — invisible on Skype
+  8's dark background.)
 * Skype 4's two-column message layout (name in the left gutter, text beside
   it, timestamp right-aligned) is not implemented; the app stacks name over
   text in every era.

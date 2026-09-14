@@ -3935,6 +3935,40 @@ button.link-btn:hover,
   height: 1px;
   background: #C8D9E6;
 }
+
+/* The in-chat date separator only ever had a Skype 7 rule, so in the
+   other five eras it rendered as unstyled text — grey on grey in Skype 8,
+   where it was effectively invisible. Each era gets its own treatment.
+
+   Skype 8 is measured: a #444446 hairline either side of a centred grey
+   label, the pair spanning the message column. The classic eras are not
+   measured — a plain centred date line is the period-plausible reading,
+   and it is at least legible, which is the bar the old state failed. */
+.app.theme-skype8 .date-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 8px;
+  color: var(--muted);
+  font: 600 11.5px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  user-select: none;
+}
+.app.theme-skype8 .date-sep::before,
+.app.theme-skype8 .date-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--separator);
+}
+.app:is(.theme-skype3,.theme-skype4,.theme-skype5,.theme-skype6) .date-sep {
+  display: block;
+  text-align: center;
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 10.5px;
+  user-select: none;
+}
+.app.theme-skype3 .date-sep { font-family: Tahoma, 'MS Sans Serif', sans-serif; }
 /* Missed/completed call notice, dropped inline where the call happened. */
 .call-line {
   display: flex;
@@ -5338,13 +5372,17 @@ button.link-btn:hover,
   padding: 1px 7px;
 }
 
-/* Sentence case, not Metro's uppercase tracking. */
+/* Uppercase with a little tracking.
+   This block used to say "sentence case, not Metro's uppercase tracking"
+   — the reference disagrees: RECENT CHATS, ONGOING CALL, FAVORITES and
+   CHATS are all set in small grey capitals. Skype 8 kept that from
+   Metro; what it dropped was the heavy weight. */
 .app.theme-skype8 .sidebar-section-label {
-  text-transform: none;
-  letter-spacing: 0;
-  font: 600 12px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font: 600 11px 'Segoe UI Variable', 'Segoe UI', sans-serif;
   color: var(--muted);
-  padding: 12px 14px 6px;
+  padding: 14px 14px 6px;
   background: transparent;
 }
 
@@ -5371,13 +5409,15 @@ button.link-btn:hover,
   color: var(--bubble-text-out);
 }
 .app.theme-skype8 .bubble-row { gap: 9px; margin-bottom: 9px; }
+
+/* No avatar and no sender name on a one-to-one conversation.
+   The reference carries neither: in a DM there are only two people, so
+   Skype 8 dropped both and let alignment say who spoke. (.bubble is the
+   DM log only — group chats render through .group-line-* and keep their
+   coloured sender names, which they need.) */
 .app.theme-skype8 .bubble-avatar,
-.app.theme-skype8 .bubble-avatar-spacer {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  font-size: 13px;
-}
+.app.theme-skype8 .bubble-avatar-spacer { display: none; }
+.app.theme-skype8 .bubble > .who { display: none; }
 .app.theme-skype8 .bubble-ts,
 .app.theme-skype8 .bubble .who { font-size: 11px; color: var(--muted); }
 /* Same grey behind both directions now, so the outgoing timestamp reads
@@ -5431,7 +5471,6 @@ button.link-btn:hover,
   box-shadow: 0 0 0 3px var(--input-focus);
 }
 
-.app.theme-skype8 .send-btn,
 .app.theme-skype8 .send-pill,
 .app.theme-skype8 .hub-side-bottom button {
   background: var(--brand);
@@ -5443,6 +5482,55 @@ button.link-btn:hover,
   letter-spacing: 0;
   padding: 8px 18px;
   box-shadow: var(--shadow-sm);
+}
+
+/* Send is a glyph, not a blue disc. There is no accent-filled control
+   anywhere in the reference's compose row — the icons to the right of
+   the box are the same grey as the one on its left. */
+.app.theme-skype8 .send-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--muted);
+  font: 600 15px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  padding: 6px 10px;
+  box-shadow: none;
+}
+.app.theme-skype8 .send-btn:hover:not(:disabled) {
+  background: var(--list-hover);
+  color: var(--text);
+}
+
+/* Composer icons are flat glyphs, not filled blue circles.
+   The reference puts a plain grey emoji glyph at the left of the compose
+   box and two more at its right, all on the same #2B2C33 as the box —
+   there is no accent fill anywhere in that row. Three blue discs and a
+   blue send disc were the Phaze composer showing through. */
+.app.theme-skype8 .emoji-btn,
+.app.theme-skype8 .attach-btn,
+.app.theme-skype8 .voice-btn,
+.app.theme-skype8 .composer-icon-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--muted);
+  box-shadow: none;
+}
+.app.theme-skype8 .emoji-btn:hover,
+.app.theme-skype8 .attach-btn:hover,
+.app.theme-skype8 .voice-btn:hover,
+.app.theme-skype8 .composer-icon-btn:hover {
+  background: var(--list-hover);
+  color: var(--text);
+}
+.app.theme-skype8 .row.send {
+  background: var(--chat-bg-2);
+  border-top: none;
+  padding-left: 11.5%;
+  padding-right: 11.5%;
+}
+@media (max-width: 900px) {
+  .app.theme-skype8 .row.send { padding-left: 12px; padding-right: 12px; }
 }
 .app.theme-skype8 .send-btn:hover,
 .app.theme-skype8 .send-pill:hover,
@@ -5485,16 +5573,15 @@ button.link-btn:hover,
   letter-spacing: 0;
 }
 
-.app.theme-skype8 .convo-date-header {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  font: 600 11.5px 'Segoe UI Variable', 'Segoe UI', sans-serif;
-  color: var(--muted);
-  text-transform: none;
-  letter-spacing: 0;
-  padding: 10px 0;
-  text-align: center;
+/* The message column doesn't fill the pane. In the reference it runs
+   586px of a 759px pane — about 77%, with even gutters either side. */
+.app.theme-skype8 .chat {
+  padding-left: 11.5%;
+  padding-right: 11.5%;
+}
+@media (max-width: 900px) {
+  /* Proportional gutters get silly on a narrow screen. */
+  .app.theme-skype8 .chat { padding-left: 12px; padding-right: 12px; }
 }
 
 
