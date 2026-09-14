@@ -365,6 +365,14 @@ type remoteCodeEntry struct {
 
 const remoteCodeTTL = 10 * time.Minute
 
+// bcryptCost matches the "cost factor 12" the privacy policy promises.
+// bcrypt.DefaultCost (10) is what every call site used until this was
+// audited against that promise — the policy was making a claim the code
+// didn't back up. Existing hashes still verify fine at whatever cost they
+// were created with; bcrypt stores its own cost in the hash string, so
+// raising this doesn't touch anyone's stored password.
+const bcryptCost = 12
+
 // sweepRemoteCodes removes expired remote control codes every 2 minutes.
 func (s *NexusServer) sweepRemoteCodes() {
 	t := time.NewTicker(2 * time.Minute)
@@ -875,7 +883,7 @@ func (s *NexusServer) registerUser(username, email, mood, password string) (stri
 	}
 	// C2: pre-hash with SHA-256 to avoid bcrypt's silent 72-byte truncation.
 	pwHash := sha256.Sum256([]byte(password))
-	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 	if err != nil {
 		return "", err
 	}
@@ -1008,7 +1016,7 @@ func (s *NexusServer) consumePasswordReset(token, newPassword string) error {
 	}
 	// C2: pre-hash with SHA-256 to avoid bcrypt's silent 72-byte truncation.
 	pwHash := sha256.Sum256([]byte(newPassword))
-	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 	if err != nil {
 		return err
 	}
@@ -1116,7 +1124,7 @@ func (s *NexusServer) authenticateUser(username, password string) bool {
 	// Legacy fallback: raw password was hashed directly
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
 		// Silently upgrade to new scheme
-		newHash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+		newHash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 		if err == nil {
 			s.DB.Exec("UPDATE users SET password_hash = ? WHERE username = ?", string(newHash), username)
 			log.Printf("[security] migrated %s password hash to SHA256+bcrypt", username)
@@ -3689,7 +3697,11 @@ func refreshUpdateManifest(repo string) UpdateManifest {
 func (s *NexusServer) versionHandler(w http.ResponseWriter, r *http.Request) {
 	repo := strings.TrimSpace(os.Getenv("PHAZE_RELEASE_REPO"))
 	if repo == "" {
-		repo = "jakes1345/phaze"
+		// This fallback pointed at a repo that has never existed, so every
+		// client's update check was silently asking GitHub about a 404 and
+		// concluding "no update available" forever. Fixed to the real repo;
+		// PHAZE_RELEASE_REPO still overrides it for anyone running a fork.
+		repo = "jakes1345/phazechat.world"
 	}
 
 	updates.mu.RLock()

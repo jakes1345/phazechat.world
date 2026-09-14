@@ -728,7 +728,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			// C2: pre-hash with SHA-256 to match registerUser/authenticateUser.
 			pwHash := sha256.Sum256([]byte(newPw))
-			hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+			hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 			if err != nil {
 				client.Send(NexusMessage{Type: "change_password_result", Error: "Internal error"})
 				continue

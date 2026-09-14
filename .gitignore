@@ -72,6 +72,7 @@ docs/*.md
 !docs/skype-era-research.md
 !docs/skype-era-gaps.md
 !docs/livekit-evaluation.md
+!docs/website-audit.md
 infra/coturn/README.md
 web/README.md
 kai_bot/
