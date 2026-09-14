@@ -19,7 +19,7 @@ there is nothing in the app to show or hide.
 | Feature | Claimed from | Reality |
 | --- | --- | --- |
 | `screen_share` | Skype 4 | **Not implemented.** No in-app screen sharing. Calls are an embedded Jitsi iframe, and whatever sharing Jitsi offers is Jitsi's, not ours and not era-gated. |
-| `group_video` | Skype 5 | **Not implemented.** There is no group calling of any kind — `startCall` only takes a single peer. |
+| `group_video` | Skype 5 | **Not implemented.** There is no group calling of any kind — `startCall` only takes a single peer, and `VoiceRoom.tsx` (the one place group voice exists) is a bare Jitsi iframe rather than anything the app controls. See `docs/livekit-evaluation.md` — an SFU is what makes this actually buildable. |
 | `mojis` | Skype 7 | **Not implemented.** Nothing distinguishes Skype 7's emoticon experience from any other era's. |
 | `dark_mode` | all modern | Meaningless as a gate; each era's palette decides its own darkness. Should probably be dropped from the feature list. |
 
@@ -46,6 +46,16 @@ call to **an iframe pointing at `meet.jit.si`**. So:
 Calling *was* Skype. A pixel-perfect project that recreates the contact
 list and then shows a third-party conferencing UI the moment someone picks
 up has recreated the quiet half.
+
+**Update:** it's worse than "Skype 3's call window uses Jitsi." *Every*
+multi-party calling surface in the app does — `VoiceRoom.tsx`, the actual
+Discord-style Spaces group voice channel, is also a bare `meet.jit.si`
+iframe, and doesn't even use the app's own signaling/TURN props it
+declares needing. See `docs/livekit-evaluation.md` for a full look at
+replacing Jitsi with a self-hosted LiveKit SFU instead — the raw-tracks
+model LiveKit provides (versus Jitsi's fixed iframe) is what actually
+*unblocks* building a per-era call UI, so that evaluation and this task
+are effectively the same piece of work now, not two.
 
 ## 3. Group chats are create-only — no management at all, in any era
 
