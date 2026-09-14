@@ -29,6 +29,9 @@ them: `text_chat`, `voice_call`, `video_call`, `file_transfer`,
 
 ## 2. The call window is not a recreation in any era
 
+**This is the agreed next piece of work** — decided, not just noticed, so
+it doesn't get rediscovered as a surprise later.
+
 The single biggest gap, and the one least visible from a screenshot of the
 contact list.
 
