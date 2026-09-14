@@ -87,44 +87,11 @@
   --shadow-glow: 0 0 60px rgba(166, 119, 255, 0.12);
 }
 
-/* "Skype 7" theme pack — exact palette from Skype 4-7 default colorway. */
-.app.theme-skype7 {
-  --phaze-cyan: #00AFF0;
-  --phaze-blue: #0095CC;
-  --brand: #00AFF0;
-  --brand-hover: #0095CC;
-  --brand-soft: rgba(0, 175, 240, 0.10);
-  --brand-glow: rgba(0, 175, 240, 0.22);
-  --shell: #D4E2F2;
-  --chrome: #ffffff;
-  --panel: #ffffff;
-  --panel-edge: #D9D9D9;
-  --separator: #E4ECEF;
-  --text: #2B2B30;
-  --text-secondary: #6E6E73;
-  --muted: #A0B7C8;
-  --list-hover: rgba(0, 149, 204, 0.06);
-  --list-sel: rgba(0, 149, 204, 0.12);
-  --bubble-in: #E5F7FD;
-  --bubble-out: #0095CC;
-  --bubble-edge: transparent;
-  --bubble-text: #2B2B30;
-  --bubble-text-out: #ffffff;
-  --input-bg: #ffffff;
-  --input-border: #D9D9D9;
-  --input-focus: rgba(0, 149, 204, 0.22);
-  --chat-bg-1: #F5FCFE;
-  --chat-bg-2: #ffffff;
-  --shadow-glow: 0 0 32px rgba(0, 175, 240, 0.15);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.10);
-  --glass: rgba(255, 255, 255, 0.88);
-  --glass-border: rgba(0, 0, 0, 0.08);
-  --glass-blur: 12px;
-  --row-min-h: 48px;
-  --row-avatar: 36px;
-}
+/* Skype 7's palette is NOT here.
+   It lives in the single .app.theme-skype7 block further down, under
+   "SKYPE 7 THEME". There used to be a duplicate of it at this spot;
+   same selector, same specificity, so the later one quietly won and
+   edits made here changed nothing on screen. Don't reintroduce one. */
 
 /* Density fallbacks.
    Every era sets --row-min-h/--row-avatar in its own palette block;
@@ -2768,7 +2735,27 @@ button.link-btn:hover,
    SKYPE 7 THEME — full layout + visual redesign
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Variables ───────────────────────────────────────────────── */
+/* ── Variables — the ONE Skype 7 palette ─────────────────────
+   There used to be a second .app.theme-skype7 block near the top of this
+   file as well. Same selector, same specificity, so this one quietly won
+   every shared variable and edits made up there had no effect at all —
+   a measured palette written into the other block changed nothing on
+   screen. They are merged here. If you are looking for Skype 7's colours,
+   this is the only place they live.
+
+   Measured against a 579x318 screenshot of Skype 7 recovered from the
+   Internet Archive's capture of the Wikipedia article on 2015-02-12 —
+   the first real reference this theme has ever had. Three values were
+   wrong in ways that changed the whole feel:
+
+   * The left rail is #F3FCFE — very nearly white, with only a hint of
+     cyan. It had been #D4E2F2, a mid blue-grey, which made the window
+     read far heavier and more "Windows 7" than Skype 7 ever did.
+   * Outgoing bubbles are NOT solid brand blue. Both directions are the
+     same pale #DEF7FD with dark text; like Skype 8, the release told
+     them apart by alignment. The saturated #00AFF0 is buttons only.
+   * #B7EEFD is the selection tint — the exact fill of the selected
+     contact row, and of a hovered message. */
 .app.theme-skype7 {
   --phaze-cyan: #00AFF0;
   --phaze-blue: #0095CC;
@@ -2776,7 +2763,7 @@ button.link-btn:hover,
   --brand-hover: #0095CC;
   --brand-soft: rgba(0, 175, 240, 0.10);
   --brand-glow: rgba(0, 175, 240, 0.22);
-  --shell: #D4E2F2;
+  --shell: #F3FCFE;
   --chrome: #ffffff;
   --panel: #ffffff;
   --panel-edge: #D9D9D9;
@@ -2784,18 +2771,19 @@ button.link-btn:hover,
   --text: #2B2B30;
   --text-secondary: #6E6E73;
   --muted: #6E6E73;
-  --list-hover: rgba(0, 149, 204, 0.08);
-  --list-sel: rgba(0, 149, 204, 0.14);
-  --bubble-in: #E5F7FD;
-  --bubble-out: #0095CC;
+  --list-hover: #E7F7FD;
+  --list-sel: #B7EEFD;
+  --bubble-in: #DEF7FD;
+  --bubble-out: #DEF7FD;
   --bubble-edge: transparent;
   --bubble-text: #2B2B30;
-  --bubble-text-out: #ffffff;
+  --bubble-text-out: #2B2B30;
   --input-bg: #ffffff;
   --input-border: #D9D9D9;
   --input-focus: rgba(0, 149, 204, 0.22);
-  --chat-bg-1: #EEF5FB;
+  --chat-bg-1: #ffffff;
   --chat-bg-2: #ffffff;
+  --shadow-glow: 0 0 32px rgba(0, 175, 240, 0.15);
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
   --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
   --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
@@ -2805,6 +2793,8 @@ button.link-btn:hover,
   --sidebar-width: 240px;
   --header-height: 64px;
   --nav-height: 0px;
+  --row-min-h: 48px;
+  --row-avatar: 36px;
   font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
 }
 
@@ -3715,17 +3705,17 @@ button.link-btn:hover,
   gap: 2px;
 }
 
-/* ── Bubble row layout — flat list, no avatars, no left/right split ──
-   Classic Skype 7 chat is a flat scroll of text, not alternating
-   bubbles: everyone's messages sit flush left, differentiated only
-   by the colored name + timestamp header line. */
+/* ── Bubble row layout ───────────────────────────────────────
+   This block used to describe Skype 7 as "a flat scroll of text, not
+   alternating bubbles". That was written from memory and the 2015
+   reference contradicts it: Skype 7's log is bubbles, sized to their
+   text, incoming on the left and outgoing on the right. Rows are flex
+   again so the alignment actually takes. */
 .app.theme-skype7 .bubble-row:not(.skype-hist) {
   padding: 1px 16px;
-  gap: 0;
-  display: block;
-}
-.app.theme-skype7 .bubble-row.me {
-  justify-content: normal;
+  gap: 6px;
+  display: flex;
+  align-items: flex-start;
 }
 .app.theme-skype7 .bubble-row:not(.skype-hist) .bubble-avatar,
 .app.theme-skype7 .bubble-avatar-spacer {
@@ -3733,25 +3723,44 @@ button.link-btn:hover,
 }
 
 /* ── Messages: flat text, no bubble background ───────────────── */
+/* Type metrics only — the box itself is described in the bubble block
+   further down, which is where the measured fill and geometry live. */
 .app.theme-skype7 .bubble:not(.skype-hist-bubble) {
-  max-width: none;
-  width: 100%;
-  padding: 1px 0 2px;
-  border-radius: 0;
   font-size: 13px;
   line-height: 1.45;
+}
+/* Skype 7 had real bubbles, and this is where being grouped with 3-6 as
+   "classic" had it wrong. The 2015 reference shows rounded pale-blue
+   bubbles sized to their text and right-aligned when outgoing — not the
+   flat full-width log that Skype 3 through 6 used. The fill is #DEF7FD
+   in both directions; a hovered message goes to #B7EEFD, the same tint
+   as the selected contact row. */
+.app.theme-skype7 .bubble:not(.skype-hist-bubble) {
+  width: auto;
+  max-width: 78%;
+  padding: 6px 11px;
+  border-radius: 4px;
+  background: var(--bubble-in);
+  color: var(--bubble-text);
   box-shadow: none;
   border: none;
-  background: transparent;
-  color: var(--bubble-text);
 }
-.app.theme-skype7 .bubble:not(.me):not(.skype-hist-bubble),
 .app.theme-skype7 .bubble.me:not(.skype-hist-bubble) {
-  background: transparent;
-  color: var(--bubble-text);
-  border-radius: 0;
-  box-shadow: none;
+  background: var(--bubble-out);
+  color: var(--bubble-text-out);
 }
+.app.theme-skype7 .bubble:not(.skype-hist-bubble):hover {
+  background: var(--list-sel);
+}
+/* The shared rules paint the name and timestamp white for outgoing
+   messages, which was fine while the bubble was solid blue. Now that
+   both directions are pale, white-on-#DEF7FD is unreadable. */
+.app.theme-skype7 .bubble.me .skype-msg-head .who,
+.app.theme-skype7 .bubble.me .who { color: #0078A8; }
+.app.theme-skype7 .bubble.me .skype-msg-head-ts,
+.app.theme-skype7 .bubble.me .bubble-ts { color: var(--muted); }
+.app.theme-skype7 .bubble-row:not(.skype-hist) { justify-content: flex-start; }
+.app.theme-skype7 .bubble-row.me:not(.skype-hist) { justify-content: flex-end; }
 /* Original per-theme name/timestamp elements are superseded by
    .skype-msg-head below — hide rather than remove so the shared
    JSX/logic (receipt ticks, etc.) stays untouched for other themes.
@@ -5722,9 +5731,16 @@ button.link-btn:hover,
    three bugs that only show up on a real page:
 
    1. Own messages inherited `justify-content: flex-end` from the shared
-      .bubble-row.me, so they sat on the right. No Skype before 8 did
-      that: the whole log was left-aligned regardless of author, which
-      is the entire point of the flat-log format.
+      .bubble-row.me, so they sat on the right. Skype 3 through 6
+      left-aligned the whole log regardless of author, which is the
+      entire point of the flat-log format.
+
+      This block used to say "no Skype before 8 did that". The 2015
+      reference disproves it: Skype 7 had real bubbles, sized to their
+      text and right-aligned when outgoing. So these corrections are
+      scoped to 3-6 and Skype 7 is excluded — it belongs with Skype 8
+      for message rendering even though it keeps the classic menu bar
+      and compact contact list.
 
    2. .bubble-row carries `align-items: flex-end` for bubble layouts.
       With flat rows that pushed each line's avatar and text apart
@@ -5735,15 +5751,15 @@ button.link-btn:hover,
       direction of its own.
    ============================================================= */
 
-.app.classic-era .bubble-row,
-.app.classic-era .bubble-row.me {
+.app.classic-era:not(.theme-skype7) .bubble-row,
+.app.classic-era:not(.theme-skype7) .bubble-row.me {
   justify-content: flex-start;
   align-items: flex-start;
   padding: 0;
 }
 
 /* Flat rows are top-aligned blocks, not bottom-aligned bubbles. */
-.app.classic-era .bubble {
+.app.classic-era:not(.theme-skype7) .bubble {
   display: block;
   min-height: 0;
 }

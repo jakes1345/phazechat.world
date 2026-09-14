@@ -28,8 +28,8 @@ say as much.
 | Skype 3.x | en.wikipedia `Skype_windows.png`, via Wayback (2007 capture) | 224×275 | **native resolution, lossless** — best reference held |
 | Skype 4.0 | en.wikipedia `Skype 4.0 screenshot.png` (from a 2009 NYT review) | 388×247 | downscaled + lossy; hue and layout only |
 | Skype 5.x | en.wikipedia `Skype_Default.png` / `Skype.png` thumbs, via Wayback | ≤250×142 | too small to sample |
-| Skype 6.x | — | — | **none found** |
-| Skype 7.x | — | — | **none found** |
+| Skype 6.x | en.wikipedia `Skype.png`, Wayback capture `20140718011340` | 400×255 | downscaled; shows Skype Home, not a conversation |
+| Skype 7.x | en.wikipedia `Skype.png`, Wayback capture `20150212024251` | 579×318 | downscaled but readable |
 | Skype 8 (dark) | en.wikipedia `Skype.png` (14.32.55.11), via Wayback (2018 capture) | 1107×869 | **native resolution, lossless** |
 
 Wikimedia Commons holds no old Skype UI screenshots — they're non-free, so
@@ -84,6 +84,65 @@ Structural notes taken from the same image, which the CSS now follows:
   not one call button in the header.
 
 The last two are still not implemented. See "Known gaps".
+
+### Getting a *specific* capture out of the Wayback Machine
+
+Worth writing down, because it's what unblocked Skype 6 and 7 after
+several dead ends. The Wikipedia infobox screenshot has always lived at
+one URL — `upload.wikimedia.org/wikipedia/en/3/31/Skype.png` — and was
+replaced in place as each new Skype shipped. Asking Wayback for a rough
+date silently returns the *nearest* capture, which is how a request for
+February 2015 kept handing back the 2018 image.
+
+The fix is to list the captures first and then ask for one by its exact
+timestamp:
+
+```
+curl 'https://web.archive.org/cdx/search/cdx?url=upload.wikimedia.org/wikipedia/en/3/31/Skype.png&output=text&fl=timestamp,statuscode,digest'
+curl -L 'https://web.archive.org/web/<exact-timestamp>im_/http://upload.wikimedia.org/wikipedia/en/3/31/Skype.png'
+```
+
+The `digest` column is the useful part: distinct digests mark the points
+where the image actually changed, so each one is a different era. Two
+distinct digests covered Skype 6 and Skype 7.
+
+Routes that did *not* work, so nobody repeats them: the Internet
+Archive's `skypeversions` item is a complete set of installers from 0.9x
+to 7.41 but contains no screenshots at all; oldversion.com and
+softpedia's archived pages carry only icons; the `skypeassets.com`
+`features-*.jpg` files on the 2011 skype.com download page are feature
+icons, not UI.
+
+## Skype 7 (2014–2017)
+
+Sampled from the 579×318 capture. Downscaled, so treat these as accurate
+hues rather than exact bytes.
+
+| Element | Value |
+| --- | --- |
+| Left rail background | `#F3FCFE` |
+| Chat pane background | `#FFFFFF` |
+| Menu bar | `#F7F7F7`, flat |
+| Windows 8 title bar | `#8FC3E9` |
+| **Message bubble, both directions** | `#DEF7FD` |
+| Selected contact row / hovered message | `#B7EEFD` |
+
+Three things this corrected, all of which had been written from memory:
+
+1. **The left rail is very nearly white** (`#F3FCFE`). It had been
+   `#D4E2F2`, a mid blue-grey, which made the whole window read heavier
+   and more "Windows 7" than Skype 7 ever looked.
+2. **Outgoing bubbles are not solid brand blue.** Both directions are
+   the same pale `#DEF7FD` with dark text, separated by alignment — the
+   same mistake, and the same correction, as Skype 8. The saturated
+   `#00AFF0` is for buttons and accents only.
+3. **Skype 7 had bubbles at all.** The CSS had it as a flat full-width
+   text log shared with Skype 3–6, and a comment in `App.css` asserted
+   that "no Skype before 8" right-aligned outgoing messages. The
+   reference shows rounded bubbles sized to their text, incoming left
+   and outgoing right. Skype 7 belongs with Skype 8 for message
+   rendering, while keeping the classic menu bar and compact contact
+   list — those are separate concerns and are now scoped separately.
 
 ## Skype 8 (2018, dark)
 
@@ -143,10 +202,16 @@ only thing that gave it away.
 
 Listing these rather than letting them pass as finished work:
 
-* **Skype 5, 6 and 7 have no usable reference at all.** Their palettes and
-  metrics are still written from memory. Skype 7 is the theme the whole app
-  was originally built around, so it's also the one where being wrong is
-  least visible — and least verified.
+* **Skype 5 has no usable reference.** Its palette and metrics are still
+  written entirely from memory. It is now the only era in that state.
+* **Skype 6's reference shows the "Skype Home" pane, not a conversation**,
+  so its chat colours and bubble treatment are unverified — in particular,
+  whether Skype 6 had bubbles like Skype 7 or a flat log like 3–5. It is
+  currently grouped with the flat-log eras on the strength of nothing
+  better than a guess.
+* Skype 7's reference is a downscaled 579×318, so its values are good
+  hues but not exact bytes. A native-resolution shot would let the
+  palette be pinned properly.
 * Skype 4's right-hand profile pane and its twin green call buttons are
   described above but not built.
 * Skype 8 has no title bar, and its composer icons sit outside the
