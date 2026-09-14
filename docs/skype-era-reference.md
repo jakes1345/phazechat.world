@@ -113,6 +113,44 @@ softpedia's archived pages carry only icons; the `skypeassets.com`
 `features-*.jpg` files on the 2011 skype.com download page are feature
 icons, not UI.
 
+### Reverse-engineering the binaries: what it did and didn't give
+
+The Internet Archive's `Skype7.3Portable` item is a RAR of an installed
+Skype 7.3 tree, and this sandbox's `libarchive.so.13` reads RAR via
+`pip install libarchive-c`. That yields a real `Skype.exe` (31.7 MB),
+readable with `pip install pefile`.
+
+**Boundary:** the binaries are read to *measure* colours, exactly as a
+screenshot is. None of Skype's artwork is copied into this repo.
+
+What's actually in Skype 7.3's `Skype.exe`:
+
+| Resource | Contents |
+| --- | --- |
+| `RT_HTML` (8, 111K) | The **Skype Home** promo pane only — real CSS, jQuery 1.4.2, two PNGs |
+| `RT_RCDATA` (5, 75K) | Splash screen PNG, a 394×120 PNG, Delphi `DVCLAL`/`PACKAGEINFO` markers |
+| `RT_ICON` (35, 454K) | App icons at 16/24/32/48/96/128/256 — no status glyphs |
+
+The one hard number worth having: sampling the splash screen's logo gives
+**`#00AFF0` across 3,524 pixels**, which confirms the brand blue exactly
+rather than approximately.
+
+What it did *not* give, and why the screenshots still matter more:
+
+* **Skype 7's main UI is drawn in code, not from assets.** The binary
+  contains no skin files, no stylesheet beyond Skype Home's, and no
+  layout data — zero occurrences of `background-color`, `rgb(` or
+  `border-radius` anywhere in 31 MB.
+* The 464 apparent zlib streams are coincidental `78 9c` byte pairs; not
+  one decompresses to anything.
+* Delphi VCL markers are present but there are **no `TForm` resources**,
+  so there's no form layout to read off either.
+
+The window colours therefore live as `COLORREF` immediates in `.text`,
+which can't be attributed to specific UI elements without disassembling
+the drawing code. That is a much larger job than measuring a screenshot,
+for a worse result — so the screenshot route stays primary.
+
 ## Skype 7 (2014–2017)
 
 Sampled from the 579×318 capture. Downscaled, so treat these as accurate
@@ -202,8 +240,15 @@ only thing that gave it away.
 
 Listing these rather than letting them pass as finished work:
 
-* **Skype 5 has no usable reference.** Its palette and metrics are still
-  written entirely from memory. It is now the only era in that state.
+* **Skype 5 still has no proper reference.** Its full-size screenshot was
+  deleted from Wikipedia before the Internet Archive ever captured it —
+  the one surviving capture of that URL is a 404 page — so only a 180px
+  and a 250px thumbnail remain. Two values survive that downscale, both
+  agreed on independently by the two thumbnails: the contact rail is
+  `#FFFFFF` (applied), and the Skype Home content pane is `#D9E8F0` (not
+  applied — this app has no Home pane, and whether Skype 5's *chat*
+  background matched it is unverified). Everything else in that era is
+  still from memory.
 * **Skype 6's reference shows the "Skype Home" pane, not a conversation**,
   so its chat colours and bubble treatment are unverified — in particular,
   whether Skype 6 had bubbles like Skype 7 or a flat log like 3–5. It is

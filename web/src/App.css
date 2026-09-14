@@ -4235,6 +4235,14 @@ button.link-btn:hover,
 }
 
 /* ── Skype 5 (2010 · big avatars, brighter blue) ───────────── */
+/* Skype 5 is the last era with no proper reference — the full-size
+   screenshot was deleted from Wikipedia before the Internet Archive ever
+   captured it (the one surviving capture is of a 404 page), so only
+   180px and 250px thumbnails remain.
+   One value does survive that: the contact rail is white. Both
+   thumbnails agree on #FFFFFF over thousands of pixels, independently,
+   which is enough to fix --chrome even though nothing else here is
+   measured. Everything else in this block is still from memory. */
 .app.theme-skype5 {
   --phaze-cyan: #00A2E8;
   --phaze-blue: #007AB8;
@@ -4243,7 +4251,7 @@ button.link-btn:hover,
   --brand-soft: rgba(0, 162, 232, 0.10);
   --brand-glow: rgba(0, 162, 232, 0.22);
   --shell: #E8F1F7;
-  --chrome: #F0F6FA;
+  --chrome: #FFFFFF;
   --panel: #ffffff;
   --panel-edge: #BFCED9;
   --separator: #D4DDE5;
