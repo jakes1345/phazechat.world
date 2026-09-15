@@ -3178,6 +3178,51 @@ button.link-btn:hover,
 }
 .add-modal-cancel:hover { background: #EEF5FB; }
 
+/* Shared by the "New group" creation modal and GroupChat's "Manage" panel.
+   Existed as a class name in the creation modal with no rule behind it at
+   all — relying entirely on default checkbox/label flow — so this is new
+   for both, not a restyle of one at the other's expense. */
+.group-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.group-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #1B2733;
+  cursor: pointer;
+}
+.group-member-row:hover { background: #F5FAFD; }
+
+.group-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 13px;
+  color: #1B2733;
+}
+.group-manage-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.group-manage-tag { color: #7A8E9C; font-size: 12px; }
+.group-manage-remove {
+  background: transparent;
+  border: 1px solid #E0A0A0;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #C0392B;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.group-manage-remove:hover { background: #FDEFEF; }
+
 /* ── Incoming request rows ───────────────────────────────────── */
 .pending-section {
   border-bottom: 1px solid var(--separator);

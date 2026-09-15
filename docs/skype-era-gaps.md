@@ -57,7 +57,7 @@ model LiveKit provides (versus Jitsi's fixed iframe) is what actually
 *unblocks* building a per-era call UI, so that evaluation and this task
 are effectively the same piece of work now, not two.
 
-## 3. Group chats are create-only — no management at all, in any era
+## 3. Group chats are create-only — no management at all, in any era — RESOLVED (minimal version)
 
 Found while researching whether "group_chat" (dated to Skype 3, per the
 last correction) was actually as capable as the real thing. It isn't, and
@@ -85,10 +85,24 @@ never built, in Skype 8/light/dark included. It's the single largest gap
 found in this pass, larger than any of the call-window or CSS issues,
 because it's a capability gap rather than a presentation one.
 
-**Not started. Flagging for a decision on scope** — this is a real
-feature to build (add/remove member, a creator-or-admin concept, rename),
-not a CSS fix, and it touches the wire protocol, the DB schema, and both
-clients.
+**Resolved, at the minimal end of the scope below.** Added
+`convo_add_member`, `convo_remove_member`, and `convo_rename` to the wire
+protocol (`nexus_server/ws_handlers.go`), a single-admin model where the
+group's creator (already tracked in `conversations.created_by`, now also
+sent to clients as `creator`) is the only one who can remove someone or
+rename the group — anyone in the group can add a friend of theirs. The
+"Manage" panel in `web/src/GroupChat.tsx` is the GUI surface for all
+three. Covered by `nexus_server/group_management_test.go`, including who
+is *not* allowed to do something (non-members, non-friends, non-creators,
+self-removal via the wrong endpoint).
+
+While building this, found and fixed a second, older bug it was riding on
+top of: the WS cookie pre-auth branch in `handleConnections` (used on
+every reconnect after an HTTP login — i.e. every browser page reload) was
+missing the `convo_info` burst that the other two auth paths send, so
+*every* group chat, not just newly-managed ones, silently vanished from
+the web client after a reload. Fixed alongside, with its own regression
+test (`TestGroupManagement_VisibleAfterCookieReauth`).
 
 ### The real thing was bigger than "add/kick/rename"
 

@@ -45,30 +45,35 @@ var Version = "dev"
 
 // NexusMessage is the wire protocol for Phaze™
 type NexusMessage struct {
-	Type        string      `json:"type"`
-	Sender      string      `json:"sender"`
-	Recipient   string      `json:"recipient"`
-	Body        string      `json:"body"`
-	Status      string      `json:"status"`
-	Results     []string    `json:"results"`
-	SDP         string      `json:"sdp"`
-	Candidate   string      `json:"candidate"`
-	RoomID      string      `json:"room_id,omitempty"`
-	Token       string      `json:"token"`
-	Error       string      `json:"error"`
-	Email       string      `json:"email,omitempty"`
-	Mood        string      `json:"mood,omitempty"`
-	DisplayName string      `json:"display_name,omitempty"`
-	Supporter   bool        `json:"supporter,omitempty"`
-	ConvoID     string      `json:"convo_id,omitempty"`
-	ConvoName   string      `json:"convo_name,omitempty"`
-	Members     []string    `json:"members,omitempty"`
-	TurnConfig  *TurnConfig `json:"turn_config,omitempty"`
-	TOTPCode    string      `json:"totp_code,omitempty"`
-	TOTPURI     string      `json:"totp_uri,omitempty"`
-	QRToken     string      `json:"qr_token,omitempty"`
-	QRData      string      `json:"qr_data,omitempty"`
-	DeviceInfo  string      `json:"device_info,omitempty"`
+	Type        string   `json:"type"`
+	Sender      string   `json:"sender"`
+	Recipient   string   `json:"recipient"`
+	Body        string   `json:"body"`
+	Status      string   `json:"status"`
+	Results     []string `json:"results"`
+	SDP         string   `json:"sdp"`
+	Candidate   string   `json:"candidate"`
+	RoomID      string   `json:"room_id,omitempty"`
+	Token       string   `json:"token"`
+	Error       string   `json:"error"`
+	Email       string   `json:"email,omitempty"`
+	Mood        string   `json:"mood,omitempty"`
+	DisplayName string   `json:"display_name,omitempty"`
+	Supporter   bool     `json:"supporter,omitempty"`
+	ConvoID     string   `json:"convo_id,omitempty"`
+	ConvoName   string   `json:"convo_name,omitempty"`
+	Members     []string `json:"members,omitempty"`
+	// Creator is who made the group — sent on convo_info/convo_created/
+	// convo_updated so the client can show remove/rename controls only to
+	// the one person the server will actually let use them, rather than
+	// showing a button to everyone that fails for everyone but the creator.
+	Creator    string      `json:"creator,omitempty"`
+	TurnConfig *TurnConfig `json:"turn_config,omitempty"`
+	TOTPCode   string      `json:"totp_code,omitempty"`
+	TOTPURI    string      `json:"totp_uri,omitempty"`
+	QRToken    string      `json:"qr_token,omitempty"`
+	QRData     string      `json:"qr_data,omitempty"`
+	DeviceInfo string      `json:"device_info,omitempty"`
 
 	RefBy string `json:"ref_by,omitempty"` // referral: username who invited this new user
 
@@ -1509,7 +1514,7 @@ func (s *NexusServer) conversationMembers(id string) []string {
 }
 
 func (s *NexusServer) userConversations(username string) []NexusMessage {
-	rows, err := s.DB.Query(`SELECT c.id, c.name
+	rows, err := s.DB.Query(`SELECT c.id, c.name, c.created_by
 		FROM conversations c
 		JOIN conversation_members m ON m.convo_id = c.id
 		WHERE m.username = ?`, username)
@@ -1520,7 +1525,7 @@ func (s *NexusServer) userConversations(username string) []NexusMessage {
 	var out []NexusMessage
 	for rows.Next() {
 		var m NexusMessage
-		if err := rows.Scan(&m.ConvoID, &m.ConvoName); err != nil {
+		if err := rows.Scan(&m.ConvoID, &m.ConvoName, &m.Creator); err != nil {
 			log.Printf("[db] listConversations scan: %v", err)
 			continue
 		}
@@ -1528,6 +1533,43 @@ func (s *NexusServer) userConversations(username string) []NexusMessage {
 		out = append(out, m)
 	}
 	return out
+}
+
+// conversationCreator returns who made the group, and whether the group
+// exists at all. The creator is the only capability boundary group chats
+// have — no roles, no admin list, just this — which is deliberately the
+// minimal end of what real Skype group chats supported (a full Creator/
+// Master/Helper/User/Listener hierarchy) rather than a full reimplementation
+// of it. See docs/skype-era-gaps.md §3.
+func (s *NexusServer) conversationCreator(convoID string) (string, bool) {
+	var creator string
+	if err := s.DB.QueryRow("SELECT created_by FROM conversations WHERE id = ?", convoID).Scan(&creator); err != nil {
+		return "", false
+	}
+	return creator, true
+}
+
+// addConversationMembers adds new members to an existing group. Idempotent —
+// inserting someone already in the group is a silent no-op, not an error,
+// so a client retrying after a dropped ack can't double-fail.
+func (s *NexusServer) addConversationMembers(convoID string, members []string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	for _, m := range members {
+		if _, err := tx.Exec("INSERT OR IGNORE INTO conversation_members (convo_id, username) VALUES (?, ?)", convoID, m); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// renameConversation changes a group's display name.
+func (s *NexusServer) renameConversation(convoID, name string) error {
+	_, err := s.DB.Exec("UPDATE conversations SET name = ? WHERE id = ?", name, convoID)
+	return err
 }
 
 func (s *NexusServer) leaveConversation(convoID, username string) error {
