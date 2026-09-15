@@ -1,7 +1,7 @@
 // soundgen generates classic Shadow-style sound effects as WAV files.
 //
-// Run from native_client: go run ./cmd/soundgen
-// Custom output dir (absolute or relative): go run ./cmd/soundgen ../nexus_server/public/phaze/assets/sounds
+// Run from nexus_server: go run ./cmd/soundgen
+// Custom output dir (absolute or relative): go run ./cmd/soundgen public/phaze/assets/sounds
 package main
 
 import (

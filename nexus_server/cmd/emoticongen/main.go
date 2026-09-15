@@ -1,8 +1,9 @@
 // emoticongen draws Phaze-original PNG emoticons, branding images, and a master spritesheet
 // aligned with internal/ui/emoticons.go EmoticonMap (keep coordinates in sync when editing).
 //
-// Usage (from native_client): go run ./cmd/emoticongen [phaze_assets_root]
-// Default phaze_assets_root = assets  (i.e. native_client/assets)
+// Usage (from nexus_server): go run ./cmd/emoticongen [phaze_assets_root]
+// Default phaze_assets_root = assets — pass e.g. public/phaze/assets to
+// write into the tree the server actually serves.
 package main
 
 import (

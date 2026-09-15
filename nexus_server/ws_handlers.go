@@ -1308,7 +1308,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			// Directed key handoff (native_client replies to key_request with a
+			// Directed key handoff (the client replies to key_request with a
 			// presence carrying public_key + recipient = requester). It's not a
 			// status announcement — treating it as one used to reset a user's
 			// Away/DND back to whatever the key reply claimed.
@@ -1578,9 +1578,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				Type: "read_receipt", Sender: username, Body: msg.Body,
 			})
 
-		// Pairwise public-key handoff for NaCl box E2EE. Desktop clients send
-		// this when they need a peer's key; the recipient answers with a
-		// "presence" message carrying public_key (see native_client).
+		// Pairwise public-key handoff for NaCl box E2EE. Clients send this
+		// when they need a peer's key; the recipient answers with a
+		// "presence" message carrying public_key (see App.tsx's key_request
+		// handling — the web client, also what desktop/ embeds).
 		case "key_request":
 			if username == "" || msg.Recipient == "" {
 				continue

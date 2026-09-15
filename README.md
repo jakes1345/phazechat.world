@@ -13,7 +13,7 @@ Cross-platform Skype revival. DMs, group spaces, voice/video calls, screen share
 | `nexus_server/` | Go WebSocket relay — auth, messaging, calls, file uploads, spaces |
 | `web/` | React/TypeScript web app (Vite) |
 | `android/` | Android app — Kotlin + Jetpack Compose |
-| `native_client/` | Cross-platform desktop client (in progress) |
+| `desktop/` | Desktop app — Wails (Go + web frontend) |
 
 ## Running locally
 
