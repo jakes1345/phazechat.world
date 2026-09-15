@@ -25,6 +25,11 @@ export interface NexusMessage {
   convo_id?: string
   convo_name?: string
   members?: string[]
+  /** Who made the group — the only capability boundary group chats have.
+   *  Sent on convo_info/convo_created/convo_updated so the client can show
+   *  remove/rename controls only to the one person they'll actually work
+   *  for. */
+  creator?: string
   turn_config?: TurnConfig
   totp_code?: string
   totp_uri?: string

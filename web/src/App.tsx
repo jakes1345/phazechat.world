@@ -408,6 +408,10 @@ type Convo = {
   id: string
   name: string
   members: string[]
+  /** Who made the group. The only person add/remove/rename will work for —
+   *  see the convo_add_member/convo_remove_member/convo_rename handlers on
+   *  the server, which enforce exactly this and nothing more granular. */
+  creator: string
 }
 
 function defaultWsUrl(): string {
@@ -1212,7 +1216,7 @@ export default function App() {
           if (msg.convo_id) {
             setConvos((prev) => {
               if (prev.some((c) => c.id === msg.convo_id)) return prev
-              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [] }]
+              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [], creator: msg.creator || '' }]
             })
             sendRef.current({ type: 'convo_history', convo_id: msg.convo_id })
           }
@@ -1222,7 +1226,7 @@ export default function App() {
           if (msg.convo_id) {
             setConvos((prev) => {
               if (prev.some((c) => c.id === msg.convo_id)) return prev
-              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [] }]
+              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [], creator: msg.creator || '' }]
             })
             sendRef.current({ type: 'convo_history', convo_id: msg.convo_id })
             setSelectedConvo(msg.convo_id!)
@@ -1270,6 +1274,53 @@ export default function App() {
                 : c
             ))
           }
+          break
+
+        // Sent whenever a group's membership or name changes — after
+        // convo_add_member, convo_remove_member, or convo_rename. Has to be
+        // an upsert rather than an update-only: someone just added to a
+        // group while already online receives this as the very first thing
+        // that tells their client the group exists at all, with no prior
+        // convo_info to have created a row for it.
+        case 'convo_updated':
+          if (msg.convo_id) {
+            setConvos((prev) => {
+              const name = msg.convo_name || msg.convo_id!
+              const members = msg.members || []
+              const creator = msg.creator || ''
+              if (!prev.some((c) => c.id === msg.convo_id)) {
+                return [...prev, { id: msg.convo_id!, name, members, creator }]
+              }
+              return prev.map((c) => (c.id === msg.convo_id ? { ...c, name, members, creator: creator || c.creator } : c))
+            })
+          }
+          break
+
+        // The creator removed this connection's own user from a group.
+        // Distinct from convo_left (which is what OTHER members see when
+        // someone leaves or is removed) because by the time that broadcast
+        // goes out the removed user is no longer in the member list it's
+        // addressed to — this is the only message that can still reach them.
+        case 'convo_removed':
+          if (msg.convo_id) {
+            setConvos((prev) => prev.filter((c) => c.id !== msg.convo_id))
+            setConvoLogs((prev) => {
+              const { [msg.convo_id!]: _drop, ...rest } = prev
+              return rest
+            })
+            if (selectedConvoRef.current === msg.convo_id) {
+              setSelectedConvo(null)
+            }
+          }
+          break
+
+        // convo_create already had a failure path with nowhere for it to
+        // go — dropped silently by having no case at all. Now that
+        // add/remove/rename can fail for reasons a person actually needs to
+        // see (not a member, not the creator, no eligible members), reusing
+        // the existing notice popup rather than adding a second one.
+        case 'convo_error':
+          if (msg.error) setGlobalNotice({ from: 'Groups', msg: msg.error })
           break
 
         case 'link_check':
@@ -3023,6 +3074,9 @@ export default function App() {
                   <GroupChat
                     name={convos.find((c) => c.id === selectedConvo)?.name ?? selectedConvo}
                     members={convos.find((c) => c.id === selectedConvo)?.members ?? []}
+                    creator={convos.find((c) => c.id === selectedConvo)?.creator ?? ''}
+                    me={me ?? ''}
+                    friends={Object.keys(friends)}
                     lines={convoLogs[selectedConvo] ?? []}
                     renderBody={(t) => <RichText text={t} me={me} />}
                     senderColor={avatarColor}
@@ -3044,6 +3098,15 @@ export default function App() {
                       setSelectedConvo(null)
                     }}
                     onClose={() => setSelectedConvo(null)}
+                    onAddMembers={(usernames) => {
+                      send({ type: 'convo_add_member', convo_id: selectedConvo, members: usernames })
+                    }}
+                    onRemoveMember={(username) => {
+                      send({ type: 'convo_remove_member', convo_id: selectedConvo, recipient: username })
+                    }}
+                    onRename={(newName) => {
+                      send({ type: 'convo_rename', convo_id: selectedConvo, convo_name: newName })
+                    }}
                   />
                 ) : (
                 <section className="panel grow">

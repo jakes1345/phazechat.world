@@ -119,6 +119,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if len(pending) > 0 {
 				client.Send(NexusMessage{Type: "pending_requests", Results: pending})
 			}
+			for _, cm := range s.userConversations(username) {
+				cm.Type = "convo_info"
+				client.Send(cm)
+			}
 		} else {
 			msg := "Account suspended"
 			if reason != "" {
@@ -1445,6 +1449,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				ConvoName: msg.ConvoName,
 				Members:   members,
 				Sender:    username,
+				Creator:   username,
 			}
 			for _, m := range members {
 				s.sendTo(m, notice)
@@ -1530,6 +1535,133 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				s.sendTo(m, NexusMessage{
 					Type: "convo_left", Sender: username, ConvoID: msg.ConvoID,
 				})
+			}
+
+		// A group used to be frozen forever after creation — no way to add,
+		// remove, or rename, in any client. These three cases are that
+		// capability, deliberately minimal: the creator is the only admin
+		// concept, matching the smallest end of what real Skype group chats
+		// supported rather than reimplementing the full role hierarchy. See
+		// docs/skype-era-gaps.md §3.
+		case "convo_add_member":
+			if username == "" || msg.ConvoID == "" || len(msg.Members) == 0 {
+				continue
+			}
+			existing := s.conversationMembers(msg.ConvoID)
+			isMember := false
+			existingSet := map[string]bool{}
+			for _, m := range existing {
+				existingSet[m] = true
+				if m == username {
+					isMember = true
+				}
+			}
+			if !isMember {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "not a member of this group"})
+				continue
+			}
+			// Same eligibility rule as convo_create: only friends of the
+			// person doing the adding, so membership can't be used to spam
+			// strangers who never agreed to talk to anyone involved.
+			friendSet := map[string]bool{}
+			for _, f := range s.getFriends(username) {
+				friendSet[f] = true
+			}
+			var toAdd []string
+			for _, cand := range msg.Members {
+				if !existingSet[cand] && friendSet[cand] {
+					toAdd = append(toAdd, cand)
+				}
+			}
+			if len(toAdd) == 0 {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "no eligible new members — they need to be your friend first"})
+				continue
+			}
+			if err := s.addConversationMembers(msg.ConvoID, toAdd); err != nil {
+				log.Printf("[convo_add_member] db: %v", err)
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "server error"})
+				continue
+			}
+			var convoName string
+			s.DB.QueryRow(`SELECT name FROM conversations WHERE id = ?`, msg.ConvoID).Scan(&convoName)
+			convoCreator, _ := s.conversationCreator(msg.ConvoID)
+			updated := s.conversationMembers(msg.ConvoID)
+			notice := NexusMessage{
+				Type: "convo_updated", ConvoID: msg.ConvoID, ConvoName: convoName,
+				Members: updated, Sender: username, Creator: convoCreator,
+			}
+			// Sent to everyone, including the people just added — for them
+			// this is how the group appears in their client at all, so
+			// convo_updated has to be handled as an upsert-by-id, not an
+			// update to something the client is assumed to already have.
+			for _, m := range updated {
+				s.sendTo(m, notice)
+			}
+
+		case "convo_remove_member":
+			if username == "" || msg.ConvoID == "" || msg.Recipient == "" {
+				continue
+			}
+			if msg.Recipient == username {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "use convo_leave to remove yourself"})
+				continue
+			}
+			creator, ok := s.conversationCreator(msg.ConvoID)
+			if !ok || creator != username {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "only the group's creator can remove someone"})
+				continue
+			}
+			var wasMember int
+			s.DB.QueryRow(`SELECT 1 FROM conversation_members WHERE convo_id=? AND username=?`,
+				msg.ConvoID, msg.Recipient).Scan(&wasMember)
+			if wasMember == 0 {
+				continue
+			}
+			_ = s.leaveConversation(msg.ConvoID, msg.Recipient)
+			// The removed member gets their own notice, distinct from
+			// convo_left, since by the time this sends they're no longer in
+			// conversationMembers() and the broadcast below can't reach them.
+			s.sendTo(msg.Recipient, NexusMessage{Type: "convo_removed", ConvoID: msg.ConvoID, Sender: username})
+			remaining := s.conversationMembers(msg.ConvoID)
+			var convoName string
+			s.DB.QueryRow(`SELECT name FROM conversations WHERE id = ?`, msg.ConvoID).Scan(&convoName)
+			notice := NexusMessage{
+				Type: "convo_updated", ConvoID: msg.ConvoID, ConvoName: convoName,
+				// username is the creator here — that's what the check above
+				// just verified — so no extra lookup needed, unlike add_member
+				// where the actor doing the adding usually isn't the creator.
+				Members: remaining, Sender: username, Creator: username,
+			}
+			for _, m := range remaining {
+				s.sendTo(m, notice)
+			}
+
+		case "convo_rename":
+			if username == "" || msg.ConvoID == "" {
+				continue
+			}
+			newName := strings.TrimSpace(msg.ConvoName)
+			if newName == "" || len(newName) > 100 {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "group name must be 1-100 characters"})
+				continue
+			}
+			creator, ok := s.conversationCreator(msg.ConvoID)
+			if !ok || creator != username {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "only the group's creator can rename it"})
+				continue
+			}
+			if err := s.renameConversation(msg.ConvoID, newName); err != nil {
+				log.Printf("[convo_rename] db: %v", err)
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "server error"})
+				continue
+			}
+			members := s.conversationMembers(msg.ConvoID)
+			notice := NexusMessage{
+				Type: "convo_updated", ConvoID: msg.ConvoID, ConvoName: newName,
+				Members: members, Sender: username, Creator: username,
+			}
+			for _, m := range members {
+				s.sendTo(m, notice)
 			}
 
 		case "convo_history":
