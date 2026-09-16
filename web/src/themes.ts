@@ -116,9 +116,9 @@ export function isClassicSkype(id: ThemeId): boolean {
    Per-era feature capabilities.
 
    Each era-accurate theme reveals only what that Skype version
-   actually shipped. Modern additions (Spaces, Stories, Live,
-   Reactions, etc.) stay hidden when a user picks Skype 3 so the
-   app *feels* like that era, not modern-Phaze-in-2007-paint.
+   actually shipped. Modern additions (Spaces, Live, Reactions, etc.)
+   stay hidden when a user picks Skype 3 so the app *feels* like that
+   era, not modern-Phaze-in-2007-paint.
 
    The plain 'light' and 'dark' themes are treated as the full
    modern Phaze — everything is on.
@@ -139,7 +139,9 @@ export function isClassicSkype(id: ThemeId): boolean {
                          Highlights (a real Stories clone, Aug 2017,
                          walked back Sept 2018)
      Skype 8+ (2018)   — + @mentions, quoted messages, read receipts
-                         (Sept 2018), call recording (Sept 2018), themes
+                         (Sept 2018), call recording (Sept 2018), themes.
+                         "Reactions" is kept here as the best guess, not
+                         a sourced fact — see the correction below.
 
    Corrections made after checking the source-verified research in
    docs/skype-eras/ (see GATING-DIFF.md for the full evidence trail)
@@ -161,9 +163,27 @@ export function isClassicSkype(id: ThemeId): boolean {
      @mentions, edit and delete all launched together in July 2018.
      docs/skype-eras/skype3.md sources AfterDawn's own version-history
      page listing "Edit chat messages" as new in build 3.2.0.163 (2007)
-     — eleven years earlier. Moved into SKYPE3_BASE. (delete_message has
-     only weaker, undated evidence of predating Skype 8 — see
-     GATING-DIFF.md — and is deliberately left alone for now.)
+     — eleven years earlier. Moved into SKYPE3_BASE.
+
+   * delete_message was gated to Skype 8 on the same launch-bundle
+     assumption. The evidence is weaker than edit_message's — an
+     undated Wikipedia line in docs/skype-eras/skype7.md ("remove or
+     edit individual messages during one hour after sending") that
+     isn't pinned to a specific version — but it's still evidence of
+     predating Skype 8, and none was found for an 8.0-launch date
+     either. Moved into SKYPE7 as a floor, not a confirmed origin
+     version; see GATING-DIFF.md correction #2.
+
+   * reactions is left gated at Skype 8, but on weaker grounds than the
+     old comment claimed. docs/skype-eras/skype8.md's own Differences
+     section states plainly that this pass found no evidence
+     message-level reactions shipped with 8.0, or at any specific
+     later date — the only sourced "reactions" anywhere in the
+     research are 2017-18 Highlights-post reactions, a different,
+     removed surface. Skype 8 is kept as the best available guess
+     (modern Skype almost certainly has some form of this by now) but
+     the claim is no longer stated as settled fact; see GATING-DIFF.md
+     correction #4.
 
    * stories was treated as a Phaze original with no real Skype
      equivalent. docs/skype-eras/skype8.md sources Skype's real
@@ -195,9 +215,14 @@ export type Feature =
   | 'mood'
   | 'emoticons'
   | 'mojis'
+  /** Gated at Skype 8 as a best guess, not a sourced fact — no evidence
+   *  of message-level reactions was found at any date. See
+   *  docs/skype-eras/skype8.md and GATING-DIFF.md correction #4. */
   | 'reactions'
   /** Skype 3.2 (build 3.2.0.163, 2007) — see docs/skype-eras/skype3.md. */
   | 'edit_message'
+  /** Skype 7 as a floor, not a confirmed origin version — see
+   *  docs/skype-eras/skype7.md and GATING-DIFF.md correction #2. */
   | 'delete_message'
   | 'mentions'
   /** Delivered/seen ticks. Skype 8, summer 2018. */
@@ -242,8 +267,10 @@ const SKYPE5 = [...SKYPE4, 'group_video'] as Feature[]
 const SKYPE6 = SKYPE5
 /* Mojis (Sept 2015) and Highlights, Skype's real Stories clone, which
    shipped under the Skype 7 version number in August 2017 and was
-   removed again in September 2018 — see docs/skype-eras/skype8.md. */
-const SKYPE7 = [...SKYPE6, 'mojis', 'stories'] as Feature[]
+   removed again in September 2018 — see docs/skype-eras/skype8.md.
+   delete_message is added here as a floor, not a confirmed origin
+   version — see the correction note above. */
+const SKYPE7 = [...SKYPE6, 'mojis', 'stories', 'delete_message'] as Feature[]
 
 const FEATURES_BY_ERA: Record<ThemeId, Feature[]> = {
   skype3: SKYPE3_BASE,
