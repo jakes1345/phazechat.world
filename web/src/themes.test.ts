@@ -41,12 +41,37 @@ describe('era feature gating', () => {
     expect(hasFeature('skype7', 'mojis')).toBe(true)
   })
 
+  it('gives Skype 3 message editing, not just Skype 8', () => {
+    // Used to be gated to Skype 8 on the assumption that reactions,
+    // @mentions, edit and delete all launched together in July 2018.
+    // docs/skype-eras/skype3.md sources AfterDawn's version-history page:
+    // "Edit chat messages" shipped in build 3.2.0.163, 2007 — eleven years
+    // earlier. See docs/skype-eras/GATING-DIFF.md correction #1.
+    for (const era of ERAS) {
+      expect(hasFeature(era, 'edit_message'), `${era} must offer edit_message`).toBe(true)
+    }
+  })
+
+  it('gives Skype 7 Stories, via the real "Highlights" feature', () => {
+    // Stories used to be a Phaze original with no real Skype equivalent.
+    // docs/skype-eras/skype8.md sources Skype's real "Highlights" feature
+    // — a Stories-style photo/video feed — shipping under the Skype 7
+    // version number in August 2017, removed again in September 2018.
+    // Phaze's Stories UI is still original work; only the era boundary is
+    // a recreation. See docs/skype-eras/GATING-DIFF.md correction #3.
+    expect(hasFeature('skype6', 'stories')).toBe(false)
+    expect(hasFeature('skype7', 'stories')).toBe(true)
+    expect(hasFeature('skype8', 'stories')).toBe(true)
+  })
+
   it('keeps Skype 8 conversation features out of every classic era', () => {
-    // Reactions, @mentions, edit and delete all shipped with 8.0 in July
-    // 2018; read receipts followed that summer. None of them belong in a
-    // 2007 window, and all four were rendering there before this was wired.
+    // Reactions and @mentions shipped with 8.0 in July 2018; read receipts
+    // followed that summer. delete_message has only weaker, undated
+    // evidence of predating Skype 8 (see GATING-DIFF.md) and is left here
+    // deliberately, pending firmer sourcing — unlike edit_message and
+    // stories, which had strong enough evidence to move (see above).
     const eightOnly: Feature[] = [
-      'reactions', 'mentions', 'edit_message', 'delete_message', 'read_receipts',
+      'reactions', 'mentions', 'delete_message', 'read_receipts',
     ]
     for (const era of ERAS.filter((e) => e !== 'skype8')) {
       for (const f of eightOnly) {
@@ -61,7 +86,7 @@ describe('era feature gating', () => {
     // consumer Skype shipped remote desktop control — "give control" is
     // Skype for Business, the same lineage as the whiteboard.
     const originals: Feature[] = [
-      'spaces', 'live_streams', 'stories', 'pinned_messages', 'remote_control',
+      'spaces', 'live_streams', 'pinned_messages', 'remote_control',
     ]
     for (const era of ERAS.filter((e) => e !== 'skype8')) {
       for (const f of originals) {

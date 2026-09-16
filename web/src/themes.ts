@@ -127,19 +127,23 @@ export function isClassicSkype(id: ThemeId): boolean {
    Summary of what each release actually added:
 
      Skype 3 (2006-07) — text, voice, video (from 2.x), file transfer,
-                         mood messages, emoticons. Group text chat and
-                         conference calling ALREADY EXISTED; Skypecasts
-                         carried up to 100 people.
-     Skype 4 (2009)    — + screen sharing (4.1)
-     Skype 5 (2010)    — + group VIDEO calling (beta, 5 people, later 10)
+                         mood messages, emoticons, message EDITING.
+                         Group text chat and conference calling ALREADY
+                         EXISTED; Skypecasts carried up to 100 people.
+     Skype 4 (2009)    — + screen sharing (4.1, paid/capped for years)
+     Skype 5 (2010)    — + group VIDEO calling (beta, 5 people, later 10;
+                         paid Premium feature Jan 2011 - Apr 2014)
      Skype 6 (2012)    — Microsoft account sign-in, Messenger merge.
                          No new conversation feature of its own.
-     Skype 7 (2014-18) — + Mojis (Sept 2015), Skype Translator
-     Skype 8+ (2018)   — + reactions, @mentions, edit, delete, quoted
-                         messages, read receipts, call recording, themes
+     Skype 7 (2014-18) — + Mojis (Sept 2015), Skype Translator,
+                         Highlights (a real Stories clone, Aug 2017,
+                         walked back Sept 2018)
+     Skype 8+ (2018)   — + @mentions, quoted messages, read receipts
+                         (Sept 2018), call recording (Sept 2018), themes
 
-   Two corrections made after checking the research rather than
-   trusting the earlier table:
+   Corrections made after checking the source-verified research in
+   docs/skype-eras/ (see GATING-DIFF.md for the full evidence trail)
+   rather than trusting the earlier table:
 
    * group_chat and group_call were gated at Skype 5. That was wrong —
      it conflated group *video* (which is the genuine 5.0 milestone)
@@ -153,10 +157,29 @@ export function isClassicSkype(id: ThemeId): boolean {
      control" belongs to the Skype for Business lineage, same as the
      whiteboard. It is treated as a Phaze original now.
 
-   Discord-style Spaces, ephemeral Stories, and public Livestreams
-   never existed in real Skype — they're Phaze originals, so they
-   only unlock on the modern era ('skype8') and the plain Phaze
-   themes.
+   * edit_message was gated to Skype 8 on the assumption that reactions,
+     @mentions, edit and delete all launched together in July 2018.
+     docs/skype-eras/skype3.md sources AfterDawn's own version-history
+     page listing "Edit chat messages" as new in build 3.2.0.163 (2007)
+     — eleven years earlier. Moved into SKYPE3_BASE. (delete_message has
+     only weaker, undated evidence of predating Skype 8 — see
+     GATING-DIFF.md — and is deliberately left alone for now.)
+
+   * stories was treated as a Phaze original with no real Skype
+     equivalent. docs/skype-eras/skype8.md sources Skype's real
+     "Highlights" feature — a Snapchat/Stories-style photo/video feed,
+     reactions and all — which shipped under the Skype 7 version number
+     in August 2017 and was removed again in September 2018, before
+     Skype 8.0 had even been out two months. Moved to Skype 7. Phaze's
+     Stories are a from-scratch feature, not a recreation of Highlights'
+     actual UI (which nothing in the sourced research describes in
+     enough detail to rebuild) — this only fixes *when* the capability
+     existed, not what it looked like.
+
+   Discord-style Spaces and public Livestreams have no real Skype
+   equivalent found in the source-verified research — they're Phaze
+   originals, so they only unlock on the modern era ('skype8') and the
+   plain Phaze themes.
    ============================================================= */
 
 export type Feature =
@@ -173,6 +196,7 @@ export type Feature =
   | 'emoticons'
   | 'mojis'
   | 'reactions'
+  /** Skype 3.2 (build 3.2.0.163, 2007) — see docs/skype-eras/skype3.md. */
   | 'edit_message'
   | 'delete_message'
   | 'mentions'
@@ -181,6 +205,9 @@ export type Feature =
   /** Pinning a message to the top of a conversation — a Phaze original. */
   | 'pinned_messages'
   | 'remote_control'
+  /** Skype 7 (Highlights, Aug 2017 - Sept 2018) — see docs/skype-eras/skype8.md.
+   *  Phaze's implementation is original work; only the era it unlocks at
+   *  is a recreation of when the real capability existed. */
   | 'stories'
   | 'live_streams'
   | 'spaces'
@@ -196,10 +223,11 @@ const MODERN_ALL: Feature[] = [
 
 /** Everything Skype could already do by the time of our earliest theme.
  *  Text, voice and file transfer are 1.x; video is 2.x; group text chat
- *  and conference calling predate 3.x as well. Mood messages are 3.0. */
+ *  and conference calling predate 3.x as well. Mood messages are 3.0.
+ *  Message editing is 3.2 (2007) — see docs/skype-eras/skype3.md. */
 const SKYPE3_BASE: Feature[] = [
   'text_chat', 'voice_call', 'video_call', 'file_transfer',
-  'group_chat', 'group_call', 'mood', 'emoticons',
+  'group_chat', 'group_call', 'mood', 'emoticons', 'edit_message',
 ]
 
 /* Each era is the one before it plus what that release actually added.
@@ -212,7 +240,10 @@ const SKYPE5 = [...SKYPE4, 'group_video'] as Feature[]
    genuinely adds nothing to this table, which is a finding rather than
    an omission. */
 const SKYPE6 = SKYPE5
-const SKYPE7 = [...SKYPE6, 'mojis'] as Feature[]
+/* Mojis (Sept 2015) and Highlights, Skype's real Stories clone, which
+   shipped under the Skype 7 version number in August 2017 and was
+   removed again in September 2018 — see docs/skype-eras/skype8.md. */
+const SKYPE7 = [...SKYPE6, 'mojis', 'stories'] as Feature[]
 
 const FEATURES_BY_ERA: Record<ThemeId, Feature[]> = {
   skype3: SKYPE3_BASE,
