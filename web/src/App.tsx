@@ -3366,9 +3366,9 @@ export default function App() {
                                 {hasFeature(theme, 'pinned_messages') && (
                                   <button type="button" className="action-btn" onClick={() => togglePin(line)} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? '📍' : '📌'}</button>
                                 )}
-                                {/* Editing a sent message is a Skype 8 feature;
-                                    before that a message was gone the moment
-                                    you pressed Enter. */}
+                                {/* Message editing shipped in Skype 3.2
+                                    (2007), not Skype 8 — see
+                                    docs/skype-eras/skype3.md. */}
                                 {hasFeature(theme, 'edit_message') && line.me && !line.file && (
                                   <button type="button" className="action-btn" onClick={() => beginEdit(line)} title="Edit">✏️</button>
                                 )}
