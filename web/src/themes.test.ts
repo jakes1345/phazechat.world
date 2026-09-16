@@ -64,15 +64,24 @@ describe('era feature gating', () => {
     expect(hasFeature('skype8', 'stories')).toBe(true)
   })
 
+  it('gives Skype 7 message deletion, as a floor rather than a confirmed origin', () => {
+    // Used to be gated to Skype 8 on the same launch-bundle assumption as
+    // edit_message. The evidence is weaker — an undated Wikipedia line in
+    // docs/skype-eras/skype7.md ("remove or edit individual messages
+    // during one hour after sending") not pinned to a specific version —
+    // but it's still evidence of predating Skype 8, with nothing found to
+    // support an 8.0-launch date either. See GATING-DIFF.md correction #2.
+    expect(hasFeature('skype6', 'delete_message')).toBe(false)
+    expect(hasFeature('skype7', 'delete_message')).toBe(true)
+    expect(hasFeature('skype8', 'delete_message')).toBe(true)
+  })
+
   it('keeps Skype 8 conversation features out of every classic era', () => {
-    // Reactions and @mentions shipped with 8.0 in July 2018; read receipts
-    // followed that summer. delete_message has only weaker, undated
-    // evidence of predating Skype 8 (see GATING-DIFF.md) and is left here
-    // deliberately, pending firmer sourcing — unlike edit_message and
-    // stories, which had strong enough evidence to move (see above).
-    const eightOnly: Feature[] = [
-      'reactions', 'mentions', 'delete_message', 'read_receipts',
-    ]
+    // @mentions shipped with 8.0 in July 2018; read receipts followed that
+    // summer. reactions is kept here as the best available guess, not a
+    // sourced fact — no evidence of message-level reactions shipping at
+    // any date survived this pass (see GATING-DIFF.md correction #4).
+    const eightOnly: Feature[] = ['reactions', 'mentions', 'read_receipts']
     for (const era of ERAS.filter((e) => e !== 'skype8')) {
       for (const f of eightOnly) {
         expect(hasFeature(era, f), `${era} must not offer ${f}`).toBe(false)
