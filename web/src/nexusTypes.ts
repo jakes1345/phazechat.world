@@ -30,6 +30,11 @@ export interface NexusMessage {
    *  remove/rename controls only to the one person they'll actually work
    *  for. */
   creator?: string
+  /** contact -> group name the current user has filed that contact under
+   *  in their own contact list (e.g. "Family", "Work"). Sent as a full
+   *  map, never incrementally — see contact_group_set / contact_groups
+   *  in nexus_server/ws_handlers.go. */
+  contact_groups?: Record<string, string>
   turn_config?: TurnConfig
   totp_code?: string
   totp_uri?: string

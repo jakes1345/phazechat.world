@@ -14,7 +14,7 @@ import { loadPins, savePins } from './keyPins'
 import { encryptKeypair as encryptKeyBackup } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
-import { STATUSES, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
+import { statusesForEra, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
 import { MoodEditor } from './MoodEditor'
 import { ContactsView } from './ContactsView'
 import { tokenize as tokenizeEmoticons } from './emoticons'
@@ -462,6 +462,7 @@ export default function App() {
   const [err, setErr] = useState('')
   const [log, setLog] = useState<ChatLine[]>([])
   const [friends, setFriends] = useState<Record<string, string>>({})
+  const [contactGroups, setContactGroups] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [pending, setPending] = useState<string[]>([])
   const [draft, setDraft] = useState('')
@@ -1118,6 +1119,17 @@ export default function App() {
           if (msg.sender) {
             setFriends((f) => { const n = { ...f }; delete n[msg.sender!]; return n })
           }
+          break
+
+        // Contact groups ("Groups panel" — see docs/skype-eras/skype3.md).
+        // Always sent as the full map, both on the post-auth burst and
+        // after every contact_group_set, so this is a plain replace.
+        case 'contact_groups':
+          setContactGroups(msg.contact_groups || {})
+          break
+
+        case 'contact_group_error':
+          if (msg.error) setGlobalNotice({ from: 'Contacts', msg: msg.error })
           break
 
         case 'register_result':
@@ -2798,7 +2810,7 @@ export default function App() {
                     <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
                     {statusMenuOpen && (
                       <div className="presence-menu" onMouseLeave={() => setStatusMenuOpen(false)}>
-                        {STATUSES.map((s) => (
+                        {statusesForEra(theme).map((s) => (
                           <button key={s} type="button" className={s === myStatus ? 'on' : ''}
                             onClick={() => { pickStatus(s); setStatusMenuOpen(false) }}>
                             <PresenceIcon status={s} /> {s}
@@ -2959,7 +2971,13 @@ export default function App() {
                   )}
 
                   {view === 'contacts' ? (
-                    <ContactsView friends={friends} moods={moods} onOpen={(u) => { openChat(u); setView('dms') }} />
+                    <ContactsView
+                      friends={friends}
+                      moods={moods}
+                      onOpen={(u) => { openChat(u); setView('dms') }}
+                      contactGroups={contactGroups}
+                      onSetGroup={(u, groupName) => send({ type: 'contact_group_set', recipient: u, body: groupName })}
+                    />
                   ) : (
                   <>
                   {Object.keys(friends).length === 0 && (

@@ -67,13 +67,18 @@ type NexusMessage struct {
 	// convo_updated so the client can show remove/rename controls only to
 	// the one person the server will actually let use them, rather than
 	// showing a button to everyone that fails for everyone but the creator.
-	Creator    string      `json:"creator,omitempty"`
-	TurnConfig *TurnConfig `json:"turn_config,omitempty"`
-	TOTPCode   string      `json:"totp_code,omitempty"`
-	TOTPURI    string      `json:"totp_uri,omitempty"`
-	QRToken    string      `json:"qr_token,omitempty"`
-	QRData     string      `json:"qr_data,omitempty"`
-	DeviceInfo string      `json:"device_info,omitempty"`
+	Creator string `json:"creator,omitempty"`
+	// ContactGroups[contact] = the group name the receiving user has filed
+	// that contact under in their own contact list (e.g. "Family", "Work")
+	// — sent as a full-map burst after auth and again after every
+	// contact_group_set, never incrementally. See getContactGroups.
+	ContactGroups map[string]string `json:"contact_groups,omitempty"`
+	TurnConfig    *TurnConfig       `json:"turn_config,omitempty"`
+	TOTPCode      string            `json:"totp_code,omitempty"`
+	TOTPURI       string            `json:"totp_uri,omitempty"`
+	QRToken       string            `json:"qr_token,omitempty"`
+	QRData        string            `json:"qr_data,omitempty"`
+	DeviceInfo    string            `json:"device_info,omitempty"`
 
 	RefBy string `json:"ref_by,omitempty"` // referral: username who invited this new user
 
@@ -462,6 +467,20 @@ func (s *NexusServer) initDB() {
 			status TEXT NOT NULL DEFAULT 'pending',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(user_a, user_b)
+		)`,
+		// Contact groups ("Groups panel" — confirmed as early as Skype
+		// 3.0.0.214, 2007; see docs/skype-eras/skype3.md and
+		// GATING-DIFF.md's unmodeled-capabilities list). Deliberately
+		// asymmetric: which group a contact sits in is the owner's own
+		// filing, not a property of the friendship itself, so this is a
+		// separate table keyed by (owner, contact) rather than a column on
+		// friends — Alice can file Bob under "Work" while Bob files Alice
+		// under "Family", the same as real Skype's contact list.
+		`CREATE TABLE IF NOT EXISTS contact_groups (
+			owner TEXT NOT NULL,
+			contact TEXT NOT NULL,
+			group_name TEXT NOT NULL,
+			PRIMARY KEY (owner, contact)
 		)`,
 		`CREATE TABLE IF NOT EXISTS offline_messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1419,6 +1438,41 @@ func (s *NexusServer) getFriends(username string) []string {
 		friends = append(friends, f)
 	}
 	return friends
+}
+
+// getContactGroups returns owner's contact-list filing as contact -> group
+// name. A contact with no row is simply ungrouped; the client renders that
+// as its own bucket rather than the server inventing an "Ungrouped" string.
+func (s *NexusServer) getContactGroups(owner string) map[string]string {
+	rows, err := s.DB.Query("SELECT contact, group_name FROM contact_groups WHERE owner = ?", owner)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	groups := map[string]string{}
+	for rows.Next() {
+		var contact, name string
+		if err := rows.Scan(&contact, &name); err != nil {
+			log.Printf("[db] getContactGroups scan: %v", err)
+			continue
+		}
+		groups[contact] = name
+	}
+	return groups
+}
+
+// setContactGroup files contact under groupName in owner's contact list, or
+// un-files it (deletes the row) when groupName is blank.
+func (s *NexusServer) setContactGroup(owner, contact, groupName string) error {
+	if groupName == "" {
+		_, err := s.DB.Exec("DELETE FROM contact_groups WHERE owner = ? AND contact = ?", owner, contact)
+		return err
+	}
+	_, err := s.DB.Exec(`INSERT INTO contact_groups (owner, contact, group_name) VALUES (?, ?, ?)
+		ON CONFLICT(owner, contact) DO UPDATE SET group_name = excluded.group_name`,
+		owner, contact, groupName)
+	return err
 }
 
 var errFriendBlocked = fmt.Errorf("blocked")
