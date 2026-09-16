@@ -2202,7 +2202,7 @@ export default function App() {
       {/* ── Skype 7 menu bar (skype7 theme only — see .skype-menubar CSS) ── */}
       {me && (
         <nav className="skype-menubar" onMouseLeave={() => setMenuOpen(null)}>
-          {(['Skype', 'Contacts', 'Conversation', 'Call', 'View', 'Tools', 'Help'] as const).map((label) => (
+          {(['Phaze', 'Contacts', 'Conversation', 'Call', 'View', 'Tools', 'Help'] as const).map((label) => (
             <div key={label} className="skype-menu">
               <button
                 type="button"
@@ -2211,7 +2211,7 @@ export default function App() {
               >{label}</button>
               {menuOpen === label && (
                 <div className="skype-menu-dropdown">
-                  {label === 'Skype' && (
+                  {label === 'Phaze' && (
                     <button type="button" onClick={() => { setSettingsOpen(true); setMenuOpen(null) }}>Settings…</button>
                   )}
                   {label === 'Contacts' && (
