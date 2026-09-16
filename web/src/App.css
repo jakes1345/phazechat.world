@@ -3284,9 +3284,36 @@ button.link-btn:hover,
 /* ── Section labels ──────────────────────────────────────────── */
 .app.classic-era .sidebar-section-label { display: none; }
 
-/* ── Me bar (top of sidebar, matching Skymu's profile row) ───── */
+/* ── Me bar (top of sidebar, matching Skymu's profile row) ─────
+   Visible in every era now, not just Skype 7/8 — it's the only place
+   the status picker lives, and Skype 3-6 need that same picker (with
+   their own era-appropriate status list; see statusesForEra in
+   presence.ts) just as much as 7/8 do. Skype 7/8 override this generic
+   look with their own bespoke colors below; Skype 3-6 get a plain style
+   built from each theme's own CSS variables instead of a bespoke design
+   apiece. */
 .hub-me-bar {
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  background: var(--panel, #fff);
+  border-bottom: 1px solid var(--separator, #d9d9d9);
+  flex-shrink: 0;
+}
+.hub-me-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hub-me-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #2b2b30);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .app.theme-skype7 .hub-me-bar {
   display: flex;
@@ -3448,6 +3475,63 @@ button.link-btn:hover,
   text-overflow: ellipsis;
 }
 .contacts-empty { padding: 16px 12px; font-size: 12px; color: var(--muted, #a0b7c8); }
+/* Contact groups — real Skype's "Groups panel", confirmed as early as
+   Skype 3.0.0.214 (2007). Named groups render like .contacts-letter's
+   section headers; a per-row tag button opens a small inline editor
+   rather than a modal, since this is a quick, repeated action. */
+.contacts-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted, #a0b7c8);
+  padding: 8px 12px 3px;
+}
+.contacts-row-wrap { position: relative; }
+.contacts-row-wrap .contacts-row { padding-right: 30px; }
+.contacts-group-tag {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+  opacity: 0;
+  border-radius: 4px;
+}
+.contacts-row-wrap:hover .contacts-group-tag,
+.contacts-row-wrap:focus-within .contacts-group-tag { opacity: 0.7; }
+.contacts-group-tag:hover { opacity: 1 !important; background: var(--list-hover, rgba(0, 0, 0, 0.08)); }
+.contacts-group-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  padding: 6px 12px 8px 30px;
+  background: var(--list-hover, rgba(0, 0, 0, 0.03));
+}
+.contacts-group-chip,
+.contacts-group-apply,
+.contacts-group-clear {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge, #d9d9d9);
+  background: var(--panel, #fff);
+  cursor: pointer;
+}
+.contacts-group-clear { color: #c0392b; }
+.contacts-group-apply:disabled { opacity: 0.5; cursor: default; }
+.contacts-group-input {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge, #d9d9d9);
+  min-width: 100px;
+}
 /* Sidebar bottom rows — Skymu's flat action strip. */
 .hub-side-bottom {
   border-top: 1px solid var(--separator, #e4ecef);
@@ -3500,16 +3584,32 @@ button.link-btn:hover,
   bottom: calc(100% + 6px);
   left: 0;
   z-index: 45;
-  display: grid;
-  grid-template-columns: repeat(8, 30px);
-  gap: 4px;
+  width: 268px;
   padding: 8px;
   background: var(--panel, #fff);
   border: 1px solid var(--panel-edge, #d9d9d9);
   border-radius: 6px;
   box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.12));
 }
-.emoticon-picker button {
+.emoticon-picker-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+.emoticon-picker-tabs button {
+  flex: 1;
+  padding: 4px 0;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--panel-edge, #d9d9d9);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.emoticon-picker-tabs button.on { background: var(--list-hover, rgba(0, 0, 0, 0.08)); font-weight: 600; }
+.emoticon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 30px);
+  gap: 4px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+.emoticon-picker-grid button {
   width: 30px;
   height: 30px;
   display: flex;
@@ -3522,7 +3622,7 @@ button.link-btn:hover,
   font-size: 18px;
   padding: 0;
 }
-.emoticon-picker button:hover { background: var(--list-hover, rgba(0, 0, 0, 0.06)); }
+.emoticon-picker-grid button:hover { background: var(--list-hover, rgba(0, 0, 0, 0.06)); }
 .emoticon { display: inline-block; margin: 0 1px; line-height: 1; }
 .emoticon .emo { width: 20px; height: 20px; vertical-align: -4px; overflow: visible; }
 .emoticon-picker .emo { vertical-align: 0; }

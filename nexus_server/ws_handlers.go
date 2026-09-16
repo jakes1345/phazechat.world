@@ -123,6 +123,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				cm.Type = "convo_info"
 				client.Send(cm)
 			}
+			if groups := s.getContactGroups(username); len(groups) > 0 {
+				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
+			}
 		} else {
 			msg := "Account suspended"
 			if reason != "" {
@@ -459,6 +462,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				cm.Type = "convo_info"
 				client.Send(cm)
 			}
+			if groups := s.getContactGroups(username); len(groups) > 0 {
+				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
+			}
 
 			friends := s.getFriends(username)
 			for _, f := range friends {
@@ -559,6 +565,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			for _, cm := range s.userConversations(username) {
 				cm.Type = "convo_info"
 				client.Send(cm)
+			}
+			if groups := s.getContactGroups(username); len(groups) > 0 {
+				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
 			}
 
 		case "revoke_session":
@@ -1408,6 +1417,38 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			_ = s.removeFriend(username, msg.Recipient)
 			log.Printf("Friend removed: %s <-> %s", username, msg.Recipient)
 			s.sendTo(msg.Recipient, NexusMessage{Type: "friend_removed", Sender: username})
+
+		// Contact groups ("Groups panel" — see docs/skype-eras/skype3.md).
+		// Recipient is the contact being filed; Body is the group name, or
+		// "" to un-file them. Asymmetric by design: this changes only the
+		// caller's own contact-list filing, never the other person's — see
+		// the contact_groups table comment in main.go.
+		case "contact_group_set":
+			if username == "" || msg.Recipient == "" {
+				continue
+			}
+			isFriend := false
+			for _, f := range s.getFriends(username) {
+				if f == msg.Recipient {
+					isFriend = true
+					break
+				}
+			}
+			if !isFriend {
+				client.Send(NexusMessage{Type: "contact_group_error", Error: "not a contact"})
+				continue
+			}
+			groupName := strings.TrimSpace(msg.Body)
+			if len(groupName) > 60 {
+				client.Send(NexusMessage{Type: "contact_group_error", Error: "group name must be 60 characters or fewer"})
+				continue
+			}
+			if err := s.setContactGroup(username, msg.Recipient, groupName); err != nil {
+				log.Printf("[contact_group_set] db: %v", err)
+				client.Send(NexusMessage{Type: "contact_group_error", Error: "server error"})
+				continue
+			}
+			client.Send(NexusMessage{Type: "contact_groups", ContactGroups: s.getContactGroups(username)})
 
 		case "convo_create":
 			if username == "" {
