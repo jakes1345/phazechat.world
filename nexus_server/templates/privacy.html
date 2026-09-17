@@ -80,7 +80,7 @@
         <ul>
             <li><strong>Direct messages</strong> are end-to-end encrypted with <code>NaCl box</code> (Curve25519 + XSalsa20 + Poly1305) before they leave your device. The Phaze Nexus relay only sees ciphertext — we cannot decrypt your messages.</li>
             <li><strong>Voice and video calls</strong> use WebRTC. As of this policy, a call or voice channel connects you to a room on the public Jitsi Meet service rather than a direct connection to the other person — see Section 5 for what that means. Our own Phaze servers never store or record call audio or video either way.</li>
-            <li><strong>File attachments</strong> are uploaded temporarily to support offline delivery and deleted automatically after <strong>7 days</strong>.</li>
+            <li><strong>File attachments</strong> you send are stored on our server so the recipient can retrieve them, including if they're offline at the time. We do not currently auto-delete them after a fixed period — deleting the message in-app removes it from the conversation but the underlying file is not yet purged from storage. We're working on automatic expiry; until then, treat anything you upload as retained indefinitely.</li>
             <li><strong>Stories</strong> (photos/videos) are stored until you delete them or after <strong>24 hours</strong>.</li>
             <li><strong>Key backups</strong> (optional): if you use the key backup feature, your private key is encrypted with a PIN on-device before upload. We store the ciphertext only and cannot access your private key.</li>
         </ul>
@@ -109,8 +109,9 @@
         <table>
             <tr><th>Data type</th><th>Retention period</th></tr>
             <tr><td>Account data (username, email, hashed password)</td><td>Lifetime of account, or 90 days after deletion request</td></tr>
-            <tr><td>Message metadata (sender, recipient, timestamp)</td><td>30 days after delivery</td></tr>
-            <tr><td>File attachments</td><td>7 days after upload</td></tr>
+            <tr><td>Direct message ciphertext &amp; metadata (sender, recipient, timestamp)</td><td>Lifetime of account (needed for cross-device history) — deleted with your account</td></tr>
+            <tr><td>Spaces channel messages</td><td>30 days after posting</td></tr>
+            <tr><td>File attachments</td><td>Not currently auto-deleted (see Section 3)</td></tr>
             <tr><td>Stories</td><td>24 hours or until manually deleted</td></tr>
             <tr><td>Connection logs (IP, device model)</td><td>30 days</td></tr>
             <tr><td>FCM push tokens</td><td>Until you sign out or uninstall</td></tr>

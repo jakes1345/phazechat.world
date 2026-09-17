@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { effectiveStatus, statusesForEra } from './presence'
 
 describe('statusesForEra', () => {
-  it('offers Skype Me only at Skype 3', () => {
-    // "I'll take calls from strangers" — present since Skype's early days,
-    // hidden from the picker starting Skype 4, removed completely by
-    // Skype 5. See docs/skype-eras/skype3.md.
-    expect(statusesForEra('skype3')).toContain('Skype Me')
+  it('offers Ring Me only at Phaze 1', () => {
+    // "I'll take calls from strangers" — the real Skype 3 status this
+    // recreates ("Skype Me"), present since Skype's early days, hidden
+    // from the picker starting Skype 4, removed completely by Skype 5.
+    // See docs/skype-eras/skype3.md.
+    expect(statusesForEra('skype3')).toContain('Ring Me')
     for (const era of ['skype4', 'skype5', 'skype6', 'skype7', 'skype8'] as const) {
-      expect(statusesForEra(era), `${era} must not offer Skype Me`).not.toContain('Skype Me')
+      expect(statusesForEra(era), `${era} must not offer Ring Me`).not.toContain('Ring Me')
     }
   })
 

@@ -24,11 +24,11 @@ export function PresenceIcon({ status, size = 12 }: { status: string; size?: num
       <svg viewBox="0 0 12 12" style={s}><circle cx="6" cy="6" r="6" fill="#FCAF17" />
         <circle cx="6" cy="6" r="2.2" fill="none" stroke="#fff" strokeWidth="1.4" /></svg>
     )
-  // "Skype Me" — Skype 3-only, "I'll take calls from strangers." A green
-  // ring left open at the top, echoing an old-fashioned ringing-phone
-  // motion line rather than a solid dot, to read as "extra open" next to
-  // plain Online.
-  if (status === 'Skype Me')
+  // "Ring Me" — Phaze 1-only, "I'll take calls from strangers" (the real
+  // Skype 3 status this recreates, "Skype Me"). A green ring left open at
+  // the top, echoing an old-fashioned ringing-phone motion line rather
+  // than a solid dot, to read as "extra open" next to plain Online.
+  if (status === 'Ring Me')
     return (
       <svg viewBox="0 0 12 12" style={s}><circle cx="6" cy="6" r="6" fill="#7BA700" />
         <path d="M6 2.4a3.6 3.6 0 1 1 -3.2 1.9" stroke="#fff" strokeWidth="1.3" fill="none" strokeLinecap="round" />
