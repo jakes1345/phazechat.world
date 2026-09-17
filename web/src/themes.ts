@@ -36,14 +36,21 @@ export interface ThemeMeta {
   hidden?: boolean
 }
 
-/** Display order — chronological, oldest first. */
+/** Display order — chronological, oldest first.
+ *
+ *  Labels are "Phaze N", not the real Skype version numbers this app
+ *  recreates — internal ids (`skype3`...`skype8`) and CSS class names
+ *  (`.theme-skype3`, etc.) are unchanged, since those are implementation
+ *  detail nobody visiting the site ever sees; only what actually renders
+ *  on screen was renamed. See docs/skype-eras/ for which real release
+ *  each numbered id still corresponds to internally. */
 export const THEMES: ThemeMeta[] = [
-  { id: 'skype3', label: 'Skype 3',  hint: '2007 · XP Luna',       icon: '💠', era: true },
-  { id: 'skype4', label: 'Skype 4',  hint: '2009 · Vista Aero',    icon: '🔷', era: true },
-  { id: 'skype5', label: 'Skype 5',  hint: '2010',                 icon: '🔵', era: true },
-  { id: 'skype6', label: 'Skype 6',  hint: '2012 · Metro',         icon: '⬛', era: true },
-  { id: 'skype7', label: 'Skype 7',  hint: '2014 · Aero blue',     icon: '💙', era: true },
-  { id: 'skype8', label: 'Skype 8+', hint: '2018 · Fluent',        icon: '🩶', era: true },
+  { id: 'skype3', label: 'Phaze 1',  hint: '2007 · XP Luna',       icon: '💠', era: true },
+  { id: 'skype4', label: 'Phaze 2',  hint: '2009 · Vista Aero',    icon: '🔷', era: true },
+  { id: 'skype5', label: 'Phaze 3',  hint: '2010',                 icon: '🔵', era: true },
+  { id: 'skype6', label: 'Phaze 4',  hint: '2012 · Metro',         icon: '⬛', era: true },
+  { id: 'skype7', label: 'Phaze 5',  hint: '2014 · Aero blue',     icon: '💙', era: true },
+  { id: 'skype8', label: 'Phaze 6+', hint: '2018 · Fluent',        icon: '🩶', era: true },
   { id: 'light',  label: 'Phaze Light',                              icon: '☀', hidden: true },
   { id: 'dark',   label: 'Phaze Dark',                               icon: '🌙', hidden: true },
 ]

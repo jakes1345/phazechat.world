@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react'
 import QRCode from 'qrcode'
 import type { NexusMessage } from './nexusTypes'
 import { bumpAvatarVersion } from './avatarVersions'
+import { SELECTABLE_THEMES, type ThemeId } from './themes'
 import './settings.css'
 
-type Tab = 'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite' | 'import'
+type Tab = 'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite' | 'import' | 'appearance'
 
 interface Session {
   token: string
@@ -23,9 +24,18 @@ interface Props {
   onSetBackupPin: (pin: string) => Promise<void>
   onDeleteBackup: () => void
   initialTab?: Tab
+  /** Current theme and its setter, threaded down from App so Appearance
+   *  can always change it here — regardless of which theme is active.
+   *  This is the fix for a real lock-in bug: the in-chat theme picker
+   *  lives inside a menu bar that one theme (Phaze 6+) hides entirely by
+   *  design, and theme is a server-synced per-account setting, not just
+   *  local — so picking that theme with no other picker anywhere left an
+   *  account stuck on it, permanently, on every device. */
+  theme: ThemeId
+  onSetTheme: (t: ThemeId) => void
 }
 
-export default function Settings({ me, sessionToken, send, subscribe, onClose, onSignOut, onSetBackupPin, onDeleteBackup, initialTab }: Props) {
+export default function Settings({ me, sessionToken, send, subscribe, onClose, onSignOut, onSetBackupPin, onDeleteBackup, initialTab, theme, onSetTheme }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'profile')
 
   // Profile
@@ -268,7 +278,8 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'profile', label: 'Profile' },
-    { id: 'import', label: 'Skype Import' },
+    { id: 'appearance', label: 'Appearance' },
+    { id: 'import', label: 'Chat History Import' },
     { id: 'invite', label: 'Invite Friends' },
     { id: 'notifications', label: 'Notifications' },
     { id: 'security', label: 'Security' },
@@ -713,6 +724,35 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
             </div>
           )}
 
+          {/* ── Appearance ───────────────────────────────────────
+              Always-available theme picker. The in-chat one lives inside
+              a menu bar that Phaze 6+ hides by design (matching the real
+              release it recreates, which dropped the menu bar) — and
+              theme is a per-account setting synced to the server, not
+              just this browser, so that was previously a one-way door:
+              nothing else anywhere could change it back. */}
+          {tab === 'appearance' && (
+            <div className="settings-section">
+              <label className="settings-label">Theme</label>
+              <p className="settings-hint">Always available here, even from a theme with no in-chat menu bar.</p>
+              <div className="settings-theme-grid">
+                {SELECTABLE_THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={`settings-theme-option ${t.id === theme ? 'on' : ''}`}
+                    onClick={() => onSetTheme(t.id)}
+                  >
+                    <span className="settings-theme-icon">{t.icon}</span>
+                    <span className="settings-theme-label">{t.label}</span>
+                    {t.hint && <span className="settings-theme-hint">{t.hint}</span>}
+                    {t.id === theme && <span className="settings-theme-check">✓</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── Notifications ────────────────────────────────── */}
           {tab === 'notifications' && (
             <div className="settings-section">
@@ -833,11 +873,14 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
           {/* ── Danger ───────────────────────────────────────── */}
           {tab === 'import' && (
             <div className="settings-section">
-              <h3 className="settings-section-title">Import from Skype</h3>
+              <h3 className="settings-section-title">Chat History Import</h3>
               <p className="settings-label" style={{ marginBottom: '0.75rem' }}>
-                Bring your Skype message history and contacts to Phaze. Export your data first at{' '}
+                Bring your old chat history and contacts to Phaze from a compatible export. You can
+                get one from{' '}
                 <a href="https://go.skype.com/export" target="_blank" rel="noreferrer" style={{ color: 'var(--brand)' }}>go.skype.com/export</a>
-                {' '}then upload the .zip below. Text messages import fine — images and files can't be recovered (Microsoft's CDN is gone).
+                {' '}(kept as a plain link since it's the only place that export actually lives —
+                not this app's own service), then upload the .zip below. Text messages import
+                fine — images and files can't be recovered (the original CDN is gone).
               </p>
               <label style={{ display: 'block', cursor: importBusy ? 'not-allowed' : 'pointer' }}>
                 <input
@@ -848,7 +891,7 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) importSkype(f) }}
                 />
                 <span className={`settings-btn${importBusy ? ' disabled' : ''}`} style={{ display: 'inline-block' }}>
-                  {importBusy ? 'Importing…' : '📂 Choose Skype export .zip'}
+                  {importBusy ? 'Importing…' : '📂 Choose export .zip'}
                 </span>
               </label>
               {importMsg && <p className="settings-msg" style={{ marginTop: '0.5rem' }}>{importMsg}</p>}
@@ -856,7 +899,7 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
               {contactsLoaded && skypeContacts.length > 0 && (
                 <>
                   <hr className="settings-divider" />
-                  <h3 className="settings-section-title">Your Skype contacts</h3>
+                  <h3 className="settings-section-title">Imported contacts</h3>
                   <p className="settings-label" style={{ marginBottom: '0.75rem' }}>
                     <strong>{skypeContacts.filter(c => c.on_phaze).length}</strong> already on Phaze · <strong>{skypeContacts.filter(c => !c.on_phaze).length}</strong> not yet
                   </p>

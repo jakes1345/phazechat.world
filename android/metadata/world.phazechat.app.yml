@@ -12,11 +12,12 @@ Changelog: https://github.com/jakes1345/phazechat.world/releases
 AutoName: Phaze
 
 Description: |-
-  Phaze is an encrypted messaging app built as a Skype replacement.
+  Phaze is a free, encrypted messaging app with voice, video, and group Spaces.
 
   Messages are end-to-end encrypted on your device before they're sent — the
-  server stores ciphertext and cannot read them. Voice and video calls use
-  WebRTC peer-to-peer with TURN fallback so they work behind NAT.
+  server stores ciphertext and cannot read them. Voice and video calls
+  currently run through a Jitsi Meet room rather than a direct connection —
+  see the privacy policy for what that means. Direct WebRTC is planned.
 
   Features:
   * End-to-end encrypted direct messages (NaCl/libsodium)
@@ -26,7 +27,7 @@ Description: |-
   * File sharing up to 25MB
   * Push notifications
   * Cross-device sync with a Recovery PIN
-  * Skype history import — upload your Skype export zip and messages appear in your DMs
+  * Chat history import — upload a compatible export zip and messages appear in your DMs
   * 2FA / TOTP support
   * No ads, no tracking, no phone number required
 
