@@ -21,7 +21,7 @@ Welcome to Phaze — private, encrypted chat & calls.
 • End-to-end encrypted messaging (NaCl/libsodium)
 • Voice & video calls + screen sharing (WebRTC)
 • Spaces — group channels, now with public Discover
-• Themes: Dark, Light & classic "Skype 7" — plus snowflakes
+• Themes: Dark, Light & classic "Phaze 5" — plus snowflakes
 • Stories, file sharing, voice messages
 • Two-factor auth (TOTP), QR device linking, encrypted key backup
 • Push notifications
@@ -84,7 +84,7 @@ Phaze is an end-to-end encrypted messenger built for privacy-first communication
 • Voice and video calls + screen sharing over WebRTC
 • Spaces — group channels with a public Discover directory
 • Stories — share photos and short videos with your contacts
-• Themes — Dark, Light, and a classic "Skype 7" look (plus snowflakes)
+• Themes — Dark, Light, and a classic "Phaze 5" look (plus snowflakes)
 • Two-factor authentication (TOTP) for extra account security
 • QR code device linking — sign in on a new device without a password
 

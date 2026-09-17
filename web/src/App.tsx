@@ -651,7 +651,7 @@ export default function App() {
     { icon: '🔴', title: 'Live', desc: 'Broadcast your camera or screen. Anyone on Phaze can watch.', color: '#dc2626' },
     { icon: '🎁', title: 'Invite Links', desc: 'Share your invite link and see who signs up from it.', color: '#d97706' },
     { icon: '📞', title: 'Calls', desc: 'Screen sharing mid-call, self-hosted TURN relay, better audio.', color: '#0891b2' },
-    { icon: '🎨', title: 'Skype 7 theme', desc: 'Classic blue Skype skin is now the default. Dark and light themes still available.', color: '#a855f7' },
+    { icon: '🎨', title: 'Phaze 5 theme', desc: 'Classic blue skin is now the default. Dark and light themes still available.', color: '#a855f7' },
   ]
   const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
   const [theme, setTheme] = useState<ThemeId>(() =>
@@ -2259,7 +2259,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => { setOsFrame((v) => !v); setMenuOpen(null) }}
-                        title="Frame the app in the desktop OS this Skype era shipped on"
+                        title="Frame the app in the desktop OS this era shipped on"
                       >{osFrame ? 'Hide desktop frame' : 'Show desktop frame'}</button>
                       <button type="button" onClick={() => { setSnow((s) => !s); setMenuOpen(null) }}>{snow ? 'Turn off snow' : 'Let it snow'}</button>
                     </>
@@ -2358,6 +2358,8 @@ export default function App() {
             setView('dms')
           }}
           initialTab={settingsInitialTab}
+          theme={theme}
+          onSetTheme={setTheme}
           onSetBackupPin={async (pin: string) => {
             const blob = await encryptKeyBackup(keysRef.current.publicKey, keysRef.current.secretKey, pin)
             send({ type: 'key_backup_put', key_backup: blob })

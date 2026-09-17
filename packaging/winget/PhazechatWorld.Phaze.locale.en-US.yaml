@@ -4,12 +4,12 @@ PackageVersion: 1.5.0
 PackageLocale: en-US
 Publisher: Phazechat World
 PublisherUrl: https://phazechat.world
-PublisherSupportUrl: https://github.com/jakes1345/skype7-reborn/issues
+PublisherSupportUrl: https://github.com/jakes1345/phazechat.world/issues
 PackageName: Phaze
 PackageUrl: https://phazechat.world
 License: Proprietary
 Copyright: Copyright © 2026 Phazechat World
-ShortDescription: Encrypted messaging, voice and video calls — a modern Skype alternative
+ShortDescription: Encrypted messaging, voice and video calls, free forever
 Description: |-
   Phaze is a free encrypted messaging app with end-to-end encrypted DMs, voice and
   video calls, group chats, spaces (servers), stories, and screen share. Works on
