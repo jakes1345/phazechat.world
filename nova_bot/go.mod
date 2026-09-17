@@ -1,4 +1,4 @@
-module kai-bot
+module nova-bot
 
 go 1.23
 
