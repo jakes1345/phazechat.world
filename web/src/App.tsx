@@ -1102,10 +1102,18 @@ export default function App() {
 
         case 'friend_request_sent':
           setErr(`Friend request sent to ${msg.recipient || 'user'}`)
+          // Reflects the real server outcome in the Add Contact modal — it
+          // used to show "Request sent" the instant the button was clicked,
+          // regardless of whether the server actually accepted it (e.g.
+          // already friends, blocked, unknown user all showed the same
+          // false success message). See friend_error just below for the
+          // other half of this fix.
+          setAddStatus(`Request sent to ${msg.recipient || 'user'}`)
           break
 
         case 'friend_error':
           setErr(msg.error || 'Friend request failed')
+          setAddStatus(msg.error || 'Friend request failed')
           break
 
         case 'friend_accepted':
@@ -2871,7 +2879,7 @@ export default function App() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && addFriend.trim()) {
                             sendFriendRequest(addFriend.trim())
-                            setAddStatus(`Request sent to ${addFriend.trim()}`)
+                            setAddStatus('Sending…')
                             setAddFriend('')
                           }
                           if (e.key === 'Escape') setAddOpen(false)
@@ -2886,7 +2894,7 @@ export default function App() {
                           onClick={() => {
                             if (!addFriend.trim()) return
                             sendFriendRequest(addFriend.trim())
-                            setAddStatus(`Request sent to ${addFriend.trim()}`)
+                            setAddStatus('Sending…')
                             setAddFriend('')
                           }}
                         >Send request</button>
