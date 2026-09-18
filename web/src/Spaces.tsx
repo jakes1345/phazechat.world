@@ -23,6 +23,12 @@ interface Props {
   onUserClick?: (username: string) => void
   /** Uploads a file via the parent's session token; returns attachment or null. */
   uploadAttachment?: (file: File) => Promise<FileAttachment | null>
+  /** Switches the parent app back to DMs. Spaces replaces the hub sidebar's
+   *  own Contacts/Recent/Spaces/Live tabs entirely, and the floating pill
+   *  nav is hidden for every Skype-era theme (including this one) — so
+   *  without this, a theme where Spaces is reachable has no way back to
+   *  DMs at all. */
+  onExitSpaces?: () => void
 }
 
 const FILE_PREFIX = 'phaze-file'
@@ -90,7 +96,7 @@ function RichText({ text, me }: { text: string; me: string }) {
   )
 }
 
-export default function Spaces({ me, send, subscribe, turn = null, onUserClick, uploadAttachment }: Props) {
+export default function Spaces({ me, send, subscribe, turn = null, onUserClick, uploadAttachment, onExitSpaces }: Props) {
   const [servers, setServers] = useState<ServerSummary[]>([])
   const [activeServer, setActiveServer] = useState<string | null>(null)
   const [channelsByServer, setChannelsByServer] = useState<Record<string, ChannelInfo[]>>({})
@@ -403,9 +409,11 @@ export default function Spaces({ me, send, subscribe, turn = null, onUserClick, 
     <div className="spaces-root">
       <aside className="server-rail">
         <button
+          type="button"
           className="server-icon home"
           aria-label="Direct messages — back to chat"
-          title="(future: jump back to DMs)"
+          title="Back to chats"
+          onClick={onExitSpaces}
         >
           <SkypeMark />
         </button>

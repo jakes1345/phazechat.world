@@ -1787,10 +1787,15 @@ export default function App() {
       const isMe = r.sender === my
       let text = r.body || ''
       // For E2EE bodies we only know how to decrypt if we have the peer key.
-      // If the peer key isn't loaded yet, leave as-is; the next presence
-      // exchange will provide it and a later refresh will resolve.
-      if (text && peerKey) {
-        try { text = decryptFromPeer(text, peerKey, mySec) } catch { text = '[Encrypted]' }
+      // Same invariant as unwrap() above: never let raw ciphertext reach the
+      // UI or the local history cache. If the peer key isn't loaded yet, a
+      // later re-open of this chat re-requests dm_history and resolves it.
+      if (text) {
+        if (peerKey) {
+          try { text = decryptFromPeer(text, peerKey, mySec) } catch { text = '[Encrypted]' }
+        } else {
+          text = '[Encrypted]'
+        }
       }
       const file = decodeFileBody(text) || undefined
       const ts = Date.parse(r.created_at + 'Z') || Date.now()
@@ -2669,6 +2674,7 @@ export default function App() {
             if (!resp.ok) return null
             return await resp.json()
           }}
+          onExitSpaces={() => setView('dms')}
         />
         </Suspense>
       ) : me && view === 'live' ? (
