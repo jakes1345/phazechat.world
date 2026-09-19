@@ -2212,10 +2212,17 @@ export default function App() {
         {me && <span className="me">@{me}</span>}
       </header>
 
-      {/* ── Skype 7 menu bar (skype7 theme only — see .skype-menubar CSS) ── */}
+      {/* ── Classic menu bar (skype3-skype7 themes — see .skype-menubar CSS) ── */}
       {me && (
         <nav className="skype-menubar" onMouseLeave={() => setMenuOpen(null)}>
-          {(['Phaze', 'Contacts', 'Conversation', 'Call', 'View', 'Tools', 'Help'] as const).map((label) => (
+          {/* A real Windows Skype 5.0 screenshot (mgraves.org, Oct 2010 —
+             see docs/skype-eras/skype5.md) confirms the actual menu bar was
+             Skype/Contacts/Call/View/Tools/Help, six items, no separate
+             "Conversation" menu — every classic-era doc had flagged the
+             exact menu contents as unsourced/guessed until this. Dropped
+             it; its one action ("Search this conversation") was already
+             duplicated by the 🔍 icon in the chat header. */}
+          {(['Phaze', 'Contacts', 'Call', 'View', 'Tools', 'Help'] as const).map((label) => (
             <div key={label} className="skype-menu">
               <button
                 type="button"
@@ -2233,9 +2240,6 @@ export default function App() {
                       <button type="button" onClick={() => { setNewGroupOpen(true); setMenuOpen(null) }}>Create a group…</button>
                       <button type="button" onClick={() => { setPaletteOpen(true); setPaletteQuery(''); setPaletteIdx(0); setMenuOpen(null) }}>Search friends… ⌘K</button>
                     </>
-                  )}
-                  {label === 'Conversation' && (
-                    <button type="button" disabled={!selected} onClick={() => { setSearchOpen(true); setMenuOpen(null) }}>Search this conversation</button>
                   )}
                   {label === 'Call' && (
                     <>
