@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	firebase.google.com/go/v4 v4.21.0
 	github.com/SherClockHolmes/webpush-go v1.4.0
-	github.com/getsentry/sentry-go v0.46.2
+	github.com/getsentry/sentry-go v0.49.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/pquerna/otp v1.5.0
 	golang.org/x/crypto v0.56.0
