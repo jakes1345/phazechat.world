@@ -14,14 +14,14 @@ import { loadPins, savePins } from './keyPins'
 import { encryptKeypair as encryptKeyBackup } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
-import { STATUSES, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
+import { statusesForEra, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
 import { MoodEditor } from './MoodEditor'
 import { ContactsView } from './ContactsView'
 import { tokenize as tokenizeEmoticons } from './emoticons'
 import { Emoticon } from './emoticonArt'
 import { EmoticonPicker } from './EmoticonPicker'
 import { CallScreen } from './CallScreen'
-import { THEMES, type ThemeId, isThemeId, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype } from './themes'
+import { SELECTABLE_THEMES, type ThemeId, isThemeId, resolveTheme, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype, isSkypeEra } from './themes'
 import OSChrome from './OSChrome'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
@@ -408,6 +408,10 @@ type Convo = {
   id: string
   name: string
   members: string[]
+  /** Who made the group. The only person add/remove/rename will work for —
+   *  see the convo_add_member/convo_remove_member/convo_rename handlers on
+   *  the server, which enforce exactly this and nothing more granular. */
+  creator: string
 }
 
 function defaultWsUrl(): string {
@@ -458,6 +462,7 @@ export default function App() {
   const [err, setErr] = useState('')
   const [log, setLog] = useState<ChatLine[]>([])
   const [friends, setFriends] = useState<Record<string, string>>({})
+  const [contactGroups, setContactGroups] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<string | null>(null)
   const [pending, setPending] = useState<string[]>([])
   const [draft, setDraft] = useState('')
@@ -646,13 +651,14 @@ export default function App() {
     { icon: '🔴', title: 'Live', desc: 'Broadcast your camera or screen. Anyone on Phaze can watch.', color: '#dc2626' },
     { icon: '🎁', title: 'Invite Links', desc: 'Share your invite link and see who signs up from it.', color: '#d97706' },
     { icon: '📞', title: 'Calls', desc: 'Screen sharing mid-call, self-hosted TURN relay, better audio.', color: '#0891b2' },
-    { icon: '🎨', title: 'Skype 7 theme', desc: 'Classic blue Skype skin is now the default. Dark and light themes still available.', color: '#a855f7' },
+    { icon: '🎨', title: 'Phaze 5 theme', desc: 'Classic blue skin is now the default. Dark and light themes still available.', color: '#a855f7' },
   ]
   const [sessionToken, setSessionToken] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
-  const [theme, setTheme] = useState<ThemeId>(() => {
-    const raw = localStorage.getItem(THEME_KEY)
-    return isThemeId(raw) ? raw : 'skype7'
-  })
+  const [theme, setTheme] = useState<ThemeId>(() =>
+    // resolveTheme, not isThemeId: a browser that still remembers one of
+    // the shelved Phaze themes gets moved to the default rather than being
+    // left on a theme the picker no longer lists.
+    resolveTheme(localStorage.getItem(THEME_KEY)))
   const [snow, setSnow] = useState<boolean>(() => localStorage.getItem(SNOW_KEY) === '1')
   // Period-accurate desktop window frame around the app. Off by default —
   // it costs screen space, so it's opt-in from the View menu.
@@ -1096,10 +1102,18 @@ export default function App() {
 
         case 'friend_request_sent':
           setErr(`Friend request sent to ${msg.recipient || 'user'}`)
+          // Reflects the real server outcome in the Add Contact modal — it
+          // used to show "Request sent" the instant the button was clicked,
+          // regardless of whether the server actually accepted it (e.g.
+          // already friends, blocked, unknown user all showed the same
+          // false success message). See friend_error just below for the
+          // other half of this fix.
+          setAddStatus(`Request sent to ${msg.recipient || 'user'}`)
           break
 
         case 'friend_error':
           setErr(msg.error || 'Friend request failed')
+          setAddStatus(msg.error || 'Friend request failed')
           break
 
         case 'friend_accepted':
@@ -1113,6 +1127,17 @@ export default function App() {
           if (msg.sender) {
             setFriends((f) => { const n = { ...f }; delete n[msg.sender!]; return n })
           }
+          break
+
+        // Contact groups ("Groups panel" — see docs/skype-eras/skype3.md).
+        // Always sent as the full map, both on the post-auth burst and
+        // after every contact_group_set, so this is a plain replace.
+        case 'contact_groups':
+          setContactGroups(msg.contact_groups || {})
+          break
+
+        case 'contact_group_error':
+          if (msg.error) setGlobalNotice({ from: 'Contacts', msg: msg.error })
           break
 
         case 'register_result':
@@ -1211,7 +1236,7 @@ export default function App() {
           if (msg.convo_id) {
             setConvos((prev) => {
               if (prev.some((c) => c.id === msg.convo_id)) return prev
-              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [] }]
+              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [], creator: msg.creator || '' }]
             })
             sendRef.current({ type: 'convo_history', convo_id: msg.convo_id })
           }
@@ -1221,7 +1246,7 @@ export default function App() {
           if (msg.convo_id) {
             setConvos((prev) => {
               if (prev.some((c) => c.id === msg.convo_id)) return prev
-              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [] }]
+              return [...prev, { id: msg.convo_id!, name: msg.convo_name || msg.convo_id!, members: msg.members || [], creator: msg.creator || '' }]
             })
             sendRef.current({ type: 'convo_history', convo_id: msg.convo_id })
             setSelectedConvo(msg.convo_id!)
@@ -1269,6 +1294,53 @@ export default function App() {
                 : c
             ))
           }
+          break
+
+        // Sent whenever a group's membership or name changes — after
+        // convo_add_member, convo_remove_member, or convo_rename. Has to be
+        // an upsert rather than an update-only: someone just added to a
+        // group while already online receives this as the very first thing
+        // that tells their client the group exists at all, with no prior
+        // convo_info to have created a row for it.
+        case 'convo_updated':
+          if (msg.convo_id) {
+            setConvos((prev) => {
+              const name = msg.convo_name || msg.convo_id!
+              const members = msg.members || []
+              const creator = msg.creator || ''
+              if (!prev.some((c) => c.id === msg.convo_id)) {
+                return [...prev, { id: msg.convo_id!, name, members, creator }]
+              }
+              return prev.map((c) => (c.id === msg.convo_id ? { ...c, name, members, creator: creator || c.creator } : c))
+            })
+          }
+          break
+
+        // The creator removed this connection's own user from a group.
+        // Distinct from convo_left (which is what OTHER members see when
+        // someone leaves or is removed) because by the time that broadcast
+        // goes out the removed user is no longer in the member list it's
+        // addressed to — this is the only message that can still reach them.
+        case 'convo_removed':
+          if (msg.convo_id) {
+            setConvos((prev) => prev.filter((c) => c.id !== msg.convo_id))
+            setConvoLogs((prev) => {
+              const { [msg.convo_id!]: _drop, ...rest } = prev
+              return rest
+            })
+            if (selectedConvoRef.current === msg.convo_id) {
+              setSelectedConvo(null)
+            }
+          }
+          break
+
+        // convo_create already had a failure path with nowhere for it to
+        // go — dropped silently by having no case at all. Now that
+        // add/remove/rename can fail for reasons a person actually needs to
+        // see (not a member, not the creator, no eligible members), reusing
+        // the existing notice popup rather than adding a second one.
+        case 'convo_error':
+          if (msg.error) setGlobalNotice({ from: 'Groups', msg: msg.error })
           break
 
         case 'link_check':
@@ -1487,8 +1559,10 @@ export default function App() {
 
         case 'settings_result':
           if (msg.status === 'ok' && msg.envelopes) {
+            // A theme synced down from another device may predate the
+            // shelving, so resolve it the same way a stored one is.
             const t = msg.envelopes['theme']
-            if (isThemeId(t)) setTheme(t)
+            if (isThemeId(t)) setTheme(resolveTheme(t))
           }
           break
 
@@ -1713,10 +1787,15 @@ export default function App() {
       const isMe = r.sender === my
       let text = r.body || ''
       // For E2EE bodies we only know how to decrypt if we have the peer key.
-      // If the peer key isn't loaded yet, leave as-is; the next presence
-      // exchange will provide it and a later refresh will resolve.
-      if (text && peerKey) {
-        try { text = decryptFromPeer(text, peerKey, mySec) } catch { text = '[Encrypted]' }
+      // Same invariant as unwrap() above: never let raw ciphertext reach the
+      // UI or the local history cache. If the peer key isn't loaded yet, a
+      // later re-open of this chat re-requests dm_history and resolves it.
+      if (text) {
+        if (peerKey) {
+          try { text = decryptFromPeer(text, peerKey, mySec) } catch { text = '[Encrypted]' }
+        } else {
+          text = '[Encrypted]'
+        }
       }
       const file = decodeFileBody(text) || undefined
       const ts = Date.parse(r.created_at + 'Z') || Date.now()
@@ -2032,11 +2111,16 @@ export default function App() {
     }
   }
 
+  // @mentions are a Skype 8 feature. Gating the match list rather than just
+  // the popover switches off the keyboard handling too — an empty list makes
+  // Tab and Enter fall through to their normal behaviour, which is what they
+  // did before mentions existed.
+  const mentionsOn = hasFeature(theme, 'mentions')
   const mentionMatches = useMemo(() => {
-    if (mentionQuery === null) return [] as string[]
+    if (!mentionsOn || mentionQuery === null) return [] as string[]
     const q = mentionQuery
     return Object.keys(friends).filter((u) => u.toLowerCase().startsWith(q)).slice(0, 6)
-  }, [mentionQuery, friends])
+  }, [mentionsOn, mentionQuery, friends])
 
   const completeMention = useCallback((username: string) => {
     const inp = draftInputRef.current
@@ -2079,7 +2163,15 @@ export default function App() {
 
   return (
     <OSChrome theme={theme} enabled={osFrame && !wails}>
-    <div className={`app theme-${theme}${isClassicSkype(theme) ? ' classic-era' : ''}${wails ? ' desktop-app' : ''}`}>
+    {/* Two era classes, because they answer different questions.
+        `skype-era` means "this is a recreation of a real Skype release",
+        and switches off the Phaze chrome — the branded top bar, the
+        floating nav, the footer, the support button — for all six.
+        `classic-era` is the narrower Skype 3-7 house style: menu bar,
+        compact list, no right-aligned bubbles. Skype 8 is an era but not
+        a classic one, which is exactly the case the old single class
+        couldn't express. */}
+    <div className={`app theme-${theme}${isSkypeEra(theme) ? ' skype-era' : ''}${isClassicSkype(theme) ? ' classic-era' : ''}${wails ? ' desktop-app' : ''}`}>
       {wails && (
         <DesktopTitleBar
           onMinimise={() => wails.WindowMinimise()}
@@ -2120,10 +2212,17 @@ export default function App() {
         {me && <span className="me">@{me}</span>}
       </header>
 
-      {/* ── Skype 7 menu bar (skype7 theme only — see .skype-menubar CSS) ── */}
+      {/* ── Classic menu bar (skype3-skype7 themes — see .skype-menubar CSS) ── */}
       {me && (
         <nav className="skype-menubar" onMouseLeave={() => setMenuOpen(null)}>
-          {(['Skype', 'Contacts', 'Conversation', 'Call', 'View', 'Tools', 'Help'] as const).map((label) => (
+          {/* A real Windows Skype 5.0 screenshot (mgraves.org, Oct 2010 —
+             see docs/skype-eras/skype5.md) confirms the actual menu bar was
+             Skype/Contacts/Call/View/Tools/Help, six items, no separate
+             "Conversation" menu — every classic-era doc had flagged the
+             exact menu contents as unsourced/guessed until this. Dropped
+             it; its one action ("Search this conversation") was already
+             duplicated by the 🔍 icon in the chat header. */}
+          {(['Phaze', 'Contacts', 'Call', 'View', 'Tools', 'Help'] as const).map((label) => (
             <div key={label} className="skype-menu">
               <button
                 type="button"
@@ -2132,7 +2231,7 @@ export default function App() {
               >{label}</button>
               {menuOpen === label && (
                 <div className="skype-menu-dropdown">
-                  {label === 'Skype' && (
+                  {label === 'Phaze' && (
                     <button type="button" onClick={() => { setSettingsOpen(true); setMenuOpen(null) }}>Settings…</button>
                   )}
                   {label === 'Contacts' && (
@@ -2141,9 +2240,6 @@ export default function App() {
                       <button type="button" onClick={() => { setNewGroupOpen(true); setMenuOpen(null) }}>Create a group…</button>
                       <button type="button" onClick={() => { setPaletteOpen(true); setPaletteQuery(''); setPaletteIdx(0); setMenuOpen(null) }}>Search friends… ⌘K</button>
                     </>
-                  )}
-                  {label === 'Conversation' && (
-                    <button type="button" disabled={!selected} onClick={() => { setSearchOpen(true); setMenuOpen(null) }}>Search this conversation</button>
                   )}
                   {label === 'Call' && (
                     <>
@@ -2154,7 +2250,7 @@ export default function App() {
                   {label === 'View' && (
                     <>
                       <div className="skype-menu-sectionlabel">Theme</div>
-                      {THEMES.map((t) => (
+                      {SELECTABLE_THEMES.map((t) => (
                         <button
                           key={t.id}
                           type="button"
@@ -2172,7 +2268,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => { setOsFrame((v) => !v); setMenuOpen(null) }}
-                        title="Frame the app in the desktop OS this Skype era shipped on"
+                        title="Frame the app in the desktop OS this era shipped on"
                       >{osFrame ? 'Hide desktop frame' : 'Show desktop frame'}</button>
                       <button type="button" onClick={() => { setSnow((s) => !s); setMenuOpen(null) }}>{snow ? 'Turn off snow' : 'Let it snow'}</button>
                     </>
@@ -2271,6 +2367,8 @@ export default function App() {
             setView('dms')
           }}
           initialTab={settingsInitialTab}
+          theme={theme}
+          onSetTheme={setTheme}
           onSetBackupPin={async (pin: string) => {
             const blob = await encryptKeyBackup(keysRef.current.publicKey, keysRef.current.secretKey, pin)
             send({ type: 'key_backup_put', key_backup: blob })
@@ -2430,7 +2528,12 @@ export default function App() {
           onHangUp={hangUp}
         />
       )}
-      {callState && theme !== 'skype7' && (
+      {/* !isClassicSkype, not `theme !== 'skype7'`.
+          This condition dates from when only Skype 7 had the classic call
+          screen above. Widening that one to every classic era left this one
+          untouched, so Skype 3, 4, 5 and 6 rendered BOTH call UIs stacked
+          on top of each other for the whole duration of a call. */}
+      {callState && !isClassicSkype(theme) && (
         <div className="call-overlay">
           {callState.status === 'active' && jitsiRoom && (
             <iframe
@@ -2575,6 +2678,7 @@ export default function App() {
             if (!resp.ok) return null
             return await resp.json()
           }}
+          onExitSpaces={() => setView('dms')}
         />
         </Suspense>
       ) : me && view === 'live' ? (
@@ -2726,7 +2830,7 @@ export default function App() {
                     <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
                     {statusMenuOpen && (
                       <div className="presence-menu" onMouseLeave={() => setStatusMenuOpen(false)}>
-                        {STATUSES.map((s) => (
+                        {statusesForEra(theme).map((s) => (
                           <button key={s} type="button" className={s === myStatus ? 'on' : ''}
                             onClick={() => { pickStatus(s); setStatusMenuOpen(false) }}>
                             <PresenceIcon status={s} /> {s}
@@ -2741,14 +2845,25 @@ export default function App() {
                     <MoodEditor value={myMood} onSave={saveMood} />
                   </div>
                 )}
+                {/* Each tab carries a label as well as its icon. The classic
+                    eras hide the label and show icons only; Skype 8 stacks
+                    the label under the icon, the way its nav strip did. */}
                 <div className="sidebar-tabs">
-                  <button type="button" title="Contacts" className={view === 'contacts' ? 'on' : ''} onClick={() => setView('contacts')}><IconPerson /></button>
-                  <button type="button" title="Recent" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}><IconClock /></button>
+                  <button type="button" title="Contacts" className={view === 'contacts' ? 'on' : ''} onClick={() => setView('contacts')}>
+                    <IconPerson /><span className="tab-label">Contacts</span>
+                  </button>
+                  <button type="button" title="Recent" className={view === 'dms' ? 'on' : ''} onClick={() => setView('dms')}>
+                    <IconClock /><span className="tab-label">Chats</span>
+                  </button>
                   {hasFeature(theme, 'spaces') && (
-                    <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>#</button>
+                    <button type="button" title="Spaces" className={view === 'spaces' ? 'on' : ''} onClick={() => setView('spaces')}>
+                      #<span className="tab-label">Spaces</span>
+                    </button>
                   )}
                   {hasFeature(theme, 'live_streams') && (
-                    <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}><IconLive /></button>
+                    <button type="button" title="Live" className={`tab-live ${view === 'live' ? 'on' : ''}`} onClick={() => setView('live')}>
+                      <IconLive /><span className="tab-label">Live</span>
+                    </button>
                   )}
                 </div>
                 <div className="hub-add-friend">
@@ -2776,7 +2891,7 @@ export default function App() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && addFriend.trim()) {
                             sendFriendRequest(addFriend.trim())
-                            setAddStatus(`Request sent to ${addFriend.trim()}`)
+                            setAddStatus('Sending…')
                             setAddFriend('')
                           }
                           if (e.key === 'Escape') setAddOpen(false)
@@ -2791,7 +2906,7 @@ export default function App() {
                           onClick={() => {
                             if (!addFriend.trim()) return
                             sendFriendRequest(addFriend.trim())
-                            setAddStatus(`Request sent to ${addFriend.trim()}`)
+                            setAddStatus('Sending…')
                             setAddFriend('')
                           }}
                         >Send request</button>
@@ -2876,7 +2991,13 @@ export default function App() {
                   )}
 
                   {view === 'contacts' ? (
-                    <ContactsView friends={friends} moods={moods} onOpen={(u) => { openChat(u); setView('dms') }} />
+                    <ContactsView
+                      friends={friends}
+                      moods={moods}
+                      onOpen={(u) => { openChat(u); setView('dms') }}
+                      contactGroups={contactGroups}
+                      onSetGroup={(u, groupName) => send({ type: 'contact_group_set', recipient: u, body: groupName })}
+                    />
                   ) : (
                   <>
                   {Object.keys(friends).length === 0 && (
@@ -2962,14 +3083,24 @@ export default function App() {
                       </li>
                     ))}
                   </ul>
-                  <button type="button" className="new-group-btn" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>+ New group</button>
+                  {/* Group chat landed in Skype 5. Skype 3 and 4 could only
+                      hold a one-to-one conversation, so the era themes for
+                      those two don't offer a way to start a group. */}
+                  {hasFeature(theme, 'group_chat') && (
+                    <button type="button" className="new-group-btn" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>+ New group</button>
+                  )}
                   </>
                   )}
                 </div>
                 {isClassicSkype(theme) && (
                   <div className="hub-side-bottom">
                     <button type="button" onClick={() => { setAddOpen(true); setAddFriend(''); setAddStatus(null) }}>Add a contact</button>
-                    <button type="button" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>Create a group</button>
+                    {/* Same Skype 5 cutoff as the modern "+ New group": the
+                        classic strip is a different control for the same
+                        feature, so it has to be gated the same way. */}
+                    {hasFeature(theme, 'group_chat') && (
+                      <button type="button" onClick={() => { setNewGroupOpen(true); setNewGroupName(''); setNewGroupMembers([]) }}>Create a group</button>
+                    )}
                     <div className="online-strip">{Object.values(friends).filter((s) => s !== 'Offline').length} people online</div>
                   </div>
                 )}
@@ -2981,6 +3112,9 @@ export default function App() {
                   <GroupChat
                     name={convos.find((c) => c.id === selectedConvo)?.name ?? selectedConvo}
                     members={convos.find((c) => c.id === selectedConvo)?.members ?? []}
+                    creator={convos.find((c) => c.id === selectedConvo)?.creator ?? ''}
+                    me={me ?? ''}
+                    friends={Object.keys(friends)}
                     lines={convoLogs[selectedConvo] ?? []}
                     renderBody={(t) => <RichText text={t} me={me} />}
                     senderColor={avatarColor}
@@ -3002,6 +3136,15 @@ export default function App() {
                       setSelectedConvo(null)
                     }}
                     onClose={() => setSelectedConvo(null)}
+                    onAddMembers={(usernames) => {
+                      send({ type: 'convo_add_member', convo_id: selectedConvo, members: usernames })
+                    }}
+                    onRemoveMember={(username) => {
+                      send({ type: 'convo_remove_member', convo_id: selectedConvo, recipient: username })
+                    }}
+                    onRename={(newName) => {
+                      send({ type: 'convo_rename', convo_id: selectedConvo, convo_name: newName })
+                    }}
                   />
                 ) : (
                 <section className="panel grow">
@@ -3202,7 +3345,7 @@ export default function App() {
                                 <span className="who clickable" onClick={() => !line.me && setProfileUser(line.from)}>{line.me ? 'You' : line.from}</span>
                                 <span className="skype-msg-head-ts">
                                   {formatTime(line.ts)}
-                                  {line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}
+                                  {hasFeature(theme, 'read_receipts') && line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}
                                 </span>
                               </div>
                             )}
@@ -3233,8 +3376,14 @@ export default function App() {
                             ) : (
                               <span className="bubble-text"><RichText text={line.text} me={me} />{line.edited && <span className="edited-tag"> (edited)</span>}</span>
                             )}
-                            <span className="bubble-ts">{formatTime(line.ts)}{line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}</span>
-                            {line.reactions && Object.keys(line.reactions).length > 0 && (
+                            <span className="bubble-ts">{formatTime(line.ts)}{hasFeature(theme, 'read_receipts') && line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}</span>
+                            {/* Reactions arrived with Skype 8. A 2007 chat log
+                                that sprouts emoji chips is the giveaway that
+                                this is a modern app wearing a costume, so the
+                                existing reactions are hidden along with the
+                                ability to add one — the data is still there
+                                and comes back when the era does. */}
+                            {hasFeature(theme, 'reactions') && line.reactions && Object.keys(line.reactions).length > 0 && (
                               <div className="reactions">
                                 {Object.entries(line.reactions).map(([e, users]) => (
                                   <button
@@ -3249,19 +3398,24 @@ export default function App() {
                             )}
                             {!line.deleted && (
                               <div className="bubble-actions">
-                                {REACTION_EMOJIS.map((e) => (
+                                {hasFeature(theme, 'reactions') && REACTION_EMOJIS.map((e) => (
                                   <button key={e} type="button" className="action-btn react" onClick={() => reactTo(line, e)} title={`React ${e}`}>{e}</button>
                                 ))}
-                                <button type="button" className="action-btn" onClick={() => togglePin(line)} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? '📍' : '📌'}</button>
-                                {line.me && !line.file && (
+                                {hasFeature(theme, 'pinned_messages') && (
+                                  <button type="button" className="action-btn" onClick={() => togglePin(line)} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? '📍' : '📌'}</button>
+                                )}
+                                {/* Message editing shipped in Skype 3.2
+                                    (2007), not Skype 8 — see
+                                    docs/skype-eras/skype3.md. */}
+                                {hasFeature(theme, 'edit_message') && line.me && !line.file && (
                                   <button type="button" className="action-btn" onClick={() => beginEdit(line)} title="Edit">✏️</button>
                                 )}
-                                {line.me && (
+                                {hasFeature(theme, 'delete_message') && line.me && (
                                   <button type="button" className="action-btn" onClick={() => deleteMessage(line)} title="Delete">🗑</button>
                                 )}
                               </div>
                             )}
-                            {isPinned && <span className="pin-indicator" title="Pinned">📌</span>}
+                            {hasFeature(theme, 'pinned_messages') && isPinned && <span className="pin-indicator" title="Pinned">📌</span>}
                           </div>
                         </div>
                         )}

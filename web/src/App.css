@@ -87,41 +87,19 @@
   --shadow-glow: 0 0 60px rgba(166, 119, 255, 0.12);
 }
 
-/* "Skype 7" theme pack — exact palette from Skype 4-7 default colorway. */
-.app.theme-skype7 {
-  --phaze-cyan: #00AFF0;
-  --phaze-blue: #0095CC;
-  --brand: #00AFF0;
-  --brand-hover: #0095CC;
-  --brand-soft: rgba(0, 175, 240, 0.10);
-  --brand-glow: rgba(0, 175, 240, 0.22);
-  --shell: #D4E2F2;
-  --chrome: #ffffff;
-  --panel: #ffffff;
-  --panel-edge: #D9D9D9;
-  --separator: #E4ECEF;
-  --text: #2B2B30;
-  --text-secondary: #6E6E73;
-  --muted: #A0B7C8;
-  --list-hover: rgba(0, 149, 204, 0.06);
-  --list-sel: rgba(0, 149, 204, 0.12);
-  --bubble-in: #E5F7FD;
-  --bubble-out: #0095CC;
-  --bubble-edge: transparent;
-  --bubble-text: #2B2B30;
-  --bubble-text-out: #ffffff;
-  --input-bg: #ffffff;
-  --input-border: #D9D9D9;
-  --input-focus: rgba(0, 149, 204, 0.22);
-  --chat-bg-1: #F5FCFE;
-  --chat-bg-2: #ffffff;
-  --shadow-glow: 0 0 32px rgba(0, 175, 240, 0.15);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.10);
-  --glass: rgba(255, 255, 255, 0.88);
-  --glass-border: rgba(0, 0, 0, 0.08);
-  --glass-blur: 12px;
+/* Skype 7's palette is NOT here.
+   It lives in the single .app.theme-skype7 block further down, under
+   "SKYPE 7 THEME". There used to be a duplicate of it at this spot;
+   same selector, same specificity, so the later one quietly won and
+   edits made here changed nothing on screen. Don't reintroduce one. */
+
+/* Density fallbacks.
+   Every era sets --row-min-h/--row-avatar in its own palette block;
+   these keep the shelved light/dark themes rendering if one is ever
+   re-enabled with no era applied. */
+.app {
+  --row-min-h: 56px;
+  --row-avatar: 40px;
 }
 
 /* ── Reset / base ─────────────────────────────────────────────── */
@@ -2551,8 +2529,7 @@ button.link-btn:hover,
    ══════════════════════════════════════════════════════════════ */
 
 /* ── Auth page: animated mesh gradient background ── */
-.app.theme-dark .hub-auth,
-.app:is(.theme-dark,.theme-skype8) .hub-auth {
+.app.theme-dark .hub-auth {
   background:
     radial-gradient(ellipse 80% 60% at 20% 0%,   rgba(124, 58, 237, 0.18) 0%, transparent 60%),
     radial-gradient(ellipse 60% 50% at 80% 100%,  rgba(99,  102, 241, 0.14) 0%, transparent 60%),
@@ -2565,8 +2542,7 @@ button.link-btn:hover,
 }
 
 /* Auth panel: glass with purple tint */
-.app.theme-dark .hub-auth .panel,
-.app:is(.theme-dark,.theme-skype8) .hub-auth .panel {
+.app.theme-dark .hub-auth .panel {
   background: rgba(15, 5, 30, 0.75);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -2590,16 +2566,14 @@ button.link-btn:hover,
 
 /* ── Sidebar: purple-tinted glass ── */
 @media (min-width: 960px) {
-  .app.theme-dark .hub-sidebar,
-  .app:is(.theme-dark,.theme-skype8) .hub-sidebar {
+  .app.theme-dark .hub-sidebar {
     background: linear-gradient(180deg, rgba(15, 5, 35, 0.98) 0%, rgba(10, 5, 25, 0.98) 100%);
     border-right: 1px solid rgba(124, 58, 237, 0.15);
   }
 }
 
 /* ── Top bar: colored in dark mode ── */
-.app.theme-dark .top,
-.app:is(.theme-dark,.theme-skype8) .top {
+.app.theme-dark .top {
   background: linear-gradient(90deg, rgba(10, 5, 25, 0.95) 0%, rgba(15, 8, 35, 0.95) 100%);
   border-bottom: 1px solid rgba(124, 58, 237, 0.2);
   backdrop-filter: blur(20px);
@@ -2607,8 +2581,7 @@ button.link-btn:hover,
 }
 
 /* ── Chat area: subtle depth ── */
-.app.theme-dark .hub-chat-view,
-.app:is(.theme-dark,.theme-skype8) .hub-chat-view {
+.app.theme-dark .hub-chat-view {
   background: linear-gradient(160deg, rgba(8, 4, 20, 1) 0%, rgba(5, 3, 15, 1) 100%);
 }
 
@@ -2655,13 +2628,11 @@ button.link-btn:hover,
 }
 
 /* ── Friend row: hover glow ── */
-.app.theme-dark button.friend-row:hover,
-.app:is(.theme-dark,.theme-skype8) button.friend-row:hover {
+.app.theme-dark button.friend-row:hover {
   background: linear-gradient(90deg, rgba(124, 58, 237, 0.12), rgba(99, 102, 241, 0.06));
   border-radius: var(--radius-md);
 }
-.app.theme-dark button.friend-row.active,
-.app:is(.theme-dark,.theme-skype8) button.friend-row.active {
+.app.theme-dark button.friend-row.active {
   background: linear-gradient(90deg, rgba(124, 58, 237, 0.18), rgba(99, 102, 241, 0.1));
   border-left: 2px solid #7c3aed;
 }
@@ -2669,28 +2640,21 @@ button.link-btn:hover,
 /* ── Input fields: glass with purple focus ── */
 .app.theme-dark .form input,
 .app.theme-dark .draft-wrap input,
-.app.theme-dark .draft-wrap textarea,
-.app:is(.theme-dark,.theme-skype8) .form input,
-.app:is(.theme-dark,.theme-skype8) .draft-wrap input,
-.app:is(.theme-dark,.theme-skype8) .draft-wrap textarea {
+.app.theme-dark .draft-wrap textarea {
   background: rgba(20, 10, 40, 0.8);
   border: 1px solid rgba(124, 58, 237, 0.2);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 .app.theme-dark .form input:focus,
 .app.theme-dark .draft-wrap input:focus,
-.app.theme-dark .draft-wrap textarea:focus,
-.app:is(.theme-dark,.theme-skype8) .form input:focus,
-.app:is(.theme-dark,.theme-skype8) .draft-wrap input:focus,
-.app:is(.theme-dark,.theme-skype8) .draft-wrap textarea:focus {
+.app.theme-dark .draft-wrap textarea:focus {
   border-color: rgba(124, 58, 237, 0.6);
   box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12), 0 0 20px rgba(124, 58, 237, 0.08);
   outline: none;
 }
 
 /* ── Send row: glass footer ── */
-.app.theme-dark .row.send,
-.app:is(.theme-dark,.theme-skype8) .row.send {
+.app.theme-dark .row.send {
   background: rgba(8, 4, 20, 0.9);
   border-top: 1px solid rgba(124, 58, 237, 0.12);
   backdrop-filter: blur(12px);
@@ -2698,8 +2662,7 @@ button.link-btn:hover,
 }
 
 /* ── Chat header bar: glass ── */
-.app.theme-dark .chat-header-bar,
-.app:is(.theme-dark,.theme-skype8) .chat-header-bar {
+.app.theme-dark .chat-header-bar {
   background: rgba(10, 5, 25, 0.92);
   border-bottom: 1px solid rgba(124, 58, 237, 0.15);
   backdrop-filter: blur(16px);
@@ -2707,14 +2670,12 @@ button.link-btn:hover,
 }
 
 /* ── Home hero (no chat selected): more colorful ── */
-.app.theme-dark .hub-home-hero,
-.app:is(.theme-dark,.theme-skype8) .hub-home-hero {
+.app.theme-dark .hub-home-hero {
   background: radial-gradient(ellipse 70% 50% at 50% 40%, rgba(124, 58, 237, 0.1) 0%, transparent 70%);
 }
 
 /* ── Section labels: colored ── */
-.app.theme-dark .sidebar-section-label,
-.app:is(.theme-dark,.theme-skype8) .sidebar-section-label {
+.app.theme-dark .sidebar-section-label {
   color: rgba(167, 139, 250, 0.6);
   letter-spacing: 0.1em;
 }
@@ -2774,7 +2735,27 @@ button.link-btn:hover,
    SKYPE 7 THEME — full layout + visual redesign
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Variables ───────────────────────────────────────────────── */
+/* ── Variables — the ONE Skype 7 palette ─────────────────────
+   There used to be a second .app.theme-skype7 block near the top of this
+   file as well. Same selector, same specificity, so this one quietly won
+   every shared variable and edits made up there had no effect at all —
+   a measured palette written into the other block changed nothing on
+   screen. They are merged here. If you are looking for Skype 7's colours,
+   this is the only place they live.
+
+   Measured against a 579x318 screenshot of Skype 7 recovered from the
+   Internet Archive's capture of the Wikipedia article on 2015-02-12 —
+   the first real reference this theme has ever had. Three values were
+   wrong in ways that changed the whole feel:
+
+   * The left rail is #F3FCFE — very nearly white, with only a hint of
+     cyan. It had been #D4E2F2, a mid blue-grey, which made the window
+     read far heavier and more "Windows 7" than Skype 7 ever did.
+   * Outgoing bubbles are NOT solid brand blue. Both directions are the
+     same pale #DEF7FD with dark text; like Skype 8, the release told
+     them apart by alignment. The saturated #00AFF0 is buttons only.
+   * #B7EEFD is the selection tint — the exact fill of the selected
+     contact row, and of a hovered message. */
 .app.theme-skype7 {
   --phaze-cyan: #00AFF0;
   --phaze-blue: #0095CC;
@@ -2782,7 +2763,7 @@ button.link-btn:hover,
   --brand-hover: #0095CC;
   --brand-soft: rgba(0, 175, 240, 0.10);
   --brand-glow: rgba(0, 175, 240, 0.22);
-  --shell: #D4E2F2;
+  --shell: #F3FCFE;
   --chrome: #ffffff;
   --panel: #ffffff;
   --panel-edge: #D9D9D9;
@@ -2790,18 +2771,19 @@ button.link-btn:hover,
   --text: #2B2B30;
   --text-secondary: #6E6E73;
   --muted: #6E6E73;
-  --list-hover: rgba(0, 149, 204, 0.08);
-  --list-sel: rgba(0, 149, 204, 0.14);
-  --bubble-in: #E5F7FD;
-  --bubble-out: #0095CC;
+  --list-hover: #E7F7FD;
+  --list-sel: #B7EEFD;
+  --bubble-in: #DEF7FD;
+  --bubble-out: #DEF7FD;
   --bubble-edge: transparent;
   --bubble-text: #2B2B30;
-  --bubble-text-out: #ffffff;
+  --bubble-text-out: #2B2B30;
   --input-bg: #ffffff;
   --input-border: #D9D9D9;
   --input-focus: rgba(0, 149, 204, 0.22);
-  --chat-bg-1: #EEF5FB;
+  --chat-bg-1: #ffffff;
   --chat-bg-2: #ffffff;
+  --shadow-glow: 0 0 32px rgba(0, 175, 240, 0.15);
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
   --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
   --shadow-lg: 0 4px 16px rgba(0,0,0,0.10);
@@ -2811,12 +2793,17 @@ button.link-btn:hover,
   --sidebar-width: 240px;
   --header-height: 64px;
   --nav-height: 0px;
+  --row-min-h: 48px;
+  --row-avatar: 36px;
   font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
 }
 
 /* ── Hide the modern Phaze top bar + floating nav ────────────── */
-.app.classic-era .top          { display: none !important; }
-.app.classic-era .floating-nav { display: none !important; }
+/* Keyed on .skype-era, not .classic-era: Skype 8 is a recreation too, and
+   the branded Phaze header sitting above it was the single thing that most
+   gave the game away. */
+.app.skype-era .top          { display: none !important; }
+.app.skype-era .floating-nav { display: none !important; }
 .app.theme-skype7 .banner       { margin: 0; border-radius: 0; }
 
 /* ── Classic menu bar (Skype/Contacts/Conversation/Call/View/Tools/Help) ── */
@@ -2833,6 +2820,20 @@ button.link-btn:hover,
   font-size: 12px;
   position: relative;
   z-index: 40;
+}
+
+/* Seven menus don't fit in 400px — measured at a phone viewport, the last
+   one ran to x=418 and was simply cut off. The View menu is the only way
+   to change era, so a clipped bar is a dead end rather than a cosmetic
+   loss.
+
+   Tightening the items is the fix, NOT overflow-x on the bar: setting
+   either overflow axis to something other than visible forces the other
+   to compute as auto, which would clip the absolutely-positioned
+   dropdowns and break every menu on every screen size. */
+@media (max-width: 560px) {
+  .app.classic-era .skype-menubar { font-size: 11px; }
+  .app.classic-era .skype-menubar .skype-menu > button { padding: 0 5px; }
 }
 .skype-menubar .skype-menu { position: relative; }
 .skype-menubar .skype-menu > button {
@@ -2898,6 +2899,8 @@ button.link-btn:hover,
   border-bottom: 1px solid #B2C8D8;
   flex-shrink: 0;
 }
+/* The classic eras are icon-only; only Skype 8 labelled its tabs. */
+.tab-label { display: none; }
 .sidebar-tabs button {
   background: transparent;
   border: none;
@@ -2919,14 +2922,18 @@ button.link-btn:hover,
 }
 
 /* ── Full-height layout without top-bar offset ───────────────── */
-.app.theme-skype7 .grid {
+/* Every era wants this, not just Skype 7: with the Phaze top bar and
+   floating nav hidden there's nothing left to reserve space for, and a
+   Skype window that stops two thirds of the way down the viewport with
+   page background underneath it reads as a web page, not an app. */
+.app.skype-era .grid {
   padding-bottom: 0;
   overflow: hidden;
   flex: 1;
   display: flex;
   flex-direction: column;
 }
-.app.theme-skype7 .hub-content {
+.app.skype-era .hub-content {
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -3171,6 +3178,51 @@ button.link-btn:hover,
 }
 .add-modal-cancel:hover { background: #EEF5FB; }
 
+/* Shared by the "New group" creation modal and GroupChat's "Manage" panel.
+   Existed as a class name in the creation modal with no rule behind it at
+   all — relying entirely on default checkbox/label flow — so this is new
+   for both, not a restyle of one at the other's expense. */
+.group-member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.group-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #1B2733;
+  cursor: pointer;
+}
+.group-member-row:hover { background: #F5FAFD; }
+
+.group-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  font-size: 13px;
+  color: #1B2733;
+}
+.group-manage-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.group-manage-tag { color: #7A8E9C; font-size: 12px; }
+.group-manage-remove {
+  background: transparent;
+  border: 1px solid #E0A0A0;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #C0392B;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.group-manage-remove:hover { background: #FDEFEF; }
+
 /* ── Incoming request rows ───────────────────────────────────── */
 .pending-section {
   border-bottom: 1px solid var(--separator);
@@ -3232,9 +3284,36 @@ button.link-btn:hover,
 /* ── Section labels ──────────────────────────────────────────── */
 .app.classic-era .sidebar-section-label { display: none; }
 
-/* ── Me bar (top of sidebar, matching Skymu's profile row) ───── */
+/* ── Me bar (top of sidebar, matching Skymu's profile row) ─────
+   Visible in every era now, not just Skype 7/8 — it's the only place
+   the status picker lives, and Skype 3-6 need that same picker (with
+   their own era-appropriate status list; see statusesForEra in
+   presence.ts) just as much as 7/8 do. Skype 7/8 override this generic
+   look with their own bespoke colors below; Skype 3-6 get a plain style
+   built from each theme's own CSS variables instead of a bespoke design
+   apiece. */
 .hub-me-bar {
-  display: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  background: var(--panel, #fff);
+  border-bottom: 1px solid var(--separator, #d9d9d9);
+  flex-shrink: 0;
+}
+.hub-me-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hub-me-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text, #2b2b30);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .app.theme-skype7 .hub-me-bar {
   display: flex;
@@ -3396,6 +3475,63 @@ button.link-btn:hover,
   text-overflow: ellipsis;
 }
 .contacts-empty { padding: 16px 12px; font-size: 12px; color: var(--muted, #a0b7c8); }
+/* Contact groups — real Skype's "Groups panel", confirmed as early as
+   Skype 3.0.0.214 (2007). Named groups render like .contacts-letter's
+   section headers; a per-row tag button opens a small inline editor
+   rather than a modal, since this is a quick, repeated action. */
+.contacts-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted, #a0b7c8);
+  padding: 8px 12px 3px;
+}
+.contacts-row-wrap { position: relative; }
+.contacts-row-wrap .contacts-row { padding-right: 30px; }
+.contacts-group-tag {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+  opacity: 0;
+  border-radius: 4px;
+}
+.contacts-row-wrap:hover .contacts-group-tag,
+.contacts-row-wrap:focus-within .contacts-group-tag { opacity: 0.7; }
+.contacts-group-tag:hover { opacity: 1 !important; background: var(--list-hover, rgba(0, 0, 0, 0.08)); }
+.contacts-group-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  padding: 6px 12px 8px 30px;
+  background: var(--list-hover, rgba(0, 0, 0, 0.03));
+}
+.contacts-group-chip,
+.contacts-group-apply,
+.contacts-group-clear {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge, #d9d9d9);
+  background: var(--panel, #fff);
+  cursor: pointer;
+}
+.contacts-group-clear { color: #c0392b; }
+.contacts-group-apply:disabled { opacity: 0.5; cursor: default; }
+.contacts-group-input {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-edge, #d9d9d9);
+  min-width: 100px;
+}
 /* Sidebar bottom rows — Skymu's flat action strip. */
 .hub-side-bottom {
   border-top: 1px solid var(--separator, #e4ecef);
@@ -3448,16 +3584,32 @@ button.link-btn:hover,
   bottom: calc(100% + 6px);
   left: 0;
   z-index: 45;
-  display: grid;
-  grid-template-columns: repeat(8, 30px);
-  gap: 4px;
+  width: 268px;
   padding: 8px;
   background: var(--panel, #fff);
   border: 1px solid var(--panel-edge, #d9d9d9);
   border-radius: 6px;
   box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.12));
 }
-.emoticon-picker button {
+.emoticon-picker-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+.emoticon-picker-tabs button {
+  flex: 1;
+  padding: 4px 0;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--panel-edge, #d9d9d9);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.emoticon-picker-tabs button.on { background: var(--list-hover, rgba(0, 0, 0, 0.08)); font-weight: 600; }
+.emoticon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 30px);
+  gap: 4px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+.emoticon-picker-grid button {
   width: 30px;
   height: 30px;
   display: flex;
@@ -3470,7 +3622,7 @@ button.link-btn:hover,
   font-size: 18px;
   padding: 0;
 }
-.emoticon-picker button:hover { background: var(--list-hover, rgba(0, 0, 0, 0.06)); }
+.emoticon-picker-grid button:hover { background: var(--list-hover, rgba(0, 0, 0, 0.06)); }
 .emoticon { display: inline-block; margin: 0 1px; line-height: 1; }
 .emoticon .emo { width: 20px; height: 20px; vertical-align: -4px; overflow: visible; }
 .emoticon-picker .emo { vertical-align: 0; }
@@ -3698,17 +3850,17 @@ button.link-btn:hover,
   gap: 2px;
 }
 
-/* ── Bubble row layout — flat list, no avatars, no left/right split ──
-   Classic Skype 7 chat is a flat scroll of text, not alternating
-   bubbles: everyone's messages sit flush left, differentiated only
-   by the colored name + timestamp header line. */
+/* ── Bubble row layout ───────────────────────────────────────
+   This block used to describe Skype 7 as "a flat scroll of text, not
+   alternating bubbles". That was written from memory and the 2015
+   reference contradicts it: Skype 7's log is bubbles, sized to their
+   text, incoming on the left and outgoing on the right. Rows are flex
+   again so the alignment actually takes. */
 .app.theme-skype7 .bubble-row:not(.skype-hist) {
   padding: 1px 16px;
-  gap: 0;
-  display: block;
-}
-.app.theme-skype7 .bubble-row.me {
-  justify-content: normal;
+  gap: 6px;
+  display: flex;
+  align-items: flex-start;
 }
 .app.theme-skype7 .bubble-row:not(.skype-hist) .bubble-avatar,
 .app.theme-skype7 .bubble-avatar-spacer {
@@ -3716,25 +3868,44 @@ button.link-btn:hover,
 }
 
 /* ── Messages: flat text, no bubble background ───────────────── */
+/* Type metrics only — the box itself is described in the bubble block
+   further down, which is where the measured fill and geometry live. */
 .app.theme-skype7 .bubble:not(.skype-hist-bubble) {
-  max-width: none;
-  width: 100%;
-  padding: 1px 0 2px;
-  border-radius: 0;
   font-size: 13px;
   line-height: 1.45;
+}
+/* Skype 7 had real bubbles, and this is where being grouped with 3-6 as
+   "classic" had it wrong. The 2015 reference shows rounded pale-blue
+   bubbles sized to their text and right-aligned when outgoing — not the
+   flat full-width log that Skype 3 through 6 used. The fill is #DEF7FD
+   in both directions; a hovered message goes to #B7EEFD, the same tint
+   as the selected contact row. */
+.app.theme-skype7 .bubble:not(.skype-hist-bubble) {
+  width: auto;
+  max-width: 78%;
+  padding: 6px 11px;
+  border-radius: 4px;
+  background: var(--bubble-in);
+  color: var(--bubble-text);
   box-shadow: none;
   border: none;
-  background: transparent;
-  color: var(--bubble-text);
 }
-.app.theme-skype7 .bubble:not(.me):not(.skype-hist-bubble),
 .app.theme-skype7 .bubble.me:not(.skype-hist-bubble) {
-  background: transparent;
-  color: var(--bubble-text);
-  border-radius: 0;
-  box-shadow: none;
+  background: var(--bubble-out);
+  color: var(--bubble-text-out);
 }
+.app.theme-skype7 .bubble:not(.skype-hist-bubble):hover {
+  background: var(--list-sel);
+}
+/* The shared rules paint the name and timestamp white for outgoing
+   messages, which was fine while the bubble was solid blue. Now that
+   both directions are pale, white-on-#DEF7FD is unreadable. */
+.app.theme-skype7 .bubble.me .skype-msg-head .who,
+.app.theme-skype7 .bubble.me .who { color: #0078A8; }
+.app.theme-skype7 .bubble.me .skype-msg-head-ts,
+.app.theme-skype7 .bubble.me .bubble-ts { color: var(--muted); }
+.app.theme-skype7 .bubble-row:not(.skype-hist) { justify-content: flex-start; }
+.app.theme-skype7 .bubble-row.me:not(.skype-hist) { justify-content: flex-end; }
 /* Original per-theme name/timestamp elements are superseded by
    .skype-msg-head below — hide rather than remove so the shared
    JSX/logic (receipt ticks, etc.) stays untouched for other themes.
@@ -3801,7 +3972,11 @@ button.link-btn:hover,
   background: #ffffff;
 }
 /* Send button */
-.app.theme-skype7 .row.send > button:last-child {
+/* :not(.send-pill) because the classic eras label this button
+   "Send message" rather than showing a glyph. Forcing a 34px square
+   around that text left it overflowing the window's right edge. The
+   square is for the icon-only form. */
+.app.theme-skype7 .row.send > button:last-child:not(.send-pill) {
   width: 34px;
   height: 34px;
   min-width: 34px;
@@ -3897,9 +4072,9 @@ button.link-btn:hover,
   background: linear-gradient(135deg, var(--bubble-out), #9b5de5);
 }
 
-/* ── Hide chrome that doesn't belong in Skype7 ───────────────── */
-.app.classic-era .foot                { display: none !important; }
-.app.classic-era .support-fab { display: none !important; }
+/* ── Hide chrome that doesn't belong in any Skype ────────────── */
+.app.skype-era .foot        { display: none !important; }
+.app.skype-era .support-fab { display: none !important; }
 
 /* ── Welcome screen: blue logo instead of purple ────────────── */
 .app.theme-skype7 .hub-home-hero-logo {
@@ -3934,6 +4109,40 @@ button.link-btn:hover,
   height: 1px;
   background: #C8D9E6;
 }
+
+/* The in-chat date separator only ever had a Skype 7 rule, so in the
+   other five eras it rendered as unstyled text — grey on grey in Skype 8,
+   where it was effectively invisible. Each era gets its own treatment.
+
+   Skype 8 is measured: a #444446 hairline either side of a centred grey
+   label, the pair spanning the message column. The classic eras are not
+   measured — a plain centred date line is the period-plausible reading,
+   and it is at least legible, which is the bar the old state failed. */
+.app.theme-skype8 .date-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 8px;
+  color: var(--muted);
+  font: 600 11.5px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  user-select: none;
+}
+.app.theme-skype8 .date-sep::before,
+.app.theme-skype8 .date-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--separator);
+}
+.app:is(.theme-skype3,.theme-skype4,.theme-skype5,.theme-skype6) .date-sep {
+  display: block;
+  text-align: center;
+  margin: 8px 0 4px;
+  color: var(--muted);
+  font-size: 10.5px;
+  user-select: none;
+}
+.app.theme-skype3 .date-sep { font-family: Tahoma, 'MS Sans Serif', sans-serif; }
 /* Missed/completed call notice, dropped inline where the call happened. */
 .call-line {
   display: flex;
@@ -4118,6 +4327,8 @@ button.link-btn:hover,
   --sidebar-width: 240px;
   --header-height: 60px;
   --nav-height: 0px;
+  --row-min-h: 22px;
+  --row-avatar: 16px;
   font-family: Tahoma, 'MS Sans Serif', sans-serif;
   font-size: 11px;
 }
@@ -4159,11 +4370,24 @@ button.link-btn:hover,
   --sidebar-width: 260px;
   --header-height: 64px;
   --nav-height: 0px;
+  /* Skype 4's contact list was still compact — the photo-led list is a
+     Skype 5 thing. Measured off the Skype 4.0 reference: rows run a
+     little over twice the text height, with an icon-sized avatar. */
+  --row-min-h: 34px;
+  --row-avatar: 28px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
   font-size: 12px;
 }
 
 /* ── Skype 5 (2010 · big avatars, brighter blue) ───────────── */
+/* Skype 5 is the last era with no proper reference — the full-size
+   screenshot was deleted from Wikipedia before the Internet Archive ever
+   captured it (the one surviving capture is of a 404 page), so only
+   180px and 250px thumbnails remain.
+   One value does survive that: the contact rail is white. Both
+   thumbnails agree on #FFFFFF over thousands of pixels, independently,
+   which is enough to fix --chrome even though nothing else here is
+   measured. Everything else in this block is still from memory. */
 .app.theme-skype5 {
   --phaze-cyan: #00A2E8;
   --phaze-blue: #007AB8;
@@ -4172,7 +4396,7 @@ button.link-btn:hover,
   --brand-soft: rgba(0, 162, 232, 0.10);
   --brand-glow: rgba(0, 162, 232, 0.22);
   --shell: #E8F1F7;
-  --chrome: #F0F6FA;
+  --chrome: #FFFFFF;
   --panel: #ffffff;
   --panel-edge: #BFCED9;
   --separator: #D4DDE5;
@@ -4200,6 +4424,10 @@ button.link-btn:hover,
   --sidebar-width: 280px;
   --header-height: 64px;
   --nav-height: 0px;
+  /* The big photo avatar is Skype 5's signature — this is the release
+     that turned the contact list from a list into a gallery. */
+  --row-min-h: 52px;
+  --row-avatar: 44px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
   font-size: 12px;
 }
@@ -4241,48 +4469,66 @@ button.link-btn:hover,
   --sidebar-width: 280px;
   --header-height: 64px;
   --nav-height: 0px;
+  /* Metro pulled the avatar back down to a square icon and let type do
+     the work — denser than Skype 5, roomier than the XP era. */
+  --row-min-h: 44px;
+  --row-avatar: 32px;
   font-family: 'Segoe UI', Tahoma, sans-serif;
   font-size: 12px;
 }
 .app.theme-skype6 .bubble { border-radius: 0 !important; }
 
 /* ── Skype 8+ (2018 · modern Fluent, dark by default) ─────── */
+/* Every value below was sampled out of a full-resolution 1107x869
+   screenshot of Skype 8 (14.32.55.11), not chosen by eye. See
+   docs/skype-era-reference.md for the measurements and their source.
+
+   Two things that measuring corrected, and that guessing had got wrong:
+
+   * The sidebar is LIGHTER than the message area (#202023 over
+     #19191b), not darker. Every modern chat app since has done the
+     opposite, which is exactly why the wrong one felt right.
+   * Incoming and outgoing bubbles are the SAME grey (#2b2c33). Skype 8
+     separated them by alignment alone — the blue outgoing bubble
+     belongs to the light theme and to later builds. */
 .app.theme-skype8 {
-  --phaze-cyan: #0078D4;
-  --phaze-blue: #005A9E;
-  --brand: #0078D4;
-  --brand-hover: #005A9E;
-  --brand-soft: rgba(0, 120, 212, 0.12);
-  --brand-glow: rgba(0, 120, 212, 0.30);
-  --shell: #1F1F1F;
-  --chrome: #2A2A2A;
-  --panel: #2A2A2A;
-  --panel-edge: #3A3A3A;
-  --separator: #333333;
+  --phaze-cyan: #1686D9;
+  --phaze-blue: #0F6CB4;
+  --brand: #1686D9;
+  --brand-hover: #0F6CB4;
+  --brand-soft: rgba(22, 134, 217, 0.12);
+  --brand-glow: rgba(22, 134, 217, 0.30);
+  --shell: #19191B;
+  --chrome: #202023;
+  --panel: #202023;
+  --panel-edge: #2B2C33;
+  --separator: #444446;
   --text: #F0F0F0;
   --text-secondary: #C8C8C8;
-  --muted: #909090;
-  --list-hover: #333333;
-  --list-sel: #094771;
-  --bubble-in: #2A2A2A;
-  --bubble-out: #0078D4;
+  --muted: #8A8A8C;
+  --list-hover: #2B2C33;
+  --list-sel: #2B2C33;
+  --bubble-in: #2B2C33;
+  --bubble-out: #2B2C33;
   --bubble-edge: transparent;
   --bubble-text: #F0F0F0;
-  --bubble-text-out: #ffffff;
-  --input-bg: #242424;
-  --input-border: #3A3A3A;
-  --input-focus: rgba(0, 120, 212, 0.35);
-  --chat-bg-1: #1F1F1F;
-  --chat-bg-2: #262626;
+  --bubble-text-out: #F0F0F0;
+  --input-bg: #19191B;
+  --input-border: #2B2C33;
+  --input-focus: rgba(22, 134, 217, 0.35);
+  --chat-bg-1: #19191B;
+  --chat-bg-2: #19191B;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.20);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.30);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.45);
-  --glass: rgba(42,42,42,0.85);
+  --glass: rgba(32,32,35,0.92);
   --glass-border: rgba(255,255,255,0.06);
   --glass-blur: 20px;
-  --sidebar-width: 320px;
+  --sidebar-width: 347px;
   --header-height: 56px;
   --nav-height: 64px;
+  --row-min-h: 62px;
+  --row-avatar: 32px;
   font-family: 'Segoe UI', -apple-system, system-ui, sans-serif;
   font-size: 14px;
 }
@@ -4347,14 +4593,18 @@ button.link-btn:hover,
   align-items: center;
 }
 .app.theme-skype3 .friend-row:hover { background: #E4EFFA; }
+/* Selection is #A5CBFF with black text, sampled off a native-resolution
+   Skype 3 screenshot — not the #316AC5/white of Windows Explorer.
+   Skype drew its own highlight and kept the text readable; the Explorer
+   blue is the obvious guess and it's wrong. */
 .app.theme-skype3 .friend-row.sel,
 .app.theme-skype3 .friend-row.sel:hover {
-  background: #316AC5;
-  color: #fff;
+  background: #A5CBFF;
+  color: #000;
 }
-.app.theme-skype3 .friend-row.sel .friend-name,
+.app.theme-skype3 .friend-row.sel .friend-name { color: #000; font-weight: 700; }
 .app.theme-skype3 .friend-row.sel .friend-preview,
-.app.theme-skype3 .friend-row.sel .friend-time { color: #fff; }
+.app.theme-skype3 .friend-row.sel .friend-time { color: #24425F; }
 
 /* Skype 3 showed a status icon, not a photo. Shrink the avatar to
    icon size and drop the photo so the presence glyph is the row's
@@ -4540,15 +4790,53 @@ button.link-btn:hover,
   color: #0046A8;
 }
 
+/* The menu bar belongs to Windows, not to Skype.
+   On XP Luna it was the flat cream #E7E7CE with no gradient at all, 20px
+   tall, 11px Tahoma, and the open menu drew the Explorer blue #316AC5.
+   Sampled off a native-resolution screenshot. */
+.app.theme-skype3 .skype-menubar {
+  height: 20px;
+  background: #E7E7CE;
+  border-bottom: 1px solid #ACA899;
+  font-size: 11px;
+  font-family: Tahoma, 'MS Sans Serif', sans-serif;
+}
+.app.theme-skype3 .skype-menubar .skype-menu > button { padding: 0 8px; }
+.app.theme-skype3 .skype-menubar .skype-menu > button:hover,
+.app.theme-skype3 .skype-menubar .skype-menu > button.on {
+  background: #316AC5;
+  color: #fff;
+}
+.app.theme-skype3 .skype-menubar .skype-menu-dropdown {
+  background: #fff;
+  border: 1px solid #ACA899;
+  border-radius: 0;
+  padding: 2px;
+  box-shadow: 2px 2px 3px rgba(0,0,0,0.25);
+}
+.app.theme-skype3 .skype-menubar .skype-menu-dropdown button,
+.app.theme-skype3 .skype-menubar .skype-menu-dropdown a {
+  font-size: 11px;
+  padding: 3px 20px 3px 10px;
+  border-radius: 0;
+}
+.app.theme-skype3 .skype-menubar .skype-menu-dropdown button:hover,
+.app.theme-skype3 .skype-menubar .skype-menu-dropdown a:hover {
+  background: #316AC5;
+  color: #fff;
+}
+
 
 /* =============================================================
    Skype 4 (2009) — interior layout.
 
-   Skype 4 was the controversial wide redesign, and it inverted almost
-   every choice Skype 3 made. Where 3 was a dense 22px list with a 16px
-   status glyph and no photo, 4 went roomy: ~52px rows built around a
-   large photo avatar, with the mood message promoted to its own second
-   line instead of being crammed in beside the name.
+   Skype 4 was the controversial wide redesign. It widened the window and
+   added the right-hand profile pane, but — and this block used to claim
+   otherwise — it did NOT blow the contact list up. Measured against the
+   Skype 4.0 reference, the list is still compact: rows a little over
+   twice the text height, an icon-sized avatar, and the mood message
+   running inline after the name in grey exactly as Skype 3 had it. The
+   photo-led list with a stacked second line is Skype 5's change.
 
    Visually it's Vista's house style — Aero gradients, glossy highlights,
    softly rounded corners, Segoe UI instead of Tahoma — and selection is
@@ -4567,9 +4855,13 @@ button.link-btn:hover,
 
 /* ── Contact list: roomy, photo-led ────────────────────────── */
 .app:is(.theme-skype4,.theme-skype5) .friend-row {
-  padding: 5px 8px;
+  padding: 4px 8px;
   gap: 9px;
-  min-height: 52px;
+  /* Density is the difference between these two releases: Skype 4 kept
+     the compact list it inherited from Skype 3, Skype 5 blew it up into
+     a photo gallery. Both eras share this rule and diverge on the two
+     variables their palette blocks set. */
+  min-height: var(--row-min-h);
   border-radius: 4px;
   margin: 1px 3px;
   align-items: center;
@@ -4589,11 +4881,11 @@ button.link-btn:hover,
 /* The photo is the point of this era — show it large, and keep the
    presence glyph as a badge pinned to its corner. */
 .app:is(.theme-skype4,.theme-skype5) .friend-row .avatar {
-  width: 44px;
-  height: 44px;
+  width: var(--row-avatar);
+  height: var(--row-avatar);
   border-radius: 3px;
   flex-shrink: 0;
-  font-size: 17px;
+  font-size: calc(var(--row-avatar) * 0.39);
   border: 1px solid #9FB8CE;
   box-shadow: 0 1px 2px rgba(20, 60, 110, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
   overflow: visible;
@@ -4632,6 +4924,35 @@ button.link-btn:hover,
   font-style: italic;
 }
 .app:is(.theme-skype4,.theme-skype5) .friend-time { font-size: 10.5px; color: #7E93A6; }
+
+/* Skype 4 only: one line, not two.
+   Skype 4 ran the mood message inline after the name in grey, the way
+   Skype 3 did; stacking it onto a second line is a Skype 5 layout and
+   won't fit a 34px row anyway. */
+.app.theme-skype4 .friend-meta {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.app.theme-skype4 .friend-line { min-width: 0; }
+.app.theme-skype4 .friend-line:first-child { flex: 0 0 auto; }
+.app.theme-skype4 .friend-line:last-child { flex: 1 1 auto; overflow: hidden; }
+.app.theme-skype4 .friend-line:first-child .friend-time { display: none; }
+.app.theme-skype4 .friend-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The presence badge is a fraction of the avatar, so it stays put when
+   the two eras change avatar size. */
+.app:is(.theme-skype4,.theme-skype5) .friend-row .avatar-presence {
+  width: calc(var(--row-avatar) * 0.34);
+  height: calc(var(--row-avatar) * 0.34);
+  bottom: -2px;
+  right: -2px;
+}
 .app:is(.theme-skype4,.theme-skype5) .unread-badge {
   background: linear-gradient(180deg, #F08A6B 0%, #D4481F 100%);
   border-radius: 8px;
@@ -4807,6 +5128,22 @@ button.link-btn:hover,
   font: 600 10.5px 'Segoe UI', Tahoma, sans-serif;
   color: #4A6378;
   padding: 3px 8px;
+}
+
+/* Skype 4's list group header was a solid Skype-blue bar with white
+   text running the full width of the panel — sampled at #00A6FB, which
+   is the era's brand blue rather than the #00AFF0 of the later logo.
+   Skype 5 softened it back to the pale gradient above. */
+.app.theme-skype4 :is(.convo-date-header, .contacts-letter) {
+  background: #00A6FB;
+  border: none;
+  border-radius: 0;
+  color: #fff;
+  font: 700 10.5px 'Segoe UI', Tahoma, sans-serif;
+  padding: 3px 8px;
+  margin: 2px 0 0;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 
@@ -5160,7 +5497,14 @@ button.link-btn:hover,
 }
 .app.theme-skype8 .avatar img,
 .app.theme-skype8 .bubble-avatar img { border-radius: 50%; }
-.app.theme-skype8 .friend-row .avatar { width: 44px; height: 44px; font-size: 16px; }
+/* 32px avatar in a 62px row, measured off the 2018 screenshot. The row is
+   tall for its avatar — Skype 8 padded generously rather than scaling the
+   picture up. */
+.app.theme-skype8 .friend-row .avatar {
+  width: var(--row-avatar);
+  height: var(--row-avatar);
+  font-size: 13px;
+}
 .app.theme-skype8 .friend-row .avatar-presence,
 .app.theme-skype8 .avatar-dot {
   position: absolute;
@@ -5178,12 +5522,15 @@ button.link-btn:hover,
 
 /* ── Contact list: rounded rows, soft hover ────────────────── */
 .app.theme-skype8 .friend-row {
-  min-height: 56px;
+  min-height: var(--row-min-h);
   padding: 7px 11px;
   gap: 12px;
-  margin: 1px 7px;
+  margin: 0;
   border: none;
-  border-radius: 8px;
+  /* Square, full-bleed rows: the selected row in the reference runs edge
+     to edge with no inset and no rounding. The rounded, inset pill is a
+     later Skype (and a Teams) idea. */
+  border-radius: 0;
   background: transparent;
 }
 .app.theme-skype8 .friend-row:hover { background: var(--list-hover); }
@@ -5207,41 +5554,151 @@ button.link-btn:hover,
   padding: 1px 7px;
 }
 
-/* Sentence case, not Metro's uppercase tracking. */
-.app.theme-skype8 .sidebar-section-label {
-  text-transform: none;
-  letter-spacing: 0;
-  font: 600 12px 'Segoe UI Variable', 'Segoe UI', sans-serif;
-  color: var(--muted);
-  padding: 12px 14px 6px;
-  background: transparent;
+/* ── Sidebar head: profile row, then search, then the nav strip ──
+   All three exist in the markup but were gated to other eras, so Skype 8
+   was rendering a sidebar that started at the search box. Geometry is
+   measured off the reference: the profile row is 59px (y 34-93), the
+   search row 31px (y 96-127), the nav strip 63px (y 129-192). */
+.app.theme-skype8 .hub-me-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 59px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: none;
+  flex-shrink: 0;
 }
-
-/* ── Bubbles: rounded, solid accent, squared tail corner ───── */
-.app.theme-skype8 .bubble {
-  border-radius: 18px 18px 18px 4px;
-  padding: 9px 14px;
-  font-size: 14px;
-  line-height: 1.45;
-}
-/* The shared base paints outgoing bubbles with a blue-to-purple Phaze
-   gradient. Skype 8 used a flat accent fill, so override it outright. */
-.app.theme-skype8 .bubble.me {
-  background: var(--brand);
-  border-radius: 18px 18px 4px 18px;
-  color: var(--bubble-text-out);
-}
-.app.theme-skype8 .bubble-row { gap: 9px; margin-bottom: 9px; }
-.app.theme-skype8 .bubble-avatar,
-.app.theme-skype8 .bubble-avatar-spacer {
+.app.theme-skype8 .hub-me-avatar {
   width: 32px;
   height: 32px;
   min-width: 32px;
+  border-radius: 50%;
   font-size: 13px;
 }
+.app.theme-skype8 .hub-me-name {
+  font: 600 15px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--text);
+}
+.app.theme-skype8 .hub-me-status {
+  font-size: 12px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.app.theme-skype8 .hub-me-settings {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 17px;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.app.theme-skype8 .hub-me-settings:hover { background: var(--list-hover); color: var(--text); }
+
+/* Four equal tabs, icon over label. The active one is tinted #1686D9 —
+   measured at the first tab's icon, whose centres sit at x=41, 128, 216
+   and 303 across a 347px sidebar, i.e. one quarter each. */
+.app.theme-skype8 .sidebar-tabs {
+  display: flex;
+  align-items: stretch;
+  height: 63px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--separator);
+  flex-shrink: 0;
+}
+.app.theme-skype8 .sidebar-tabs button {
+  flex: 1 1 25%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 15px;
+  padding: 0;
+}
+.app.theme-skype8 .sidebar-tabs button .tab-label {
+  display: block;
+  font: 400 11px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  line-height: 1;
+}
+.app.theme-skype8 .sidebar-tabs button:hover { background: var(--list-hover); color: var(--text); }
+.app.theme-skype8 .sidebar-tabs button.on {
+  color: var(--brand);
+  background: transparent;
+  border-bottom: 2px solid var(--brand);
+}
+/* Source order is profile, mood, tabs, search — which is Skype 7's
+   layout. Skype 8 puts the search box directly under the profile row and
+   the nav strip below it, so reorder rather than move the markup and
+   disturb the other five eras. The mood bar goes: Skype 8 dropped the
+   classic mood message from the sidebar entirely.
+
+   Orders are negative because everything else in the sidebar sits at the
+   default order:0 — positive values would push these three below the
+   contact list instead of above it. */
+.app.theme-skype8 .hub-me-bar     { order: -3; }
+.app.theme-skype8 .hub-add-friend { order: -2; border-bottom: none; padding: 0 14px 10px; }
+.app.theme-skype8 .sidebar-tabs   { order: -1; }
+.app.theme-skype8 .hub-mood-bar   { display: none; }
+
+
+/* Uppercase with a little tracking.
+   This block used to say "sentence case, not Metro's uppercase tracking"
+   — the reference disagrees: RECENT CHATS, ONGOING CALL, FAVORITES and
+   CHATS are all set in small grey capitals. Skype 8 kept that from
+   Metro; what it dropped was the heavy weight. */
+.app.theme-skype8 .sidebar-section-label {
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font: 600 11px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--muted);
+  padding: 14px 14px 6px;
+  background: transparent;
+}
+
+/* ── Bubbles: one grey, both directions ────────────────────── */
+/* Measured, and contrary to what everyone remembers: Skype 8's dark theme
+   drew incoming and outgoing bubbles in the same #2B2C33 and told them
+   apart by alignment alone. No accent fill, and the corner radius is a
+   modest 6px — not the 18px lozenge of a messaging app. The blue outgoing
+   bubble is the light theme, and later builds. */
+.app.theme-skype8 .bubble {
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 14px;
+  line-height: 1.45;
+  background: var(--bubble-in);
+  border: none;
+}
+/* The shared base paints outgoing bubbles with a blue-to-purple Phaze
+   gradient, so this has to state the flat fill outright rather than just
+   setting a colour. */
+.app.theme-skype8 .bubble.me {
+  background: var(--bubble-out);
+  border-radius: 6px;
+  color: var(--bubble-text-out);
+}
+.app.theme-skype8 .bubble-row { gap: 9px; margin-bottom: 9px; }
+
+/* No avatar and no sender name on a one-to-one conversation.
+   The reference carries neither: in a DM there are only two people, so
+   Skype 8 dropped both and let alignment say who spoke. (.bubble is the
+   DM log only — group chats render through .group-line-* and keep their
+   coloured sender names, which they need.) */
+.app.theme-skype8 .bubble-avatar,
+.app.theme-skype8 .bubble-avatar-spacer { display: none; }
+.app.theme-skype8 .bubble > .who { display: none; }
 .app.theme-skype8 .bubble-ts,
 .app.theme-skype8 .bubble .who { font-size: 11px; color: var(--muted); }
-.app.theme-skype8 .bubble.me .bubble-ts { color: rgba(255, 255, 255, 0.72); }
+/* Same grey behind both directions now, so the outgoing timestamp reads
+   on the same muted colour as the incoming one. */
+.app.theme-skype8 .bubble.me .bubble-ts { color: var(--muted); }
 
 /* ── Chat chrome: acrylic-ish, soft elevation ──────────────── */
 .app.theme-skype8 .chat-header-bar {
@@ -5262,11 +5719,38 @@ button.link-btn:hover,
 }
 
 /* ── Pill controls ─────────────────────────────────────────── */
+/* The control at the right of the search box is a flat glyph in the
+   reference, not a filled disc — same treatment as the composer icons.
+   The base .form button rule sets both a --brand background AND a
+   --brand border, so both have to be stated here; overriding only the
+   background leaves a blue ring behind. */
+.app.theme-skype8 .hub-add-friend button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  font-size: 15px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+.app.theme-skype8 .hub-add-friend button:hover {
+  background: var(--list-hover);
+  border: none;
+  color: var(--text);
+  transform: none;
+  box-shadow: none;
+}
+/* Both the search field and the compose box are shallow rectangles in the
+   reference — a 4px radius, not the 20px pill. The search field also sits
+   on #19191B, darker than the sidebar around it, which is what
+   --input-bg now carries. */
 .app.theme-skype8 .draft-wrap textarea,
 .app.theme-skype8 .draft-wrap input,
 .app.theme-skype8 .hub-add-friend input {
   border: 1px solid var(--input-border);
-  border-radius: 20px;
+  border-radius: 4px;
   background: var(--input-bg);
   color: var(--text);
   font: 400 14px 'Segoe UI Variable', 'Segoe UI', sans-serif;
@@ -5279,7 +5763,6 @@ button.link-btn:hover,
   box-shadow: 0 0 0 3px var(--input-focus);
 }
 
-.app.theme-skype8 .send-btn,
 .app.theme-skype8 .send-pill,
 .app.theme-skype8 .hub-side-bottom button {
   background: var(--brand);
@@ -5291,6 +5774,55 @@ button.link-btn:hover,
   letter-spacing: 0;
   padding: 8px 18px;
   box-shadow: var(--shadow-sm);
+}
+
+/* Send is a glyph, not a blue disc. There is no accent-filled control
+   anywhere in the reference's compose row — the icons to the right of
+   the box are the same grey as the one on its left. */
+.app.theme-skype8 .send-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--muted);
+  font: 600 15px 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  padding: 6px 10px;
+  box-shadow: none;
+}
+.app.theme-skype8 .send-btn:hover:not(:disabled) {
+  background: var(--list-hover);
+  color: var(--text);
+}
+
+/* Composer icons are flat glyphs, not filled blue circles.
+   The reference puts a plain grey emoji glyph at the left of the compose
+   box and two more at its right, all on the same #2B2C33 as the box —
+   there is no accent fill anywhere in that row. Three blue discs and a
+   blue send disc were the Phaze composer showing through. */
+.app.theme-skype8 .emoji-btn,
+.app.theme-skype8 .attach-btn,
+.app.theme-skype8 .voice-btn,
+.app.theme-skype8 .composer-icon-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--muted);
+  box-shadow: none;
+}
+.app.theme-skype8 .emoji-btn:hover,
+.app.theme-skype8 .attach-btn:hover,
+.app.theme-skype8 .voice-btn:hover,
+.app.theme-skype8 .composer-icon-btn:hover {
+  background: var(--list-hover);
+  color: var(--text);
+}
+.app.theme-skype8 .row.send {
+  background: var(--chat-bg-2);
+  border-top: none;
+  padding-left: 11.5%;
+  padding-right: 11.5%;
+}
+@media (max-width: 900px) {
+  .app.theme-skype8 .row.send { padding-left: 12px; padding-right: 12px; }
 }
 .app.theme-skype8 .send-btn:hover,
 .app.theme-skype8 .send-pill:hover,
@@ -5333,16 +5865,15 @@ button.link-btn:hover,
   letter-spacing: 0;
 }
 
-.app.theme-skype8 .convo-date-header {
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  font: 600 11.5px 'Segoe UI Variable', 'Segoe UI', sans-serif;
-  color: var(--muted);
-  text-transform: none;
-  letter-spacing: 0;
-  padding: 10px 0;
-  text-align: center;
+/* The message column doesn't fill the pane. In the reference it runs
+   586px of a 759px pane — about 77%, with even gutters either side. */
+.app.theme-skype8 .chat {
+  padding-left: 11.5%;
+  padding-right: 11.5%;
+}
+@media (max-width: 900px) {
+  /* Proportional gutters get silly on a narrow screen. */
+  .app.theme-skype8 .chat { padding-left: 12px; padding-right: 12px; }
 }
 
 
@@ -5353,9 +5884,16 @@ button.link-btn:hover,
    three bugs that only show up on a real page:
 
    1. Own messages inherited `justify-content: flex-end` from the shared
-      .bubble-row.me, so they sat on the right. No Skype before 8 did
-      that: the whole log was left-aligned regardless of author, which
-      is the entire point of the flat-log format.
+      .bubble-row.me, so they sat on the right. Skype 3 through 6
+      left-aligned the whole log regardless of author, which is the
+      entire point of the flat-log format.
+
+      This block used to say "no Skype before 8 did that". The 2015
+      reference disproves it: Skype 7 had real bubbles, sized to their
+      text and right-aligned when outgoing. So these corrections are
+      scoped to 3-6 and Skype 7 is excluded — it belongs with Skype 8
+      for message rendering even though it keeps the classic menu bar
+      and compact contact list.
 
    2. .bubble-row carries `align-items: flex-end` for bubble layouts.
       With flat rows that pushed each line's avatar and text apart
@@ -5366,15 +5904,15 @@ button.link-btn:hover,
       direction of its own.
    ============================================================= */
 
-.app.classic-era .bubble-row,
-.app.classic-era .bubble-row.me {
+.app.classic-era:not(.theme-skype7) .bubble-row,
+.app.classic-era:not(.theme-skype7) .bubble-row.me {
   justify-content: flex-start;
   align-items: flex-start;
   padding: 0;
 }
 
 /* Flat rows are top-aligned blocks, not bottom-aligned bubbles. */
-.app.classic-era .bubble {
+.app.classic-era:not(.theme-skype7) .bubble {
   display: block;
   min-height: 0;
 }
@@ -5389,8 +5927,57 @@ button.link-btn:hover,
 }
 
 
-/* A 2025 "What's new" banner has no business in a 2007 Skype window. */
-.app.classic-era .wn-banner { display: none !important; }
+/* A 2025 "What's new" banner has no business in any Skype window. */
+.app.skype-era .wn-banner { display: none !important; }
+
+/* The conversation area is never the same colour as the contact list.
+   The base rule paints .hub-chat-view with --chrome, which is the panel
+   colour, so every era except Skype 7 was rendering as one flat slab —
+   Skype 8 was drawing its message area in the sidebar's #202023 instead
+   of the measured #19191B. The rule is shared; the value isn't, since
+   each era's --chat-bg-2 is its own. */
+.app.skype-era .hub-chat-view { background: var(--chat-bg-2); }
+
+/* The add-contact button ships as a modern 45px pill. Nothing before
+   Skype 7 looked remotely like that, so each era restates it in its own
+   idiom: an XP push button, an Aero gradient, a flat Metro square. */
+.app.theme-skype3 .hub-add-friend button {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #7F9DB9;
+  border-radius: 0;
+  background: linear-gradient(180deg, #FDFDFD 0%, #E4E3D8 100%);
+  color: #000;
+  font: 400 11px Tahoma, sans-serif;
+  box-shadow: none;
+}
+.app.theme-skype3 .hub-add-friend button:hover {
+  background: linear-gradient(180deg, #FFF 0%, #EFEEE3 100%);
+  border-color: #316AC5;
+}
+.app:is(.theme-skype4,.theme-skype5) .hub-add-friend button {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #7BA7CE;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #FBFDFF 0%, #DCEAF8 50%, #C6DCF2 100%);
+  color: #12314F;
+  font-size: 13px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.app.theme-skype6 .hub-add-friend button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--brand);
+  color: #fff;
+  font-size: 14px;
+  box-shadow: none;
+}
 
 /* Composer icon buttons ship as modern blue circles. Square them off for the
    classic eras; Metro flattens them entirely. */

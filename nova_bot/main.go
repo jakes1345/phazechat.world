@@ -120,7 +120,7 @@ About Phaze:
 - Free encrypted messaging app — chat, voice, video, group Spaces, livestreams, Stories
 - Available on web (phazechat.world), Windows, Linux, Android
 - End-to-end encrypted, no ads, no tracking
-- The alternative to Discord/Skype/Telegram that actually respects privacy
+- A chat/voice/video app that actually respects privacy — no ads, no tracking
 - Download at phazechat.world/download`
 
 func callGemini(apiKey, prompt string) (string, error) {

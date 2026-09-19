@@ -119,6 +119,13 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if len(pending) > 0 {
 				client.Send(NexusMessage{Type: "pending_requests", Results: pending})
 			}
+			for _, cm := range s.userConversations(username) {
+				cm.Type = "convo_info"
+				client.Send(cm)
+			}
+			if groups := s.getContactGroups(username); len(groups) > 0 {
+				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
+			}
 		} else {
 			msg := "Account suspended"
 			if reason != "" {
@@ -455,6 +462,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				cm.Type = "convo_info"
 				client.Send(cm)
 			}
+			if groups := s.getContactGroups(username); len(groups) > 0 {
+				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
+			}
 
 			friends := s.getFriends(username)
 			for _, f := range friends {
@@ -555,6 +565,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			for _, cm := range s.userConversations(username) {
 				cm.Type = "convo_info"
 				client.Send(cm)
+			}
+			if groups := s.getContactGroups(username); len(groups) > 0 {
+				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
 			}
 
 		case "revoke_session":
@@ -728,7 +741,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			// C2: pre-hash with SHA-256 to match registerUser/authenticateUser.
 			pwHash := sha256.Sum256([]byte(newPw))
-			hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+			hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 			if err != nil {
 				client.Send(NexusMessage{Type: "change_password_result", Error: "Internal error"})
 				continue
@@ -1308,7 +1321,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			// Directed key handoff (native_client replies to key_request with a
+			// Directed key handoff (the client replies to key_request with a
 			// presence carrying public_key + recipient = requester). It's not a
 			// status announcement — treating it as one used to reset a user's
 			// Away/DND back to whatever the key reply claimed.
@@ -1405,6 +1418,38 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			log.Printf("Friend removed: %s <-> %s", username, msg.Recipient)
 			s.sendTo(msg.Recipient, NexusMessage{Type: "friend_removed", Sender: username})
 
+		// Contact groups ("Groups panel" — see docs/skype-eras/skype3.md).
+		// Recipient is the contact being filed; Body is the group name, or
+		// "" to un-file them. Asymmetric by design: this changes only the
+		// caller's own contact-list filing, never the other person's — see
+		// the contact_groups table comment in main.go.
+		case "contact_group_set":
+			if username == "" || msg.Recipient == "" {
+				continue
+			}
+			isFriend := false
+			for _, f := range s.getFriends(username) {
+				if f == msg.Recipient {
+					isFriend = true
+					break
+				}
+			}
+			if !isFriend {
+				client.Send(NexusMessage{Type: "contact_group_error", Error: "not a contact"})
+				continue
+			}
+			groupName := strings.TrimSpace(msg.Body)
+			if len(groupName) > 60 {
+				client.Send(NexusMessage{Type: "contact_group_error", Error: "group name must be 60 characters or fewer"})
+				continue
+			}
+			if err := s.setContactGroup(username, msg.Recipient, groupName); err != nil {
+				log.Printf("[contact_group_set] db: %v", err)
+				client.Send(NexusMessage{Type: "contact_group_error", Error: "server error"})
+				continue
+			}
+			client.Send(NexusMessage{Type: "contact_groups", ContactGroups: s.getContactGroups(username)})
+
 		case "convo_create":
 			if username == "" {
 				continue
@@ -1445,6 +1490,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				ConvoName: msg.ConvoName,
 				Members:   members,
 				Sender:    username,
+				Creator:   username,
 			}
 			for _, m := range members {
 				s.sendTo(m, notice)
@@ -1532,6 +1578,133 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				})
 			}
 
+		// A group used to be frozen forever after creation — no way to add,
+		// remove, or rename, in any client. These three cases are that
+		// capability, deliberately minimal: the creator is the only admin
+		// concept, matching the smallest end of what real Skype group chats
+		// supported rather than reimplementing the full role hierarchy. See
+		// docs/skype-era-gaps.md §3.
+		case "convo_add_member":
+			if username == "" || msg.ConvoID == "" || len(msg.Members) == 0 {
+				continue
+			}
+			existing := s.conversationMembers(msg.ConvoID)
+			isMember := false
+			existingSet := map[string]bool{}
+			for _, m := range existing {
+				existingSet[m] = true
+				if m == username {
+					isMember = true
+				}
+			}
+			if !isMember {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "not a member of this group"})
+				continue
+			}
+			// Same eligibility rule as convo_create: only friends of the
+			// person doing the adding, so membership can't be used to spam
+			// strangers who never agreed to talk to anyone involved.
+			friendSet := map[string]bool{}
+			for _, f := range s.getFriends(username) {
+				friendSet[f] = true
+			}
+			var toAdd []string
+			for _, cand := range msg.Members {
+				if !existingSet[cand] && friendSet[cand] {
+					toAdd = append(toAdd, cand)
+				}
+			}
+			if len(toAdd) == 0 {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "no eligible new members — they need to be your friend first"})
+				continue
+			}
+			if err := s.addConversationMembers(msg.ConvoID, toAdd); err != nil {
+				log.Printf("[convo_add_member] db: %v", err)
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "server error"})
+				continue
+			}
+			var convoName string
+			s.DB.QueryRow(`SELECT name FROM conversations WHERE id = ?`, msg.ConvoID).Scan(&convoName)
+			convoCreator, _ := s.conversationCreator(msg.ConvoID)
+			updated := s.conversationMembers(msg.ConvoID)
+			notice := NexusMessage{
+				Type: "convo_updated", ConvoID: msg.ConvoID, ConvoName: convoName,
+				Members: updated, Sender: username, Creator: convoCreator,
+			}
+			// Sent to everyone, including the people just added — for them
+			// this is how the group appears in their client at all, so
+			// convo_updated has to be handled as an upsert-by-id, not an
+			// update to something the client is assumed to already have.
+			for _, m := range updated {
+				s.sendTo(m, notice)
+			}
+
+		case "convo_remove_member":
+			if username == "" || msg.ConvoID == "" || msg.Recipient == "" {
+				continue
+			}
+			if msg.Recipient == username {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "use convo_leave to remove yourself"})
+				continue
+			}
+			creator, ok := s.conversationCreator(msg.ConvoID)
+			if !ok || creator != username {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "only the group's creator can remove someone"})
+				continue
+			}
+			var wasMember int
+			s.DB.QueryRow(`SELECT 1 FROM conversation_members WHERE convo_id=? AND username=?`,
+				msg.ConvoID, msg.Recipient).Scan(&wasMember)
+			if wasMember == 0 {
+				continue
+			}
+			_ = s.leaveConversation(msg.ConvoID, msg.Recipient)
+			// The removed member gets their own notice, distinct from
+			// convo_left, since by the time this sends they're no longer in
+			// conversationMembers() and the broadcast below can't reach them.
+			s.sendTo(msg.Recipient, NexusMessage{Type: "convo_removed", ConvoID: msg.ConvoID, Sender: username})
+			remaining := s.conversationMembers(msg.ConvoID)
+			var convoName string
+			s.DB.QueryRow(`SELECT name FROM conversations WHERE id = ?`, msg.ConvoID).Scan(&convoName)
+			notice := NexusMessage{
+				Type: "convo_updated", ConvoID: msg.ConvoID, ConvoName: convoName,
+				// username is the creator here — that's what the check above
+				// just verified — so no extra lookup needed, unlike add_member
+				// where the actor doing the adding usually isn't the creator.
+				Members: remaining, Sender: username, Creator: username,
+			}
+			for _, m := range remaining {
+				s.sendTo(m, notice)
+			}
+
+		case "convo_rename":
+			if username == "" || msg.ConvoID == "" {
+				continue
+			}
+			newName := strings.TrimSpace(msg.ConvoName)
+			if newName == "" || len(newName) > 100 {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "group name must be 1-100 characters"})
+				continue
+			}
+			creator, ok := s.conversationCreator(msg.ConvoID)
+			if !ok || creator != username {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "only the group's creator can rename it"})
+				continue
+			}
+			if err := s.renameConversation(msg.ConvoID, newName); err != nil {
+				log.Printf("[convo_rename] db: %v", err)
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "server error"})
+				continue
+			}
+			members := s.conversationMembers(msg.ConvoID)
+			notice := NexusMessage{
+				Type: "convo_updated", ConvoID: msg.ConvoID, ConvoName: newName,
+				Members: members, Sender: username, Creator: username,
+			}
+			for _, m := range members {
+				s.sendTo(m, notice)
+			}
+
 		case "convo_history":
 			if username == "" || msg.ConvoID == "" {
 				continue
@@ -1578,9 +1751,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				Type: "read_receipt", Sender: username, Body: msg.Body,
 			})
 
-		// Pairwise public-key handoff for NaCl box E2EE. Desktop clients send
-		// this when they need a peer's key; the recipient answers with a
-		// "presence" message carrying public_key (see native_client).
+		// Pairwise public-key handoff for NaCl box E2EE. Clients send this
+		// when they need a peer's key; the recipient answers with a
+		// "presence" message carrying public_key (see App.tsx's key_request
+		// handling — the web client, also what desktop/ embeds).
 		case "key_request":
 			if username == "" || msg.Recipient == "" {
 				continue

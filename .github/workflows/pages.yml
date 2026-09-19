@@ -1,10 +1,19 @@
 name: Deploy Pages
 
-# Run on every push so the workflow's "last run" stays aligned with master
-# alongside Phaze CI and Apple verification (static site content lives in ./docs).
+# Disabled the push trigger — checked what ./docs actually holds and it's
+# not a website. There's no index.html and never has been, so this was
+# either 404ing on every run or (once GitHub's default Jekyll processing
+# got involved) serving whatever it made of a folder of engineering
+# markdown — the era-theme research notes, the LiveKit evaluation, and
+# the superpowers/ audit-and-spec files, none of which were written to be
+# public. The real marketing site is served by nexus_server from
+# nexus_server/templates/*.html at phazechat.world directly; this workflow
+# predates that and nothing currently points a domain at GitHub Pages.
+#
+# Left as workflow_dispatch rather than deleted, in case ./docs is ever
+# deliberately turned into a real static site — at which point add the
+# push trigger back and this comment can go.
 on:
-  push:
-    branches: [master, main]
   workflow_dispatch:
 
 permissions:

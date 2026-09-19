@@ -158,7 +158,7 @@ fun SettingsScreen(
             Text("APPEARANCE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("dark" to "Dark", "light" to "Light", "skype7" to "Skype 7").forEach { (key, label) ->
+                listOf("dark" to "Dark", "light" to "Light", "skype7" to "Phaze 5").forEach { (key, label) ->
                     val selected = theme == key
                     if (selected) {
                         Button(onClick = { onSetTheme(key) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(vertical = 8.dp)) { Text(label, fontSize = 13.sp) }
@@ -497,10 +497,10 @@ fun SettingsScreen(
             }
             LaunchedEffect(Unit) { onLoadSkypeContacts?.invoke() }
 
-            Text("SKYPE IMPORT", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
+            Text("CHAT HISTORY IMPORT", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, letterSpacing = 1.sp)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Import your Skype message history and contacts. Export your data at go.skype.com/export then upload the .zip.",
+                "Import your old chat history and contacts from a compatible export. You can get one at go.skype.com/export, then upload the .zip.",
                 fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(10.dp))
@@ -508,7 +508,7 @@ fun SettingsScreen(
                 onClick = { filePicker.launch("application/zip") },
                 enabled = !skypeImportBusy,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (skypeImportBusy) "Importing…" else "📂 Choose Skype export .zip") }
+            ) { Text(if (skypeImportBusy) "Importing…" else "📂 Choose export .zip") }
             if (skypeImportStatus != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(skypeImportStatus, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
