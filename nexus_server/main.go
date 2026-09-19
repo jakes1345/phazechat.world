@@ -1858,13 +1858,20 @@ func (s *NexusServer) exportUserData(username string) map[string]interface{} {
 	out["email"] = email
 	out["mood"] = mood
 	out["display_name"] = displayName
-	// Friends
-	rows, _ := s.DB.Query("SELECT user_b, status FROM friends WHERE user_a = ? AND status = 'accepted'", username)
+	// Friends. friends rows are directional (user_a = whoever sent the
+	// original request, regardless of who accepted), so this has to check
+	// both sides like getFriends does — otherwise a user who only ever
+	// accepted requests (never sent one) would export an empty list.
+	rows, _ := s.DB.Query(
+		`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END as friend
+		 FROM friends
+		 WHERE (user_a = ? OR user_b = ?) AND status = 'accepted'`,
+		username, username, username)
 	var friends []string
 	if rows != nil {
 		for rows.Next() {
-			var u, st string
-			if err := rows.Scan(&u, &st); err != nil {
+			var u string
+			if err := rows.Scan(&u); err != nil {
 				log.Printf("[db] exportUserData friends scan: %v", err)
 				continue
 			}
