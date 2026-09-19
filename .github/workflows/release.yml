@@ -51,7 +51,14 @@ jobs:
           java-version: '21'
 
       - name: Set up Android SDK
+        # Explicit `packages` because the default has, in the past, pulled
+        # in the legacy standalone `tools` package — Google stopped serving
+        # it years ago, so `sdkmanager tools` 404s and the action dies
+        # before Gradle ever runs. platform-tools is all this build needs;
+        # Gradle's own Android plugin resolves build-tools/platforms itself.
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Write google-services.json from secret
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
@@ -105,7 +112,13 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Install NSIS
-        run: choco install nsis --yes
+        run: |
+          choco install nsis --yes
+          # choco's own PATH update doesn't reach this job's later steps —
+          # confirmed by a real run where "Install NSIS" reported success
+          # but `wails build -nsis` still failed with "makensis not found".
+          # Add its install dir to GITHUB_PATH so it's on PATH from here on.
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
       - name: Build web frontend
         working-directory: web
