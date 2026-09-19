@@ -1,4 +1,9 @@
-/* Classic call screen — deep teal wash, centered caller card, dark bar. */
+/* Classic call screen — centered caller card, dark bar. Shared across
+   every classic era (skype3-skype7), but NOT one fixed look: the wash
+   below is built from each era's own --brand/--brand-hover/--phaze-blue
+   (already researched and corrected per era — see App.css's per-theme
+   blocks), so Skype 3's call screen is genuinely its own blue, not the
+   same teal Skype 7 got when this was first built Skype-7-only. */
 .call7 {
   position: fixed;
   inset: 0;
@@ -7,7 +12,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(120% 120% at 50% 0%, #1D5F7A 0%, #123F53 55%, #0C2C3B 100%);
+  background: radial-gradient(120% 120% at 50% 0%,
+    var(--brand, #1D5F7A) 0%,
+    var(--brand-hover, #123F53) 55%,
+    var(--phaze-blue, #0C2C3B) 100%);
   color: #fff;
 }
 .call7-mark {
