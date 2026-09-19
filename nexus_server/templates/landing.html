@@ -397,11 +397,6 @@
       <div class="feature-desc">Share your screen mid-call. Works on web, desktop, and Android. Nothing to install.</div>
     </div>
     <div class="feature-card">
-      <div class="feature-icon">📥</div>
-      <div class="feature-title">Chat History Import</div>
-      <div class="feature-desc">Export your old chat data, upload the zip in Settings, and your messages show up right inside your DMs. It just works.</div>
-    </div>
-    <div class="feature-card">
       <div class="feature-icon">🍪</div>
       <div class="feature-title">Sessions You Can Trust</div>
       <div class="feature-desc">Login tokens live in HttpOnly cookies, not localStorage. Scripts injected by attackers can't grab your session. Most apps skip this.</div>
@@ -440,25 +435,23 @@
   </div>
 </div>
 
-<!-- CHAT IMPORT -->
+<!-- SWITCHING -->
 <section id="skype-switch" style="padding:0 24px 88px;max-width:1200px;margin:0 auto;">
   <div class="import-panel reveal">
     <div>
-      <span class="section-tag">Bring your history</span>
-      <h2 class="section-title" style="font-size:clamp(1.5rem,3vw,2.2rem);">Don't start over.<br/>Pick up where you left off.</h2>
-      <p style="color:var(--muted);font-size:0.95rem;margin-bottom:28px;line-height:1.75;">Already have years of messages somewhere else? Export them, drop in the zip, and they appear in your Phaze DMs before the end of the day.</p>
+      <span class="section-tag">Switching over</span>
+      <h2 class="section-title" style="font-size:clamp(1.5rem,3vw,2.2rem);">No migration.<br/>Just show up.</h2>
+      <p style="color:var(--muted);font-size:0.95rem;margin-bottom:28px;line-height:1.75;">There's no export/import step because there's nothing to wait on — an account takes about 30 seconds, and getting your people over is just sending them a link.</p>
       <ol class="import-steps">
-        <li><span class="step-num">1</span><span>Request your data export from your old app. Most send you a zip in a few minutes.</span></li>
-        <li><span class="step-num">2</span><span>Create a Phaze account — just username + password, no phone number, no email required.</span></li>
-        <li><span class="step-num">3</span><span>In Settings, go to <strong>Chat Import</strong> and upload the zip. Messages show up in your DMs.</span></li>
-        <li><span class="step-num">4</span><span>Share your invite link with the people you want to bring over. Done.</span></li>
+        <li><span class="step-num">1</span><span>Pick a username and password. No phone number, no email required.</span></li>
+        <li><span class="step-num">2</span><span>Add the friends you already have — search their username or share your invite link.</span></li>
+        <li><span class="step-num">3</span><span>Start talking. DMs, calls, and group Spaces all work the moment you're both signed in.</span></li>
       </ol>
       <a class="btn btn-primary btn-lg" href="/web" style="margin-top:28px;display:inline-flex;">Switch to Phaze free →</a>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;">
-      <div class="p-row"><span class="p-row-icon">💬</span><span class="p-row-label">Message history</span><span class="p-row-val">Imported</span></div>
-      <div class="p-row"><span class="p-row-icon">👥</span><span class="p-row-label">Contacts &amp; friends</span><span class="p-row-val">Bridged</span></div>
-      <div class="p-row"><span class="p-row-icon">📞</span><span class="p-row-label">Voice &amp; video calls</span><span class="p-row-val">Better</span></div>
+      <div class="p-row"><span class="p-row-icon">⏱️</span><span class="p-row-label">Time to first message</span><span class="p-row-val">~30 seconds</span></div>
+      <div class="p-row"><span class="p-row-icon">👥</span><span class="p-row-label">Bringing friends over</span><span class="p-row-val">Share a link</span></div>
       <div class="p-row"><span class="p-row-icon">🔒</span><span class="p-row-label">Encryption</span><span class="p-row-val">Real E2EE</span></div>
       <div class="p-row"><span class="p-row-icon">💰</span><span class="p-row-label">Price</span><span class="p-row-val">Free forever</span></div>
       <div class="p-row"><span class="p-row-icon">📱</span><span class="p-row-label">Platforms</span><span class="p-row-val">Web · Desktop · Android</span></div>
@@ -493,7 +486,6 @@
           <tr><td>Voice &amp; Video calls</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
           <tr><td>Stories</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td></tr>
           <tr><td>Phone number NOT required</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
-          <tr><td>Chat history import</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td><td class="cross">✗</td></tr>
           <tr><td>Open source</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="partial">~</td><td class="check">✓</td></tr>
           <tr><td>Owned by Meta/VC</td><td class="phaze-col check" style="color:var(--success);font-weight:700;">No</td><td class="cross">Yes (Meta)</td><td class="cross">Yes (VC)</td><td class="check">No</td><td class="check">No</td></tr>
         </tbody>
@@ -515,7 +507,7 @@
       <div class="platform-name">Web App</div>
       <div class="platform-sub">No install needed</div>
     </a>
-    <a class="platform-card" href="https://github.com/jakes1345/phaze/releases/latest" id="dl-windows">
+    <a class="platform-card" href="https://github.com/jakes1345/phazechat.world/releases/latest" id="dl-windows">
       <div class="platform-icon">🪟</div>
       <div class="platform-name">Windows</div>
       <div class="platform-sub">Desktop app</div>
@@ -545,7 +537,7 @@
     <p>Free, open source, running right now. No phone number, no credit card. If you hate it, you've lost nothing.</p>
     <div class="cta-actions">
       <a class="btn btn-lg btn-white" href="/web" id="cta-start">Open Phaze free →</a>
-      <a class="btn btn-lg btn-ghost" href="https://github.com/jakes1345/phaze" id="cta-github">View source on GitHub</a>
+      <a class="btn btn-lg btn-ghost" href="https://github.com/jakes1345/phazechat.world" id="cta-github">View source on GitHub</a>
     </div>
   </div>
 </section>
@@ -571,11 +563,11 @@
       <h4>Legal</h4>
       <a href="/privacy">Privacy Policy</a>
       <a href="/terms">Terms of Service</a>
-      <a href="/security">Security</a>
+      <a href="/privacy">Security</a>
     </div>
     <div class="footer-col">
       <h4>Community</h4>
-      <a href="https://github.com/jakes1345/phaze" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/jakes1345/phazechat.world" target="_blank" rel="noopener">GitHub</a>
       <a href="https://x.com/PhazeChatWorld" target="_blank" rel="noopener">X / Twitter</a>
       <a href="https://instagram.com/phazechat.world" target="_blank" rel="noopener">Instagram</a>
     </div>
@@ -585,7 +577,7 @@
     <div class="footer-social">
       <a href="https://x.com/PhazeChatWorld" target="_blank" rel="noopener" aria-label="Phaze on X">𝕏</a>
       <a href="https://instagram.com/phazechat.world" target="_blank" rel="noopener" aria-label="Phaze on Instagram">📷</a>
-      <a href="https://github.com/jakes1345/phaze" target="_blank" rel="noopener" aria-label="Phaze on GitHub">⌨️</a>
+      <a href="https://github.com/jakes1345/phazechat.world" target="_blank" rel="noopener" aria-label="Phaze on GitHub">⌨️</a>
     </div>
   </div>
 </footer>

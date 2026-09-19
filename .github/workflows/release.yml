@@ -12,10 +12,34 @@ permissions:
   contents: write
 
 jobs:
+  # Every platform job below ends in `gh release upload $TAG ... --clobber`,
+  # which requires a GitHub Release to already exist for that tag — it does
+  # not create one. That was fine for the `release: [published]` trigger
+  # (the release already exists by definition), but it meant the OTHER
+  # documented trigger, a bare `push: tags: v*`, could never actually
+  # succeed: nothing in this file ever created the release a tag push needs.
+  # This job closes that gap. It's idempotent — `gh release view` short-
+  # circuits it when triggered by an actual `release` event, or by a re-run
+  # after a release already exists — so it's safe on both trigger paths.
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure a release exists for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
+
   # Android (Kotlin/Compose) — the Google Play client. Builds a signed APK
   # (uploaded as Phaze.apk for the website's stable URL) and a release AAB
   # (for Play Store upload).
   android:
+    needs: create-release
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
@@ -27,7 +51,14 @@ jobs:
           java-version: '21'
 
       - name: Set up Android SDK
+        # Explicit `packages` because the default has, in the past, pulled
+        # in the legacy standalone `tools` package — Google stopped serving
+        # it years ago, so `sdkmanager tools` 404s and the action dies
+        # before Gradle ever runs. platform-tools is all this build needs;
+        # Gradle's own Android plugin resolves build-tools/platforms itself.
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
 
       - name: Write google-services.json from secret
         run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
@@ -63,6 +94,7 @@ jobs:
   # Windows desktop — Wails app with WebView2, packaged as an NSIS installer.
   # The installer is what gets submitted to winget.
   desktop-windows:
+    needs: create-release
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: windows-latest
     steps:
@@ -80,7 +112,13 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       - name: Install NSIS
-        run: choco install nsis --yes
+        run: |
+          choco install nsis --yes
+          # choco's own PATH update doesn't reach this job's later steps —
+          # confirmed by a real run where "Install NSIS" reported success
+          # but `wails build -nsis` still failed with "makensis not found".
+          # Add its install dir to GITHUB_PATH so it's on PATH from here on.
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
 
       - name: Build web frontend
         working-directory: web
@@ -116,6 +154,7 @@ jobs:
 
   # Linux desktop — Wails app using WebKit2GTK 4.1.
   desktop-linux:
+    needs: create-release
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: ubuntu-22.04
     steps:

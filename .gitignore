@@ -57,6 +57,13 @@ android/app/google-services.json
 android/.gradle/
 android/build/
 android/app/build/
+
+# Gradle's local build cache, wherever an Android tree ends up. The narrow
+# android/.gradle/ rule above didn't cover native_client/android/.gradle/ —
+# that whole cache got committed by accident as a result. Anchoring on the
+# bare directory name catches every Android tree, not just the one at the
+# top level.
+**/.gradle/
 android/local.properties
 android/app/phaze-release.keystore
 
@@ -64,6 +71,16 @@ android/app/phaze-release.keystore
 .DS_Store
 __pycache__/
 docs/*.md
+# ...except the era notes. These are the record of what was measured off a
+# real screenshot versus what's still written from memory, so they have to
+# travel with the CSS they describe — without them the next person can't
+# tell a sampled colour from a guessed one.
+!docs/skype-era-reference.md
+!docs/skype-era-research.md
+!docs/skype-era-gaps.md
+!docs/livekit-evaluation.md
+!docs/website-audit.md
+!docs/slop-audit.md
 infra/coturn/README.md
 web/README.md
 kai_bot/

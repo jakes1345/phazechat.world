@@ -15,13 +15,16 @@ const OS_FOR_ERA: Record<ThemeId, string> = {
   dark:   'win11',
 }
 
-/** Title text in the frame's caption bar, matching what the real client showed. */
+/** Title text in the frame's caption bar. Shaped like what the real client
+ *  showed ("Skype™ — username"), but naming this app rather than the real
+ *  one it's recreating — see the App.tsx classic-menu-bar fix for the same
+ *  correction applied to the top-left menu label. */
 const CAPTION_FOR_ERA: Record<ThemeId, string> = {
-  skype3: 'Skype™ — jakes1345',
-  skype4: 'Skype™ — jakes1345',
-  skype5: 'Skype™ — jakes1345',
-  skype6: 'Skype',
-  skype7: 'Skype™ — jakes1345',
+  skype3: 'Phaze™ — jakes1345',
+  skype4: 'Phaze™ — jakes1345',
+  skype5: 'Phaze™ — jakes1345',
+  skype6: 'Phaze',
+  skype7: 'Phaze™ — jakes1345',
   skype8: 'Phaze',
   light:  'Phaze',
   dark:   'Phaze',
@@ -55,7 +58,7 @@ export default function OSChrome({ theme, children, enabled }: Props) {
     <div className={`os-desktop os-${os}`}>
       <div className="os-window">
         <div className="os-titlebar">
-          <span className="os-title-icon" aria-hidden="true">S</span>
+          <span className="os-title-icon" aria-hidden="true">P</span>
           <span className="os-title-text">{caption}</span>
           <div className="os-title-buttons">
             <button type="button" className="os-btn os-btn-min" tabIndex={-1} aria-hidden="true">

@@ -25,6 +25,16 @@ export interface NexusMessage {
   convo_id?: string
   convo_name?: string
   members?: string[]
+  /** Who made the group — the only capability boundary group chats have.
+   *  Sent on convo_info/convo_created/convo_updated so the client can show
+   *  remove/rename controls only to the one person they'll actually work
+   *  for. */
+  creator?: string
+  /** contact -> group name the current user has filed that contact under
+   *  in their own contact list (e.g. "Family", "Work"). Sent as a full
+   *  map, never incrementally — see contact_group_set / contact_groups
+   *  in nexus_server/ws_handlers.go. */
+  contact_groups?: Record<string, string>
   turn_config?: TurnConfig
   totp_code?: string
   totp_uri?: string

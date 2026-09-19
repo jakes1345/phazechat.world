@@ -79,8 +79,8 @@
         <h2>3. Messages, calls, and files</h2>
         <ul>
             <li><strong>Direct messages</strong> are end-to-end encrypted with <code>NaCl box</code> (Curve25519 + XSalsa20 + Poly1305) before they leave your device. The Phaze Nexus relay only sees ciphertext — we cannot decrypt your messages.</li>
-            <li><strong>Voice and video calls</strong> are negotiated peer-to-peer via WebRTC. Call audio and video are never stored or recorded by our servers.</li>
-            <li><strong>File attachments</strong> are uploaded temporarily to support offline delivery and deleted automatically after <strong>7 days</strong>.</li>
+            <li><strong>Voice and video calls</strong> use WebRTC. As of this policy, a call or voice channel connects you to a room on the public Jitsi Meet service rather than a direct connection to the other person — see Section 5 for what that means. Our own Phaze servers never store or record call audio or video either way.</li>
+            <li><strong>File attachments</strong> you send are stored on our server so the recipient can retrieve them, including if they're offline at the time. We do not currently auto-delete them after a fixed period — deleting the message in-app removes it from the conversation but the underlying file is not yet purged from storage. We're working on automatic expiry; until then, treat anything you upload as retained indefinitely.</li>
             <li><strong>Stories</strong> (photos/videos) are stored until you delete them or after <strong>24 hours</strong>.</li>
             <li><strong>Key backups</strong> (optional): if you use the key backup feature, your private key is encrypted with a PIN on-device before upload. We store the ciphertext only and cannot access your private key.</li>
         </ul>
@@ -100,7 +100,8 @@
             <li><strong>Firebase Cloud Messaging (Google):</strong> used to deliver push notifications to Android devices. Google receives your FCM device token. Subject to <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy Policy</a>.</li>
             <li><strong>Email delivery:</strong> verification and password-reset emails are delivered via an SMTP provider, which sees your email address and subject line.</li>
             <li><strong>SMS (optional):</strong> if you opt into phone verification, handled via Twilio. Twilio sees your phone number and the OTP.</li>
-            <li><strong>TURN/STUN relay:</strong> used to establish peer-to-peer calls when direct connections are blocked by NAT. TURN servers relay encrypted RTP packets and cannot decrypt call content.</li>
+            <li><strong>TURN/STUN relay:</strong> our own relay, used to help WebRTC connections form when direct connections are blocked by NAT. It passes encrypted RTP packets and cannot decrypt call content.</li>
+            <li><strong>Jitsi Meet (8x8, Inc.):</strong> voice and video calls, and voice channels in Spaces, currently run as a room on the public <code>meet.jit.si</code> service rather than through Phaze's own infrastructure. Jitsi's server sees your call's audio/video and, per their own policy, may apply end-to-end encryption depending on client support and room settings — it is not the same guarantee this policy makes for DMs. See <a href="https://jitsi.org/meet-privacy-policy/" target="_blank" rel="noopener">Jitsi's privacy policy</a>. We're moving calls onto our own infrastructure; this entry will be removed once that's done.</li>
             <li><strong>Hosting:</strong> <code>phazechat.world</code> runs on a commercial hosting provider. Your IP is visible to the provider for the duration of your connection.</li>
         </ul>
 
@@ -108,8 +109,9 @@
         <table>
             <tr><th>Data type</th><th>Retention period</th></tr>
             <tr><td>Account data (username, email, hashed password)</td><td>Lifetime of account, or 90 days after deletion request</td></tr>
-            <tr><td>Message metadata (sender, recipient, timestamp)</td><td>30 days after delivery</td></tr>
-            <tr><td>File attachments</td><td>7 days after upload</td></tr>
+            <tr><td>Direct message ciphertext &amp; metadata (sender, recipient, timestamp)</td><td>Lifetime of account (needed for cross-device history) — deleted with your account</td></tr>
+            <tr><td>Spaces channel messages</td><td>30 days after posting</td></tr>
+            <tr><td>File attachments</td><td>Not currently auto-deleted (see Section 3)</td></tr>
             <tr><td>Stories</td><td>24 hours or until manually deleted</td></tr>
             <tr><td>Connection logs (IP, device model)</td><td>30 days</td></tr>
             <tr><td>FCM push tokens</td><td>Until you sign out or uninstall</td></tr>

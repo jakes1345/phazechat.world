@@ -45,30 +45,40 @@ var Version = "dev"
 
 // NexusMessage is the wire protocol for Phaze™
 type NexusMessage struct {
-	Type        string      `json:"type"`
-	Sender      string      `json:"sender"`
-	Recipient   string      `json:"recipient"`
-	Body        string      `json:"body"`
-	Status      string      `json:"status"`
-	Results     []string    `json:"results"`
-	SDP         string      `json:"sdp"`
-	Candidate   string      `json:"candidate"`
-	RoomID      string      `json:"room_id,omitempty"`
-	Token       string      `json:"token"`
-	Error       string      `json:"error"`
-	Email       string      `json:"email,omitempty"`
-	Mood        string      `json:"mood,omitempty"`
-	DisplayName string      `json:"display_name,omitempty"`
-	Supporter   bool        `json:"supporter,omitempty"`
-	ConvoID     string      `json:"convo_id,omitempty"`
-	ConvoName   string      `json:"convo_name,omitempty"`
-	Members     []string    `json:"members,omitempty"`
-	TurnConfig  *TurnConfig `json:"turn_config,omitempty"`
-	TOTPCode    string      `json:"totp_code,omitempty"`
-	TOTPURI     string      `json:"totp_uri,omitempty"`
-	QRToken     string      `json:"qr_token,omitempty"`
-	QRData      string      `json:"qr_data,omitempty"`
-	DeviceInfo  string      `json:"device_info,omitempty"`
+	Type        string   `json:"type"`
+	Sender      string   `json:"sender"`
+	Recipient   string   `json:"recipient"`
+	Body        string   `json:"body"`
+	Status      string   `json:"status"`
+	Results     []string `json:"results"`
+	SDP         string   `json:"sdp"`
+	Candidate   string   `json:"candidate"`
+	RoomID      string   `json:"room_id,omitempty"`
+	Token       string   `json:"token"`
+	Error       string   `json:"error"`
+	Email       string   `json:"email,omitempty"`
+	Mood        string   `json:"mood,omitempty"`
+	DisplayName string   `json:"display_name,omitempty"`
+	Supporter   bool     `json:"supporter,omitempty"`
+	ConvoID     string   `json:"convo_id,omitempty"`
+	ConvoName   string   `json:"convo_name,omitempty"`
+	Members     []string `json:"members,omitempty"`
+	// Creator is who made the group — sent on convo_info/convo_created/
+	// convo_updated so the client can show remove/rename controls only to
+	// the one person the server will actually let use them, rather than
+	// showing a button to everyone that fails for everyone but the creator.
+	Creator string `json:"creator,omitempty"`
+	// ContactGroups[contact] = the group name the receiving user has filed
+	// that contact under in their own contact list (e.g. "Family", "Work")
+	// — sent as a full-map burst after auth and again after every
+	// contact_group_set, never incrementally. See getContactGroups.
+	ContactGroups map[string]string `json:"contact_groups,omitempty"`
+	TurnConfig    *TurnConfig       `json:"turn_config,omitempty"`
+	TOTPCode      string            `json:"totp_code,omitempty"`
+	TOTPURI       string            `json:"totp_uri,omitempty"`
+	QRToken       string            `json:"qr_token,omitempty"`
+	QRData        string            `json:"qr_data,omitempty"`
+	DeviceInfo    string            `json:"device_info,omitempty"`
 
 	RefBy string `json:"ref_by,omitempty"` // referral: username who invited this new user
 
@@ -365,6 +375,14 @@ type remoteCodeEntry struct {
 
 const remoteCodeTTL = 10 * time.Minute
 
+// bcryptCost matches the "cost factor 12" the privacy policy promises.
+// bcrypt.DefaultCost (10) is what every call site used until this was
+// audited against that promise — the policy was making a claim the code
+// didn't back up. Existing hashes still verify fine at whatever cost they
+// were created with; bcrypt stores its own cost in the hash string, so
+// raising this doesn't touch anyone's stored password.
+const bcryptCost = 12
+
 // sweepRemoteCodes removes expired remote control codes every 2 minutes.
 func (s *NexusServer) sweepRemoteCodes() {
 	t := time.NewTicker(2 * time.Minute)
@@ -449,6 +467,20 @@ func (s *NexusServer) initDB() {
 			status TEXT NOT NULL DEFAULT 'pending',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			UNIQUE(user_a, user_b)
+		)`,
+		// Contact groups ("Groups panel" — confirmed as early as Skype
+		// 3.0.0.214, 2007; see docs/skype-eras/skype3.md and
+		// GATING-DIFF.md's unmodeled-capabilities list). Deliberately
+		// asymmetric: which group a contact sits in is the owner's own
+		// filing, not a property of the friendship itself, so this is a
+		// separate table keyed by (owner, contact) rather than a column on
+		// friends — Alice can file Bob under "Work" while Bob files Alice
+		// under "Family", the same as real Skype's contact list.
+		`CREATE TABLE IF NOT EXISTS contact_groups (
+			owner TEXT NOT NULL,
+			contact TEXT NOT NULL,
+			group_name TEXT NOT NULL,
+			PRIMARY KEY (owner, contact)
 		)`,
 		`CREATE TABLE IF NOT EXISTS offline_messages (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -875,7 +907,7 @@ func (s *NexusServer) registerUser(username, email, mood, password string) (stri
 	}
 	// C2: pre-hash with SHA-256 to avoid bcrypt's silent 72-byte truncation.
 	pwHash := sha256.Sum256([]byte(password))
-	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 	if err != nil {
 		return "", err
 	}
@@ -1008,7 +1040,7 @@ func (s *NexusServer) consumePasswordReset(token, newPassword string) error {
 	}
 	// C2: pre-hash with SHA-256 to avoid bcrypt's silent 72-byte truncation.
 	pwHash := sha256.Sum256([]byte(newPassword))
-	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 	if err != nil {
 		return err
 	}
@@ -1116,7 +1148,7 @@ func (s *NexusServer) authenticateUser(username, password string) bool {
 	// Legacy fallback: raw password was hashed directly
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil {
 		// Silently upgrade to new scheme
-		newHash, err := bcrypt.GenerateFromPassword(pwHash[:], bcrypt.DefaultCost)
+		newHash, err := bcrypt.GenerateFromPassword(pwHash[:], bcryptCost)
 		if err == nil {
 			s.DB.Exec("UPDATE users SET password_hash = ? WHERE username = ?", string(newHash), username)
 			log.Printf("[security] migrated %s password hash to SHA256+bcrypt", username)
@@ -1408,6 +1440,41 @@ func (s *NexusServer) getFriends(username string) []string {
 	return friends
 }
 
+// getContactGroups returns owner's contact-list filing as contact -> group
+// name. A contact with no row is simply ungrouped; the client renders that
+// as its own bucket rather than the server inventing an "Ungrouped" string.
+func (s *NexusServer) getContactGroups(owner string) map[string]string {
+	rows, err := s.DB.Query("SELECT contact, group_name FROM contact_groups WHERE owner = ?", owner)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+
+	groups := map[string]string{}
+	for rows.Next() {
+		var contact, name string
+		if err := rows.Scan(&contact, &name); err != nil {
+			log.Printf("[db] getContactGroups scan: %v", err)
+			continue
+		}
+		groups[contact] = name
+	}
+	return groups
+}
+
+// setContactGroup files contact under groupName in owner's contact list, or
+// un-files it (deletes the row) when groupName is blank.
+func (s *NexusServer) setContactGroup(owner, contact, groupName string) error {
+	if groupName == "" {
+		_, err := s.DB.Exec("DELETE FROM contact_groups WHERE owner = ? AND contact = ?", owner, contact)
+		return err
+	}
+	_, err := s.DB.Exec(`INSERT INTO contact_groups (owner, contact, group_name) VALUES (?, ?, ?)
+		ON CONFLICT(owner, contact) DO UPDATE SET group_name = excluded.group_name`,
+		owner, contact, groupName)
+	return err
+}
+
 var errFriendBlocked = fmt.Errorf("blocked")
 var errFriendDuplicate = fmt.Errorf("already friends or request pending")
 
@@ -1501,7 +1568,7 @@ func (s *NexusServer) conversationMembers(id string) []string {
 }
 
 func (s *NexusServer) userConversations(username string) []NexusMessage {
-	rows, err := s.DB.Query(`SELECT c.id, c.name
+	rows, err := s.DB.Query(`SELECT c.id, c.name, c.created_by
 		FROM conversations c
 		JOIN conversation_members m ON m.convo_id = c.id
 		WHERE m.username = ?`, username)
@@ -1512,7 +1579,7 @@ func (s *NexusServer) userConversations(username string) []NexusMessage {
 	var out []NexusMessage
 	for rows.Next() {
 		var m NexusMessage
-		if err := rows.Scan(&m.ConvoID, &m.ConvoName); err != nil {
+		if err := rows.Scan(&m.ConvoID, &m.ConvoName, &m.Creator); err != nil {
 			log.Printf("[db] listConversations scan: %v", err)
 			continue
 		}
@@ -1520,6 +1587,43 @@ func (s *NexusServer) userConversations(username string) []NexusMessage {
 		out = append(out, m)
 	}
 	return out
+}
+
+// conversationCreator returns who made the group, and whether the group
+// exists at all. The creator is the only capability boundary group chats
+// have — no roles, no admin list, just this — which is deliberately the
+// minimal end of what real Skype group chats supported (a full Creator/
+// Master/Helper/User/Listener hierarchy) rather than a full reimplementation
+// of it. See docs/skype-era-gaps.md §3.
+func (s *NexusServer) conversationCreator(convoID string) (string, bool) {
+	var creator string
+	if err := s.DB.QueryRow("SELECT created_by FROM conversations WHERE id = ?", convoID).Scan(&creator); err != nil {
+		return "", false
+	}
+	return creator, true
+}
+
+// addConversationMembers adds new members to an existing group. Idempotent —
+// inserting someone already in the group is a silent no-op, not an error,
+// so a client retrying after a dropped ack can't double-fail.
+func (s *NexusServer) addConversationMembers(convoID string, members []string) error {
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return err
+	}
+	for _, m := range members {
+		if _, err := tx.Exec("INSERT OR IGNORE INTO conversation_members (convo_id, username) VALUES (?, ?)", convoID, m); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// renameConversation changes a group's display name.
+func (s *NexusServer) renameConversation(convoID, name string) error {
+	_, err := s.DB.Exec("UPDATE conversations SET name = ? WHERE id = ?", name, convoID)
+	return err
 }
 
 func (s *NexusServer) leaveConversation(convoID, username string) error {
@@ -1754,13 +1858,20 @@ func (s *NexusServer) exportUserData(username string) map[string]interface{} {
 	out["email"] = email
 	out["mood"] = mood
 	out["display_name"] = displayName
-	// Friends
-	rows, _ := s.DB.Query("SELECT user_b, status FROM friends WHERE user_a = ? AND status = 'accepted'", username)
+	// Friends. friends rows are directional (user_a = whoever sent the
+	// original request, regardless of who accepted), so this has to check
+	// both sides like getFriends does — otherwise a user who only ever
+	// accepted requests (never sent one) would export an empty list.
+	rows, _ := s.DB.Query(
+		`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END as friend
+		 FROM friends
+		 WHERE (user_a = ? OR user_b = ?) AND status = 'accepted'`,
+		username, username, username)
 	var friends []string
 	if rows != nil {
 		for rows.Next() {
-			var u, st string
-			if err := rows.Scan(&u, &st); err != nil {
+			var u string
+			if err := rows.Scan(&u); err != nil {
 				log.Printf("[db] exportUserData friends scan: %v", err)
 				continue
 			}
@@ -3689,7 +3800,11 @@ func refreshUpdateManifest(repo string) UpdateManifest {
 func (s *NexusServer) versionHandler(w http.ResponseWriter, r *http.Request) {
 	repo := strings.TrimSpace(os.Getenv("PHAZE_RELEASE_REPO"))
 	if repo == "" {
-		repo = "jakes1345/phaze"
+		// This fallback pointed at a repo that has never existed, so every
+		// client's update check was silently asking GitHub about a 404 and
+		// concluding "no update available" forever. Fixed to the real repo;
+		// PHAZE_RELEASE_REPO still overrides it for anyone running a fork.
+		repo = "jakes1345/phazechat.world"
 	}
 
 	updates.mu.RLock()
