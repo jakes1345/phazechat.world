@@ -152,6 +152,11 @@ export default function Whiteboard({ me, channelId, channelName, canClear, send,
     strokesRef.current = []
     liveRef.current = null
     ownStrokeIdsRef.current.clear()
+    // Deliberate: this effect's job is switching whiteboard channels, and
+    // ready has to drop before wb_join's reply repaints the new channel's
+    // strokes — otherwise the previous channel's board stays visible while
+    // the new one's state is still in flight.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReady(false)
     paint()
     send({ type: 'wb_join', channel_id: channelId })

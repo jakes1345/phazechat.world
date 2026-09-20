@@ -315,6 +315,9 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
         .then(url => setTotpQrCodeDataUrl(url))
         .catch(err => console.error(err))
     } else {
+      // Deliberate: clears the stale QR image the instant the 2FA setup
+      // URI is gone rather than leaving a dead code on screen.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTotpQrCodeDataUrl('')
     }
   }, [totpUri])
@@ -325,6 +328,9 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
         .then(url => setQrLoginQrCodeDataUrl(url))
         .catch(err => console.error(err))
     } else {
+      // Deliberate: clears the stale QR image the instant the token is
+      // gone (revoked/expired) rather than leaving a dead code on screen.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setQrLoginQrCodeDataUrl('')
     }
   }, [qrToken])
