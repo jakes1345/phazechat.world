@@ -1325,7 +1325,8 @@ export default function App() {
           if (msg.convo_id) {
             setConvos((prev) => prev.filter((c) => c.id !== msg.convo_id))
             setConvoLogs((prev) => {
-              const { [msg.convo_id!]: _drop, ...rest } = prev
+              const rest = { ...prev }
+              delete rest[msg.convo_id!]
               return rest
             })
             if (selectedConvoRef.current === msg.convo_id) {
