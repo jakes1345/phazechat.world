@@ -66,16 +66,27 @@ func dial(t *testing.T, wsBase string) *websocket.Conn {
 		t.Fatalf("dial: %v", err)
 	}
 	t.Cleanup(func() { c.Close() })
-	c.SetReadDeadline(time.Now().Add(5 * time.Second))
+	c.SetReadDeadline(time.Now().Add(readDeadline))
 	return c
 }
+
+// readDeadline is generous on purpose: bcrypt at cost 12 (see bcryptCost in
+// main.go — raised from Go's default 10 to match what privacy.html
+// promises) is real CPU work, and under `go test -race` plus a loaded
+// full-suite run, a single authenticateUser call can take long enough to
+// blow a tight deadline even though nothing is actually stuck — confirmed
+// by TestSmoke_DeleteAccount passing instantly in isolation (1.7s) but
+// timing out here reliably (2/2) as part of the full suite. Widening the
+// window costs nothing when a response is fast; it only matters when one
+// genuinely isn't, which was exactly the false-failure case here.
+const readDeadline = 20 * time.Second
 
 // readUntil reads messages until one matches the predicate or the deadline trips.
 // Each successful read resets the read deadline so bursty server messages cannot
 // consume the entire window before the awaited frame arrives.
 func readUntil(t *testing.T, c *websocket.Conn, want func(NexusMessage) bool) NexusMessage {
 	t.Helper()
-	const perRead = 5 * time.Second
+	const perRead = readDeadline
 	for {
 		c.SetReadDeadline(time.Now().Add(perRead))
 		var m NexusMessage
