@@ -100,9 +100,9 @@
 The following are NOT CONFIRMED this pass, either because the source could not be reached or because the claim came from an unverified summary rather than a fetched primary/secondary source.
 
 Source-unreachable claims:
-- A claim describing Skype's Tools > Options window with a left-nav "Notifications" category containing Notification Settings, Alerts & Messages, and Sounds sub-settings could not be verified — supertintin.com returned HTTP 522 on both attempts [9].
-- A claim that Skype's Options > Notifications > Sounds section lets users uncheck sound triggers for events like "incoming IM," "incoming contacts," "incoming voice message," "incoming file," and "incoming request for my details" could not be verified — smallbusiness.chron.com returned HTTP 403 on both attempts [10].
-- A claim that Skype app versions 7.17 to 7.30 on Windows Desktop were dropped from support on September 4, 2017 could not be verified directly — linustechtips.com returned 403 on both attempts; only corroborated by an unverified WebSearch snippet, not the source page itself [6].
+- A claim describing Skype's Tools > Options window with a left-nav "Notifications" category containing Notification Settings, Alerts & Messages, and Sounds sub-settings could not be verified — supertintin.com returned HTTP 522 on both attempts, and again on a third attempt this pass; this looks like the origin server itself is down rather than a bot-block, so it may simply stay unreachable [9].
+- **Partially confirmed this pass** (source [10], smallbusiness.chron.com, was 403 before — fetched successfully this pass): the general mechanism is real — Skype's Notifications category has a "Sounds" sub-section reached via Tools > Options > Notifications > Sounds, with an "Enable all sounds" / "Mute all sounds" toggle and individual checkboxes "in front of the warnings you want to receive." The article doesn't itemize the specific named events ("incoming IM," "incoming contacts," etc.) — only the mechanism, not the exact event list, is confirmed [10].
+- A claim that Skype app versions 7.17 to 7.30 on Windows Desktop were dropped from support on September 4, 2017 could not be verified directly — linustechtips.com returned 403 again this pass (plain fetch and stealth-browser fetch both retried); only corroborated by an unverified WebSearch snippet, not the source page itself [6].
 
 UNSOURCED open questions (from AI-summarized search snippets or unreached sources, not verbatim-quoted fetches):
 - Skype 7.0 for Windows introducing chat bubbles, rounded avatars, and mobile-style redesigned notifications, as originally surfaced via an AI-summarized search snippet rather than a fetched page.
@@ -140,7 +140,7 @@ UNSOURCED open questions (from AI-summarized search snippets or unreached source
 7. https://techcrunch.com/?p=1067823 — secondary
 8. http://www.skaip.org/skype-7-0-0-102-for-windows — secondary
 9. https://www.supertintin.com/blog/skype-recorder/manage-skype-notifications — secondary (unreachable this pass)
-10. https://smallbusiness.chron.com/skype-isnt-making-sounds-62345.html — secondary (unreachable this pass)
+10. https://smallbusiness.chron.com/skype-isnt-making-sounds-62345.html — secondary; fetched successfully this pass (was 403 before) — confirms the Sounds sub-section mechanism, not the exact event list
 11. https://en.wikipedia.org/wiki/List_of_Skype_features — secondary
 12. https://learn.microsoft.com/en-us/archive/technet-wiki/29126.skype-how-to-add-moderatorsadministrators-to-a-chat-group — secondary
 13. https://www.ghacks.net/2016/05/22/skype-file-transfers-limited-100mb/ — secondary
