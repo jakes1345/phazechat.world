@@ -16,8 +16,8 @@
 - Skype 5.2 for Mac was released July 5, 2011, adding group screen sharing during group video calls (previously screen sharing was one-to-one only), a call-control bar that keeps video visible while multitasking, and a new "Recents"/history section [3][18][19].
 - Group video calling and group screen sharing in the Skype 5.2 era required a Skype Premium subscription costing between $4.49 and $8.99 per month, with $4.99 day passes available (partly sourced — the $4.49 low end is TechCrunch's figure; an independent outlet instead states $4.99/day or $8.99/month, a minor discrepancy in the exact floor price) [3][18].
 - Skype 5.5 for Windows was released around the same time as Skype 5.2 for Mac (mid-2011), adding deep Facebook integration (low confidence — mentioned only as a companion detail in the Mac-focused article) [3].
-- A Skype 5.11 for Windows Beta (dated September 14, 2012 in search-result text) reportedly tightened Facebook and Microsoft account integration for sign-in; this specific claim could not be confirmed against an actual fetched article — the only source_url offered was a Google search-results query, not a published page — so it is treated as unverified [not supported by any fetchable source].
-- A claim that Skype 5.10.0.116 was a stable Windows build and that 5.11 Windows Beta let users log in via Microsoft or Facebook account (as well as a regular Skype account) could not be verified: the cited ghacks.net page returned a Cloudflare challenge on every fetch attempt [5, source unreachable].
+- **Now confirmed** (the ghacks.net source [5] was Cloudflare-blocked on every earlier fetch attempt; refetched successfully this pass): Skype 5.11 for Windows Beta, released September 14, 2012, let users sign in directly with a Facebook or Microsoft account instead of creating a Skype account first. Facebook sign-in gave free Skype-to-Skype calling with Facebook contacts who also used Skype; Microsoft account sign-in additionally pulled in Messenger/Xbox/Hotmail/Outlook.com contacts and their presence. Accounts could be linked and merged rather than replaced. 5.11 also added 6 new interface languages (Thai, Croatian, Slovenian, Serbian, Catalan, Slovak), a back-catalog of previously-used profile photos, and an "updated design" [5].
+- The narrower claim that build **5.10.0.116** specifically was a "stable" release remains unconfirmed — the ghacks.net article covers 5.11's features only and never mentions 5.10 by version number. No real, fetchable URL for that sub-claim has ever been identified in this doc (an earlier pass named "betanews.com" as its likely source but never pinned down an actual article URL); not re-verified this pass for lack of anything concrete to fetch.
 - Exact release dates and changelog text for Skype 5.3, 5.6, 5.7, 5.8, 5.9, and 5.10 for Windows were not found within the research budget for this pass.
 
 ## Settings and UI
@@ -29,8 +29,7 @@
 - Skype 5.0 for Windows let users call and SMS their Facebook friends' mobile phones and landlines directly from Skype (partly sourced — this specific mechanic is confirmed verbatim; a further claim that Skype-to-Skype calls to Facebook contacts who also use Skype were free was not confirmed in the source text) [1].
 - Skype 5.0 for Windows featured an improved UI and a new home dashboard showing a feed of contacts' mood messages plus tutorials on Skype features [1].
 - In Skype 5.0, the contact search screen featured images and mood messages and offered real-time results [9].
-- A claim that Skype for Windows' Options interface grouped settings into Privacy, Notifications and alerts, Sound effects and sound devices, Hotkeys, Connection options, and Advanced features (in that order under General options) could not be verified: the cited support.freedomscientific.com transcript page returned HTTP 403 on every fetch attempt [8, source unreachable].
-- A related claim that Skype's Privacy options are reached via Tools > Options > Privacy > Blocked Contacts is likewise unverified for the same reason [8, source unreachable].
+- **Checked this pass, does not support the claim as attributed**: the support.freedomscientific.com transcript [8] (403 on every earlier attempt; now reachable) turned out to be a JAWS screen-reader walkthrough of a much later, tab-based Settings redesign — categories are Account and profile / General / Appearance / Audio and video / Calling / Messaging / Notifications / Contacts / Help and feedback, opened with CTRL+COMMA, and it includes a "share location with Bing" toggle. That's the post-redesign Settings UI (Skype 8+ territory), not the 5.x "Tools > Options" dialog the claim described. The specific claim that 5.x's Options grouped Privacy/Notifications/Sounds/Hotkeys/Connection/Advanced (or that Privacy was reached via Tools > Options > Privacy > Blocked Contacts) is neither confirmed nor refuted by this source — it's simply the wrong era's UI, and remains unsourced for 5.x specifically.
 - The profile editor's mood-message/avatar/Skype Name layout and tray-icon right-click menu specifics remain unsourced open questions (see below) — but the exact menu bar contents are now sourced; see above.
 - Two claims about a "Call Quality information button" dialog and full-screen window drag behavior, sourced to a TechRadar article, were checked against that page's own metadata and found to describe Skype 4.0 from 2008, not the 5.x era — they are not stated as fact here (see Refuted or unresolved).
 
@@ -85,17 +84,18 @@
 
 **Source-unreachable claims (not confirmed this pass):**
 
-- Skype 5.10.0.116 being a "stable" Windows build, and 5.11 Windows Beta allowing login via Microsoft or Facebook account as well as a regular Skype account — ghacks.net returned a Cloudflare challenge page on every fetch attempt [5].
-- Group video calling being made completely free (no Premium required) starting April 2014 across Windows, Mac and Xbox One (up to 10 people on PC/Mac, 4 on Xbox One) — this is outside the 2010-2012 window in any case, and forbes.com returned HTTP 403 on every fetch attempt [6].
-- Skype for Windows' Options interface grouping (Privacy, Notifications and alerts, Sound effects and sound devices, Hotkeys, Connection options, Advanced features, in that sequence) — support.freedomscientific.com returned HTTP 403 on every fetch attempt [8].
-- Skype's Privacy options being reached via Tools > Options > Privacy > Blocked Contacts — same unreachable source [8].
+- Group video calling being made completely free (no Premium required) starting April 2014 across Windows, Mac and Xbox One (up to 10 people on PC/Mac, 4 on Xbox One) — this is outside the 2010-2012 window in any case, and forbes.com returned HTTP 403 on every fetch attempt (plain fetch and stealth-browser fetch, both retried this pass) [6].
+
+**Resolved this pass** (were listed here previously; see the Changelog and Settings sections above for what's now sourced):
+
+- Source [5] (ghacks.net, Cloudflare-blocked before) is now fetched directly and confirms the 5.11 Facebook/Microsoft sign-in claim. Source [4]'s Google-search placeholder is no longer the sole reference for that claim and can be treated as superseded.
+- Source [8] (support.freedomscientific.com, 403 before) is now fetched directly — it turned out to describe a later, tab-based Settings redesign, not 5.x's Tools > Options dialog, so the specific claim it was cited for stays unsourced for this era, but for a different reason (wrong-era source, not an unreachable one).
 
 **UNSOURCED open questions (not confirmed this pass):**
 
 - Exact release dates and full changelog text for Skype 5.3, 5.6, 5.7, 5.8, 5.9, 5.10 for Windows were not found within budget.
 - Skype Extras/API details, Skype Access, and Skype WiFi tie-ins to specific 5.x versions were not sourced this run.
-- The claim about 5.10.0.116 being "stable" and its exact date is attributed to an AI search summary, not a directly fetched primary quote.
-- The 5.11 claim's only offered source_url is a placeholder search URL since betanews.com (the actual article) returned 403 and could not be fetched directly.
+- The claim about 5.10.0.116 being "stable" is attributed to an AI search summary, not a directly fetched primary quote, and no real URL for its likely source ("betanews.com") has ever been pinned down in this doc — not re-checked this pass for lack of anything concrete to fetch.
 - A likely list of Skype 5.x Tools > Options categories (General, Privacy, Notifications, Sounds, Calls, IM & SMS, Advanced, Connection) could not be verified with a dated 5.x source this run.
 - Details of the 5.x profile editor (mood message, avatar, Skype Name display) were not sourced verbatim this run.
 - Tray icon behavior/right-click menu specifics for Skype 5.x were not sourced this run.
@@ -118,11 +118,11 @@
 1. https://techcrunch.com/2010/10/14/skype-5-0-for-windows-debuts-with-facebook-integration-call-recovery-and-more — secondary (news report)
 2. https://www.engadget.com/2011-01-27-skype-5-0-hits-mac-with-group-video-calling-streamlined-interfa.html — secondary (news report)
 3. https://techcrunch.com/2011/07/05/skype-5-2-for-mac-has-arrived-comes-with-group-screen-sharing-and-video-calls — secondary (news report)
-4. https://www.google.com/search?q=Skype+5.11+for+Windows+Beta+tightens+Facebook+Microsoft+account+integration — not a usable source (search-results query, not a published article); listed for transparency only
-5. https://www.ghacks.net/2012/09/14/skype-beta-now-with-facebook-login-and-microsoft-account-access/ — secondary (news report); unreachable this pass
-6. https://www.forbes.com/sites/amitchowdhry/2014/04/29/skypes-group-video-calling-service-is-now-free/ — secondary (news report); unreachable this pass
+4. https://www.google.com/search?q=Skype+5.11+for+Windows+Beta+tightens+Facebook+Microsoft+account+integration — not a usable source (search-results query, not a published article); superseded by source 5, fetched directly this pass
+5. https://www.ghacks.net/2012/09/14/skype-beta-now-with-facebook-login-and-microsoft-account-access/ — secondary (news report); fetched successfully this pass (was Cloudflare-blocked before)
+6. https://www.forbes.com/sites/amitchowdhry/2014/04/29/skypes-group-video-calling-service-is-now-free/ — secondary (news report); still unreachable this pass (403, plain and stealth-browser fetch both retried)
 7. https://www.techradar.com/news/voip/internet/skype-s-new-videocalls-full-eye-to-eye-contact-395328 — secondary (news report); confirmed by page metadata to cover Skype 4.0 (2008), not 5.x
-8. https://support.freedomscientific.com/teachers/lessons/6.3.5_Transcript-SkypeSettings.htm — secondary (instructional transcript); unreachable this pass
+8. https://support.freedomscientific.com/teachers/lessons/6.3.5_Transcript-SkypeSettings.htm — secondary (instructional transcript); fetched successfully this pass (was 403 before) — describes a later Settings redesign, not 5.x
 9. https://www.computerworld.com/article/2469532/skype-5-0-loves-facebook-and-video-chat--download-it-now.html — secondary (news report)
 10. http://handytechtips.blogspot.com/2011/08/more-hidden-skype-emoticons-in-skype-55.html — secondary (blog post)
 11. https://www.techlicious.com/blog/skype-launches-group-video-calling/ — secondary (news report)
