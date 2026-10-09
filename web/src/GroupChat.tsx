@@ -22,7 +22,7 @@ type Props = {
    *  will actually accept — it applies the identical friends-only rule. */
   friends: string[]
   lines: GroupLine[]
-  renderBody: (text: string) => React.ReactNode
+  renderBody: (text: string, sender: string) => React.ReactNode
   senderColor: (name: string) => string
   onSend: (text: string) => void
   onLeave: () => void
@@ -138,7 +138,7 @@ export default function GroupChat({
         ) : (
           <div key={item.line.id} className={`group-line ${item.line.me ? 'me' : ''}`}>
             {!item.line.me && <span className="group-line-sender" style={{ color: senderColor(item.line.sender) }}>{item.line.sender}</span>}
-            <span className="group-line-body">{renderBody(item.line.body)}</span>
+            <span className="group-line-body">{renderBody(item.line.body, item.line.sender)}</span>
             <span className="group-line-ts">{new Date(item.line.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         ))}

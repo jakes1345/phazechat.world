@@ -77,6 +77,18 @@ export interface NexusMessage {
 
   // Referral tracking
   ref_by?: string
+  // Referral reward crates (nexus_server/rewards.go). `perks` maps a
+  // username to the reward ids they own; `items`/`crates` are the caller's
+  // own inventory and unopened-crate count; `item` is what a crate dropped.
+  perks?: Record<string, string[]>
+  items?: string[]
+  item?: string
+  crates?: number
+  // Shards (crate duplicates) and what they craft; see rewards.go.
+  shards?: number
+  shards_gained?: number
+  dupe?: boolean
+  costs?: Record<string, number>
 
   // New-device verification. challenge_id identifies a sign-in awaiting
   // approval; device_id is the browser/install it came from. On an inbound

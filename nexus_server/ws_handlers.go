@@ -115,6 +115,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					username, f, f, username).Scan(&lastSec)
 				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
 			}
+			s.sendReferralPerks(client, username, s.getFriends(username))
 			pending := s.getPendingRequests(username)
 			if len(pending) > 0 {
 				client.Send(NexusMessage{Type: "pending_requests", Results: pending})
@@ -292,6 +293,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 		case "verify_email":
 			if s.verifyUser(msg.Sender, msg.Body) {
 				s.autoJoinGlobalSpace(msg.Sender)
+				s.onReferralVerified(msg.Sender)
 				client.Send(NexusMessage{Type: "verify_result", Status: "ok"})
 			} else {
 				client.Send(NexusMessage{Type: "verify_result", Error: "Invalid verification code"})
@@ -482,6 +484,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					username, f, f, username).Scan(&lastSec)
 				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
 			}
+			s.sendReferralPerks(client, username, s.getFriends(username))
 
 		case "session_auth":
 			if authTracker.isIPThrottled(client.IP) {
@@ -559,6 +562,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				s.Mu.RUnlock()
 				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status})
 			}
+			s.sendReferralPerks(client, username, s.getFriends(username))
 			if pending := s.getPendingRequests(username); len(pending) > 0 {
 				client.Send(NexusMessage{Type: "pending_requests", Results: pending})
 			}
@@ -1096,19 +1100,68 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			var count int
-			s.DB.QueryRow("SELECT COUNT(*) FROM users WHERE referred_by = ?", username).Scan(&count)
-			rows, _ := s.DB.Query("SELECT username FROM users WHERE referred_by = ? ORDER BY created_at DESC LIMIT 20", username)
-			var referred []string
+			// Catch up any crates earned while offline / held back by the
+			// daily cap before reporting the count.
+			s.syncCrates(username)
+			count := s.verifiedReferralCount(username)
+			// Results: verified referrals (these count). Members: signed up
+			// but not verified yet — shown as pending so the referrer knows
+			// to nudge them.
+			rows, _ := s.DB.Query("SELECT username, COALESCE(is_verified, 0) FROM users WHERE referred_by = ? ORDER BY created_at DESC LIMIT 50", username)
+			var referred, pending []string
 			if rows != nil {
 				for rows.Next() {
 					var u string
-					rows.Scan(&u)
-					referred = append(referred, u)
+					var verified int
+					rows.Scan(&u, &verified)
+					if verified == 1 {
+						referred = append(referred, u)
+					} else {
+						pending = append(pending, u)
+					}
 				}
 				rows.Close()
 			}
-			client.Send(NexusMessage{Type: "referral_stats", Results: referred, Token: strconv.Itoa(count)})
+			toAmbassador := ambassadorAt - count
+			if toAmbassador < 0 {
+				toAmbassador = 0
+			}
+			client.Send(NexusMessage{
+				Type: "referral_stats", Results: referred, Members: pending,
+				Token: strconv.Itoa(count), Crates: s.unopenedCrates(username),
+				Items: s.openedItems(username), Duration: toAmbassador,
+				Shards: s.shardBalance(username), Costs: craftCost,
+			})
+
+		case "open_crate":
+			if username == "" {
+				continue
+			}
+			it, dupe, gained, err := s.openCrate(username)
+			if err != nil {
+				client.Send(NexusMessage{Type: "crate_opened", Error: err.Error(), Crates: s.unopenedCrates(username)})
+				continue
+			}
+			client.Send(NexusMessage{
+				Type: "crate_opened", Item: it.ID, Status: it.Rarity, Dupe: dupe, ShardsGained: gained,
+				Crates: s.unopenedCrates(username), Items: s.openedItems(username), Shards: s.shardBalance(username),
+			})
+			s.pushPerks(username)
+
+		case "craft_reward":
+			if username == "" {
+				continue
+			}
+			it, err := s.craftReward(username, msg.Item)
+			if err != nil {
+				client.Send(NexusMessage{Type: "craft_result", Error: err.Error(), Shards: s.shardBalance(username)})
+				continue
+			}
+			client.Send(NexusMessage{
+				Type: "craft_result", Item: it.ID, Status: it.Rarity,
+				Items: s.openedItems(username), Shards: s.shardBalance(username),
+			})
+			s.pushPerks(username)
 
 		case "invite_email":
 			if username == "" {

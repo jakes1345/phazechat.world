@@ -1,0 +1,21 @@
+[
+  { "id": "squad", "kind": "emoticon", "rarity": "common", "name": "Squad", "shortcut": "(squad)" },
+  { "id": "cheers", "kind": "emoticon", "rarity": "common", "name": "Cheers", "shortcut": "(cheers)" },
+  { "id": "boba", "kind": "emoticon", "rarity": "common", "name": "Boba", "shortcut": "(boba)" },
+  { "id": "sticker-hello", "kind": "sticker", "rarity": "common", "name": "Hello", "shortcut": "(sticker-hello)" },
+  { "id": "sticker-gg", "kind": "sticker", "rarity": "common", "name": "GG", "shortcut": "(sticker-gg)" },
+
+  { "id": "comet", "kind": "emoticon", "rarity": "rare", "name": "Comet", "shortcut": "(comet)" },
+  { "id": "rocket", "kind": "emoticon", "rarity": "rare", "name": "Rocket", "shortcut": "(rocket)" },
+  { "id": "sticker-cat", "kind": "sticker", "rarity": "rare", "name": "Cat", "shortcut": "(sticker-cat)" },
+  { "id": "fx-confetti", "kind": "effect", "rarity": "rare", "name": "Confetti", "shortcut": "(confetti)" },
+  { "id": "fx-hearts", "kind": "effect", "rarity": "rare", "name": "Love Storm", "shortcut": "(lovestorm)" },
+
+  { "id": "crown", "kind": "emoticon", "rarity": "epic", "name": "Crown", "shortcut": "(crown)" },
+  { "id": "diamond", "kind": "emoticon", "rarity": "epic", "name": "Diamond", "shortcut": "(diamond)" },
+  { "id": "sticker-cosmic", "kind": "sticker", "rarity": "epic", "name": "Cosmic", "shortcut": "(sticker-cosmic)" },
+  { "id": "fx-fireworks", "kind": "effect", "rarity": "epic", "name": "Fireworks", "shortcut": "(fireworks)" },
+
+  { "id": "legend", "kind": "emoticon", "rarity": "legendary", "name": "Legend", "shortcut": "(legend)" },
+  { "id": "fx-aurora", "kind": "effect", "rarity": "legendary", "name": "Aurora", "shortcut": "(aurora)" }
+]

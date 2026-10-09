@@ -1,3 +1,5 @@
+import { REWARDS, rewardById } from './referralRewards'
+
 export type Token =
   | { kind: 'text'; value: string }
   | { kind: 'emoticon'; id: string; shortcut: string }
@@ -242,6 +244,9 @@ export const FLAG_EMOTICONS = FLAGS
 
 const byShortcut = new Map<string, string>()
 for (const e of EMOTICONS) for (const s of e.shortcuts) byShortcut.set(s, e.id)
+// Reward shortcodes tokenize like any other; whether they draw as art is
+// decided at render time by who sent them (see referralRewards.ts).
+for (const r of REWARDS) byShortcut.set(r.shortcut, r.id)
 // Longest first so ":-)" wins over ":)" when both could start at a position.
 const allShortcuts = [...byShortcut.keys()].sort((a, b) => b.length - a.length)
 const urlRe = /https?:\/\/\S+/y
@@ -268,4 +273,12 @@ export function tokenize(input: string): Token[] {
   }
   flush()
   return out
+}
+
+/** The first screen effect in `text` that `owns` allows, e.g. "(confetti)". */
+export function effectIn(text: string, owns: (id: string) => boolean): string | null {
+  for (const t of tokenize(text)) {
+    if (t.kind === 'emoticon' && rewardById(t.id)?.kind === 'effect' && owns(t.id)) return t.id
+  }
+  return null
 }
