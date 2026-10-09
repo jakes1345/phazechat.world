@@ -3687,6 +3687,18 @@ button.link-btn:hover,
 .group-line-body { color: var(--text, #2b2b30); overflow-wrap: anywhere; }
 .group-line-ts { margin-left: auto; font-size: 11px; color: var(--muted, #a0b7c8); flex-shrink: 0; }
 .group-line.me .group-line-ts { margin-left: 8px; }
+/* Command output (/showmembers, /help, permission errors) — local-only,
+   so it reads as a system line, not a message anyone else saw. */
+.group-line.group-notice {
+  display: block;
+  white-space: pre-line;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted, #7a8894);
+  padding: 4px 8px;
+  margin: 2px 0;
+  border-left: 2px solid var(--separator, #d4dde5);
+}
 .group-chat-compose { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--separator, #e4ecef); }
 .group-chat-compose input {
   flex: 1;

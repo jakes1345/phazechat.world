@@ -36,6 +36,7 @@ import Settings from './Settings'
 import DesktopTitleBar from './DesktopTitleBar'
 import { AvatarImg } from './AvatarImg'
 import GroupChat from './GroupChat'
+import { loadMutedConvos, saveMutedConvos } from './groupCommands'
 import './App.css'
 
 // Wails desktop bridge — only present when running inside the Wails desktop app.
@@ -668,6 +669,11 @@ export default function App() {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   // Refs so the WS handler and audio paths see the live values without re-subscribing.
   const dndRef = useRef(false)
+  // Groups silenced with /alertsoff. State drives the header label; the ref
+  // is what the WS handler reads, so it sees changes without re-subscribing.
+  const [mutedConvos, setMutedConvos] = useState<Set<string>>(() => loadMutedConvos())
+  const mutedConvosRef = useRef(mutedConvos)
+  useEffect(() => { mutedConvosRef.current = mutedConvos }, [mutedConvos])
   const idleRef = useRef(false)
   const lastAckedStatusRef = useRef<UserStatus>('Online')
   const announcedStatusRef = useRef<UserStatus | null>(null)
@@ -1267,7 +1273,8 @@ export default function App() {
               ...prev,
               [msg.convo_id!]: [...(prev[msg.convo_id!] ?? []), gline],
             }))
-            if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id && !dndRef.current) {
+            if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id && !dndRef.current
+                && !mutedConvosRef.current.has(msg.convo_id)) {
               playPhazeSound('MessageReceived.wav')
             }
           }
@@ -3145,6 +3152,18 @@ export default function App() {
                     }}
                     onRename={(newName) => {
                       send({ type: 'convo_rename', convo_id: selectedConvo, convo_name: newName })
+                    }}
+                    classicCommands={isClassicSkype(theme)}
+                    alertsOn={!mutedConvos.has(selectedConvo)}
+                    onSetAlerts={(on) => {
+                      const cid = selectedConvo
+                      setMutedConvos((prev) => {
+                        const next = new Set(prev)
+                        if (on) next.delete(cid)
+                        else next.add(cid)
+                        saveMutedConvos(next)
+                        return next
+                      })
                     }}
                   />
                 ) : (
