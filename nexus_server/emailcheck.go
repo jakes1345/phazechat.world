@@ -11,10 +11,14 @@ package main
 // isDisposableEmail returns ("reason", true) when the email should be rejected.
 
 import (
+	"errors"
 	"net"
 	"os"
 	"strings"
 )
+
+// lookupMX is a variable so tests can substitute DNS answers.
+var lookupMX = net.LookupMX
 
 func isDisposableEmail(email string) (reason string, blocked bool) {
 	at := strings.LastIndex(email, "@")
@@ -40,8 +44,20 @@ func isDisposableEmail(email string) (reason string, blocked bool) {
 	}
 
 	// 2. MX record validation — domain must have at least one mail server.
-	mxs, err := net.LookupMX(domain)
-	if err != nil || len(mxs) == 0 {
+	// Only a definitive answer rejects: NXDOMAIN / no MX records. A lookup
+	// that merely failed (timeout, SERVFAIL, resolver down) lets the signup
+	// through — previously it rejected every registration for as long as
+	// DNS was flaky. Failing open here is safe because the account still
+	// can't do anything until the emailed verification code is entered.
+	mxs, err := lookupMX(domain)
+	if err != nil {
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			return "email domain has no mail servers", true
+		}
+		return "", false
+	}
+	if len(mxs) == 0 {
 		return "email domain has no mail servers", true
 	}
 
