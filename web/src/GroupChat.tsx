@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { runGroupCommand } from './groupCommands'
 
 export type GroupLine = {
   id: string
@@ -29,7 +30,17 @@ type Props = {
   onAddMembers: (usernames: string[]) => void
   onRemoveMember: (username: string) => void
   onRename: (newName: string) => void
+  /** Classic eras (Skype 3-7) understood /topic, /add, /kick… in group
+   *  chats; Skype 8's cloud chats dropped them. Off means slash text is
+   *  sent as an ordinary message. */
+  classicCommands: boolean
+  /** False once /alertsoff muted this group's message sounds. */
+  alertsOn: boolean
+  onSetAlerts: (on: boolean) => void
 }
+
+/** A line only this user sees — command output and errors. */
+type Notice = { id: string; text: string; ts: number }
 
 /** Group conversation pane. Messages are not end-to-end encrypted (the
  *  server fans them out per member), and the header says so.
@@ -44,8 +55,10 @@ type Props = {
 export default function GroupChat({
   name, members, creator, me, friends, lines, renderBody, senderColor,
   onSend, onLeave, onClose, onAddMembers, onRemoveMember, onRename,
+  classicCommands, alertsOn, onSetAlerts,
 }: Props) {
   const [draft, setDraft] = useState('')
+  const [notices, setNotices] = useState<Notice[]>([])
   const [manageOpen, setManageOpen] = useState(false)
   const [renameDraft, setRenameDraft] = useState(name)
   const [toAdd, setToAdd] = useState<string[]>([])
@@ -61,12 +74,38 @@ export default function GroupChat({
   // convo_updated arriving) would silently get typed over on next render.
   useEffect(() => { setRenameDraft(name) }, [name])
 
+  const notice = (text: string) =>
+    setNotices((prev) => [...prev, { id: `n-${Date.now()}-${prev.length}`, text, ts: Date.now() }])
+
   const send = () => {
     const text = draft.trim()
     if (!text) return
-    onSend(text)
     setDraft('')
+    if (!classicCommands) { onSend(text); return }
+    const r = runGroupCommand(text, { me, creator, members, friends })
+    switch (r.kind) {
+      case 'send': onSend(r.text); break
+      case 'rename': onRename(r.name); break
+      case 'add':
+        onAddMembers(r.users)
+        if (r.notice) notice(r.notice)
+        break
+      case 'kick': onRemoveMember(r.user); break
+      case 'leave': onLeave(); break
+      case 'alerts':
+        onSetAlerts(r.on)
+        notice(r.on ? 'Alerts on — new messages here will play a sound.' : 'Alerts off — this group stays silent. /alertson to undo.')
+        break
+      case 'notice': notice(r.text); break
+    }
   }
+
+  // Command output interleaves with the conversation by time, like the
+  // system lines real Skype printed into the chat itself.
+  const timeline = [
+    ...lines.map((l) => ({ kind: 'line' as const, ts: l.ts, line: l })),
+    ...notices.map((n) => ({ kind: 'notice' as const, ts: n.ts, notice: n })),
+  ].sort((a, b) => a.ts - b.ts)
 
   const addable = friends.filter((f) => !members.includes(f))
 
@@ -82,7 +121,9 @@ export default function GroupChat({
         <span className="avatar group-avatar">{name[0]?.toUpperCase()}</span>
         <span className="chat-peer-info">
           <span className="chat-peer-name">{name}</span>
-          <span className="chat-peer-status">{members.length} people · not end-to-end encrypted</span>
+          <span className="chat-peer-status">
+            {members.length} people · not end-to-end encrypted{!alertsOn && ' · alerts off'}
+          </span>
         </span>
         <span className="group-chat-actions">
           <button type="button" onClick={openManage} title="Manage group">Manage</button>
@@ -91,12 +132,14 @@ export default function GroupChat({
         </span>
       </div>
       <div className="group-chat-scroll" ref={scrollRef}>
-        {lines.length === 0 && <div className="group-chat-empty">No messages yet — say hi.</div>}
-        {lines.map((l) => (
-          <div key={l.id} className={`group-line ${l.me ? 'me' : ''}`}>
-            {!l.me && <span className="group-line-sender" style={{ color: senderColor(l.sender) }}>{l.sender}</span>}
-            <span className="group-line-body">{renderBody(l.body)}</span>
-            <span className="group-line-ts">{new Date(l.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        {timeline.length === 0 && <div className="group-chat-empty">No messages yet — say hi.</div>}
+        {timeline.map((item) => item.kind === 'notice' ? (
+          <div key={item.notice.id} className="group-line group-notice">{item.notice.text}</div>
+        ) : (
+          <div key={item.line.id} className={`group-line ${item.line.me ? 'me' : ''}`}>
+            {!item.line.me && <span className="group-line-sender" style={{ color: senderColor(item.line.sender) }}>{item.line.sender}</span>}
+            <span className="group-line-body">{renderBody(item.line.body)}</span>
+            <span className="group-line-ts">{new Date(item.line.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         ))}
       </div>
@@ -105,7 +148,7 @@ export default function GroupChat({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') send() }}
-          placeholder="Message the group…"
+          placeholder={classicCommands ? 'Message the group… (/help for commands)' : 'Message the group…'}
         />
         <button type="button" className="send-pill" onClick={send} disabled={!draft.trim()}>Send message</button>
       </div>
