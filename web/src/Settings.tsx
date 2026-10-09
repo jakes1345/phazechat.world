@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import type { NexusMessage } from './nexusTypes'
 import { bumpAvatarVersion } from './avatarVersions'
 import { SELECTABLE_THEMES, type ThemeId } from './themes'
+import RewardsPanel from './RewardsPanel'
 import './settings.css'
 
 type Tab = 'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite' | 'import' | 'appearance'
@@ -83,9 +84,6 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
   const [delPw, setDelPw] = useState('')
   const [delMsg, setDelMsg] = useState('')
 
-  // Referral stats
-  const [referralCount, setReferralCount] = useState<number | null>(null)
-  const [referredUsers, setReferredUsers] = useState<string[]>([])
 
   // Skype import
   const [importBusy, setImportBusy] = useState(false)
@@ -103,7 +101,6 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
   useEffect(() => {
     if (tab === 'sessions') send({ type: 'list_sessions' })
     if (tab === 'import') loadSkypeContacts()
-    if (tab === 'invite' && referralCount === null) send({ type: 'get_referral_stats' })
   }, [tab, send])
 
   const onMsg = useCallback((msg: NexusMessage) => {
@@ -170,10 +167,6 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
       case 'invite_result':
         setInviteMsg(msg.status === 'sent' ? 'Invite sent!' : (msg.error || 'Error'))
         if (msg.status === 'sent') setInviteEmail('')
-        break
-      case 'referral_stats':
-        setReferralCount(parseInt(msg.token || '0', 10))
-        setReferredUsers(msg.results || [])
         break
       case 'sessions_list':
         try { setSessions(JSON.parse(msg.body || '[]') as Session[]) } catch { /* ignore */ }
@@ -435,15 +428,9 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
           {/* ── Invite Friends ─────────────────────────────────── */}
           {tab === 'invite' && (
             <div className="settings-section">
-              {referralCount !== null && referralCount > 0 && (
-                <div className="referral-stat-box">
-                  <span className="referral-stat-num">{referralCount}</span>
-                  <span className="referral-stat-label">{referralCount === 1 ? 'person' : 'people'} joined Phaze from your link</span>
-                  {referredUsers.length > 0 && (
-                    <p className="referral-users">{referredUsers.join(', ')}</p>
-                  )}
-                </div>
-              )}
+              <RewardsPanel send={send} subscribe={subscribe} />
+
+              <hr className="settings-divider" />
 
               <h3 className="settings-section-title">Your invite link</h3>
               <p className="settings-label">Anyone who signs up through this link is counted as your referral.</p>
@@ -453,11 +440,21 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
                   try {
                     await navigator.clipboard.writeText(inviteLink)
                     setInviteMsg('Link copied!')
-                  } catch { setInviteMsg('Link copied!') }
+                  } catch { setInviteMsg('Copy failed — select the link and copy it.') }
                 }}>Copy</button>
               </div>
 
               <div className="invite-share-row">
+                {/* Discord has no share-intent URL, so copy a ready-to-paste
+                    message and open Discord; the link unfurls into a Phaze
+                    card there via the OpenGraph tags in index.html. */}
+                <button className="settings-btn invite-share-btn invite-share-discord" onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(`come chat with me on Phaze ${inviteLink}`)
+                    setInviteMsg('Copied! Paste it into a Discord DM or server.')
+                  } catch { setInviteMsg('Copy failed — select the link and copy it.') }
+                  window.open('https://discord.com/channels/@me', '_blank', 'noopener,noreferrer')
+                }}>Discord</button>
                 <a
                   className="settings-btn invite-share-btn"
                   href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`come chat with me on Phaze ${inviteLink}`)}`}

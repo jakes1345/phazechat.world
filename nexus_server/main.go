@@ -60,9 +60,24 @@ type NexusMessage struct {
 	Mood        string   `json:"mood,omitempty"`
 	DisplayName string   `json:"display_name,omitempty"`
 	Supporter   bool     `json:"supporter,omitempty"`
-	ConvoID     string   `json:"convo_id,omitempty"`
-	ConvoName   string   `json:"convo_name,omitempty"`
-	Members     []string `json:"members,omitempty"`
+
+	// Referral rewards (referrals.go / rewards.go): username -> owned
+	// reward ids on referral_perks; the user's own inventory and unopened
+	// crate count on referral_stats / crate_opened.
+	Perks  map[string][]string `json:"perks,omitempty"`
+	Items  []string            `json:"items,omitempty"`
+	Item   string              `json:"item,omitempty"`
+	Crates int                 `json:"crates,omitempty"`
+	// Shards: the caller's balance. ShardsGained / Dupe describe a crate that
+	// dropped something already owned. Costs is shards needed to craft, by rarity.
+	Shards       int            `json:"shards,omitempty"`
+	ShardsGained int            `json:"shards_gained,omitempty"`
+	Dupe         bool           `json:"dupe,omitempty"`
+	Costs        map[string]int `json:"costs,omitempty"`
+
+	ConvoID   string   `json:"convo_id,omitempty"`
+	ConvoName string   `json:"convo_name,omitempty"`
+	Members   []string `json:"members,omitempty"`
 	// Creator is who made the group — sent on convo_info/convo_created/
 	// convo_updated so the client can show remove/rename controls only to
 	// the one person the server will actually let use them, rather than
@@ -856,6 +871,7 @@ func (s *NexusServer) initDB() {
 	if _, err := s.DB.Exec(`UPDATE users SET role = 'admin' WHERE is_admin = 1 AND (role = '' OR role = 'user')`); err != nil {
 		log.Printf("[role] backfill: %v", err)
 	}
+	s.initRewardsDB()
 }
 
 // Role hierarchy from lowest to highest. roleRank(r) returns the numeric
@@ -4206,6 +4222,7 @@ func main() {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if server.verifyUser(u, code) {
 			server.autoJoinGlobalSpace(u)
+			server.onReferralVerified(u)
 			fmt.Fprint(w, `<!doctype html><html><head><meta charset="utf-8"><title>Verified!</title>
 <style>body{font-family:Inter,system-ui,sans-serif;background:#0b0b0d;color:#fafafa;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
 .card{background:#16161a;border:1px solid #232328;border-radius:16px;padding:48px;text-align:center;max-width:420px}
@@ -4417,6 +4434,8 @@ func (s *NexusServer) profileHandler(w http.ResponseWriter, r *http.Request) {
 		"display_name": displayName,
 		"mood":         mood,
 		"supporter":    supporter == 1,
+		// Referral milestone (referrals.go): shows the Ambassador badge.
+		"ambassador": s.isAmbassador(username),
 	})
 }
 

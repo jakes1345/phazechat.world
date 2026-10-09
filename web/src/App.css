@@ -1911,7 +1911,8 @@ button.link-btn:hover,
   font-size: 1.25rem;
   font-weight: 800;
 }
-.supporter-badge {
+.supporter-badge,
+.ambassador-badge {
   display: inline-block;
   margin-left: 0.4rem;
   font-size: 0.95rem;
@@ -3584,7 +3585,7 @@ button.link-btn:hover,
   bottom: calc(100% + 6px);
   left: 0;
   z-index: 45;
-  width: 268px;
+  width: 288px;
   padding: 8px;
   background: var(--panel, #fff);
   border: 1px solid var(--panel-edge, #d9d9d9);
@@ -3601,6 +3602,7 @@ button.link-btn:hover,
   border-radius: 4px;
   cursor: pointer;
 }
+.emoticon-picker-tabs button { color: var(--text, #1a1a1a); }
 .emoticon-picker-tabs button.on { background: var(--list-hover, rgba(0, 0, 0, 0.08)); font-weight: 600; }
 .emoticon-picker-grid {
   display: grid;
@@ -6065,3 +6067,64 @@ button.link-btn:hover,
   .device-ask-actions { margin-left: 0; }
   .device-ask-actions button { flex: 1; }
 }
+
+/* ── Referral rewards: picker tab + "a friend joined" banner ───── */
+.emoticon-picker-grid button.emo-locked { position: relative; }
+.emoticon-picker-grid button.emo-locked .emoticon { filter: grayscale(1); opacity: 0.45; }
+.emo-lock { position: absolute; right: 0; bottom: 0; font-size: 9px; line-height: 1; }
+.emoticon-picker-note { margin: 6px 2px 0; font-size: 11px; color: var(--muted); }
+.emoticon-picker-note .link-btn { font-size: 11px; padding: 0; align-self: auto; text-decoration: underline; }
+.banner.referral-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--panel, #fff); color: var(--text, inherit);
+}
+.banner.referral-banner button {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--input-border);
+  background: transparent; color: inherit; cursor: pointer;
+}
+
+/* ── Reward stickers ──────────────────────────────────────────── */
+.emoticon .sticker { width: 100%; height: 100%; overflow: visible; display: block; }
+.emoticon.sticker-big { display: block; width: 120px; height: 120px; margin: 2px 0; }
+.emoticon.sticker-inline { width: 28px; height: 28px; vertical-align: -8px; }
+.emoticon-picker .emoticon.sticker-inline { vertical-align: 0; }
+.bubble-text:has(.sticker-big) { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+
+/* ── Reward screen effects (ScreenEffects.tsx) ───────────────── */
+.screen-fx { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 9000; }
+.fx-confetti-bit { position: absolute; top: -20px; border-radius: 1px; opacity: 0; animation: fx-fall linear forwards; }
+@keyframes fx-fall {
+  0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--drift), 105vh) rotate(var(--rot)); opacity: 0.9; }
+}
+.fx-heart { position: absolute; bottom: -40px; opacity: 0; animation: fx-rise ease-out forwards; text-shadow: 0 0 6px rgba(255, 255, 255, 0.5); }
+@keyframes fx-rise {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate(var(--drift), -105vh) scale(1.1); opacity: 0; }
+}
+.fx-burst { position: absolute; width: 0; height: 0; }
+.fx-burst i {
+  position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%;
+  opacity: 0; animation: fx-spark 1.5s ease-out forwards;
+  box-shadow: 0 0 6px currentColor;
+}
+@keyframes fx-spark {
+  0% { transform: rotate(var(--a)) translateX(0) scale(1); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: rotate(var(--a)) translateX(110px) scale(0.2); opacity: 0; }
+}
+.fx-aurora-band {
+  position: absolute; left: -20%; right: -20%; height: 38%; filter: blur(34px); opacity: 0;
+  animation: fx-aurora 4.2s ease-in-out forwards; mix-blend-mode: screen;
+}
+.fx-aurora-band.a { top: -6%; background: linear-gradient(90deg, transparent, #3DDC97, #4FA3E0, transparent); }
+.fx-aurora-band.b { top: 8%; background: linear-gradient(90deg, transparent, #7C5CFF, #FF8FB1, transparent); animation-delay: 0.3s; }
+.fx-aurora-band.c { top: 20%; background: linear-gradient(90deg, transparent, #4FA3E0, #3DDC97, transparent); animation-delay: 0.6s; }
+@keyframes fx-aurora {
+  0% { opacity: 0; transform: translateX(-12%) skewX(-8deg); }
+  35% { opacity: 0.75; }
+  70% { opacity: 0.6; }
+  100% { opacity: 0; transform: translateX(12%) skewX(8deg); }
+}
+@media (prefers-reduced-motion: reduce) { .screen-fx { display: none; } }

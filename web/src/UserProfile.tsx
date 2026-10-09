@@ -19,6 +19,8 @@ interface Profile {
   display_name?: string
   mood?: string
   supporter?: boolean
+  /** Brought 10+ friends to Phaze (nexus_server/referrals.go). */
+  ambassador?: boolean
 }
 
 // UserProfile is the click-a-user modal: shows the target's profile and
@@ -83,6 +85,9 @@ export default function UserProfile({ username, me, friends, pendingOut = [], se
           {profile?.display_name || username}
           {profile?.supporter && (
             <span className="supporter-badge" title="Phaze Supporter" aria-label="Phaze Supporter">💜</span>
+          )}
+          {profile?.ambassador && (
+            <span className="ambassador-badge" title="Phaze Ambassador — brought 10+ friends to Phaze" aria-label="Phaze Ambassador">🌟</span>
           )}
           {presence && (
             <span className={`user-profile-status ${presence === 'Online' ? 'on' : 'off'}`}>{presence}</span>

@@ -20,6 +20,11 @@ import { ContactsView } from './ContactsView'
 import { tokenize as tokenizeEmoticons } from './emoticons'
 import { Emoticon } from './emoticonArt'
 import { EmoticonPicker } from './EmoticonPicker'
+import { SenderItemsContext, rewardById } from './referralRewards'
+
+const NO_ITEMS: ReadonlySet<string> = new Set()
+import { effectIn } from './emoticons'
+import ScreenEffect, { type EffectId } from './ScreenEffects'
 import { CallScreen } from './CallScreen'
 import { SELECTABLE_THEMES, type ThemeId, isThemeId, resolveTheme, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype, isSkypeEra } from './themes'
 import OSChrome from './OSChrome'
@@ -355,10 +360,18 @@ function tokenize(text: string): Segment[] {
 
 /** Plain-text run with classic emoticon shortcuts swapped for art. */
 function EmoticonText({ text }: { text: string }) {
+  const toks = tokenizeEmoticons(text)
+  // A sticker that is the whole message (spaces aside) draws full size,
+  // like a sticker in other messengers; mixed with text it stays inline.
+  const meaningful = toks.filter((t) => t.kind !== 'text' || t.value.trim() !== '')
+  const only = meaningful.length === 1 && meaningful[0].kind === 'emoticon' ? meaningful[0] : null
+  if (only && rewardById(only.id)?.kind === 'sticker') {
+    return <Emoticon id={only.id} shortcut={only.shortcut} big />
+  }
   return (
     <>
-      {tokenizeEmoticons(text).map((t, i) =>
-        t.kind === 'text' ? <span key={i}>{t.value}</span> : <Emoticon key={i} id={t.id} />)}
+      {toks.map((t, i) =>
+        t.kind === 'text' ? <span key={i}>{t.value}</span> : <Emoticon key={i} id={t.id} shortcut={t.shortcut} />)}
     </>
   )
 }
@@ -641,6 +654,23 @@ export default function App() {
   const [remoteOpen, setRemoteOpen] = useState(false)
   const [groupCallRoom, setGroupCallRoom] = useState<string | null>(null)
   const [groupCallInvite, setGroupCallInvite] = useState<{ from: string; room: string } | null>(null)
+  // Referral tiers the server reported, keyed by username (self included);
+  // decides who can send reward emoticons — see referralRewards.ts.
+  const [perks, setPerks] = useState<Record<string, string[]>>({})
+  const perksRef = useRef<Record<string, string[]>>({})
+  const [crateNews, setCrateNews] = useState<{ who: string; count: number; crates: number } | null>(null)
+  const [activeFx, setActiveFx] = useState<{ kind: EffectId; seed: number } | null>(null)
+  const endFx = useCallback(() => setActiveFx(null), [])
+  const itemSets = useMemo(() => new Map(Object.entries(perks).map(([u, ids]) => [u, new Set(ids)])), [perks])
+  const itemsOf = (u: string): ReadonlySet<string> => itemSets.get(u) ?? NO_ITEMS
+  /** Plays a screen effect when `text` (sent by `sender`) uses one the
+   *  sender actually owns. Reads the ref so socket handlers stay stable. */
+  const fireEffect = useCallback((sender: string | undefined, text: string) => {
+    const owned = sender ? perksRef.current[sender] : undefined
+    if (!owned?.length) return
+    const fx = effectIn(text, (id) => owned.includes(id))
+    if (fx) setActiveFx({ kind: fx as EffectId, seed: Date.now() })
+  }, [])
   const [globalNotice, setGlobalNotice] = useState<{ from: string; msg: string } | null>(null)
   const [changelogSeen, setChangelogSeen] = useState(() => localStorage.getItem('phaze_changelog_v') === '2025-05-25')
   const [changelogOpen, setChangelogOpen] = useState(false)
@@ -709,7 +739,7 @@ export default function App() {
   const recStartRef = useRef<number>(0)
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recChunksRef = useRef<Blob[]>([])
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications'>('profile')
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite'>('profile')
   const [reportTarget, setReportTarget] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
   const [reportSent, setReportSent] = useState(false)
@@ -1176,6 +1206,23 @@ export default function App() {
         case 'search_results':
           setGlobalSearchResults(msg.results ?? [])
           break
+        case 'referral_perks':
+          if (msg.perks) {
+            perksRef.current = { ...perksRef.current, ...msg.perks }
+            setPerks(perksRef.current)
+          }
+          break
+
+        case 'crate_earned':
+        case 'referral_joined':
+          if (msg.sender) {
+            setCrateNews({
+              who: msg.sender, count: parseInt(msg.token || '0', 10),
+              crates: msg.type === 'crate_earned' ? (msg.crates ?? 1) : 0,
+            })
+          }
+          break
+
         case 'presence': {
           const pk = decodePublicKeyField(msg.public_key as string | number[] | undefined)
           if (msg.sender && pk && pk.length === 32) acceptPeerKey(msg.sender, pk, msg.key_fingerprint || '')
@@ -1214,6 +1261,7 @@ export default function App() {
               if (peer && loadHistory(my!, peer).some((l) => l.id === incomingId)) break
             }
             appendLog(msg.sender, msg.body || '[empty]', msg.sender === my, { id: incomingId })
+            if (msg.sender !== my) fireEffect(msg.sender, msg.body || '')
             // Suppress notification sound + browser notification for muted
             // peers, and for everyone while we're on Do Not Disturb.
             const senderIsMuted = msg.sender ? isPeerMuted(msg.sender) : false
@@ -1273,6 +1321,7 @@ export default function App() {
               ...prev,
               [msg.convo_id!]: [...(prev[msg.convo_id!] ?? []), gline],
             }))
+            fireEffect(msg.sender, msg.body)
             if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id && !dndRef.current
                 && !mutedConvosRef.current.has(msg.convo_id)) {
               playPhazeSound('MessageReceived.wav')
@@ -1933,6 +1982,7 @@ export default function App() {
     const msgId = newMsgId()
     send({ type: 'msg', sender: me, recipient: selected, body, msg_id: msgId })
     appendLog(me, plaintext, true, { id: msgId })
+    fireEffect(me, plaintext)
     playPhazeSound('MessageOutgoing.wav')
     setDraft('')
     setEmojiOpen(false)
@@ -2631,6 +2681,26 @@ export default function App() {
         </div>
       )}
 
+      {activeFx && <ScreenEffect key={activeFx.seed} kind={activeFx.kind} seed={activeFx.seed} onDone={endFx} />}
+
+      {/* ── Referral news: a friend joined from your invite ───── */}
+      {crateNews && (
+        <div className="banner referral-banner">
+          <span>
+            🎉 <strong>{crateNews.who}</strong> joined Phaze from your invite
+            {crateNews.crates > 0
+              ? <> — you earned a <strong>reward crate</strong>{crateNews.crates > 1 ? ` (${crateNews.crates} waiting)` : ''}!</>
+              : <> ({crateNews.count} so far)</>}
+          </span>
+          <span style={{ display: 'flex', gap: 6 }}>
+            <button type="button" onClick={() => { setCrateNews(null); setSettingsInitialTab('invite'); setSettingsOpen(true) }}>
+              {crateNews.crates > 0 ? 'Open it' : 'See rewards'}
+            </button>
+            <button type="button" onClick={() => setCrateNews(null)} aria-label="Dismiss">×</button>
+          </span>
+        </div>
+      )}
+
       {/* ── Group call invite banner ─────────────────────────── */}
       {groupCallInvite && (
         <div className="banner" style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
@@ -3124,7 +3194,11 @@ export default function App() {
                     me={me ?? ''}
                     friends={Object.keys(friends)}
                     lines={convoLogs[selectedConvo] ?? []}
-                    renderBody={(t) => <RichText text={t} me={me} />}
+                    renderBody={(t, sender) => (
+                      <SenderItemsContext.Provider value={itemsOf(sender)}>
+                        <RichText text={t} me={me} />
+                      </SenderItemsContext.Provider>
+                    )}
                     senderColor={avatarColor}
                     onSend={(text) => {
                       send({ type: 'convo_msg', convo_id: selectedConvo, sender: me ?? undefined, body: text })
@@ -3394,7 +3468,7 @@ export default function App() {
                                 </a>
                               )
                             ) : (
-                              <span className="bubble-text"><RichText text={line.text} me={me} />{line.edited && <span className="edited-tag"> (edited)</span>}</span>
+                              <span className="bubble-text"><SenderItemsContext.Provider value={itemsOf(line.from)}><RichText text={line.text} me={me} /></SenderItemsContext.Provider>{line.edited && <span className="edited-tag"> (edited)</span>}</span>
                             )}
                             <span className="bubble-ts">{formatTime(line.ts)}{hasFeature(theme, 'read_receipts') && line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}</span>
                             {/* Reactions arrived with Skype 8. A 2007 chat log
@@ -3504,6 +3578,8 @@ export default function App() {
                           <EmoticonPicker
                             onPick={(sc) => { setDraft((d) => d + sc + ' '); setEmojiOpen(false); draftInputRef.current?.focus() }}
                             onClose={() => setEmojiOpen(false)}
+                            myItems={me ? itemsOf(me) : undefined}
+                            onOpenInvite={() => { setEmojiOpen(false); setSettingsInitialTab('invite'); setSettingsOpen(true) }}
                           />
                         ) : (
                           <div className="emoji-picker" role="dialog" aria-label="Emoji picker">

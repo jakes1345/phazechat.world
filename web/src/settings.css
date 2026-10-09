@@ -396,27 +396,79 @@
   font-size: 0.8rem;
   padding: 0.4rem 0.8rem;
 }
-.referral-stat-box {
-  background: var(--accent-muted, rgba(99,102,241,0.12));
-  border: 1px solid var(--accent, #6366f1);
+.referral-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.6rem 0 0.4rem;
+}
+.referral-tier {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--input-border, rgba(0,0,0,0.12));
   border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  text-align: center;
 }
-.referral-stat-num {
-  display: block;
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--accent, #6366f1);
-  line-height: 1;
-}
-.referral-stat-label {
-  font-size: 0.85rem;
-  color: var(--muted, #888);
-}
+.referral-tier:not(.got) .referral-tier-emos { filter: grayscale(1); opacity: 0.5; }
+.referral-tier.got { border-color: var(--accent, #6366f1); background: var(--accent-muted, rgba(99,102,241,0.08)); }
+.referral-tier-emos { display: flex; gap: 2px; min-width: 46px; }
+.referral-tier-emos .emo { width: 22px; height: 22px; }
+.referral-tier-text { display: flex; flex-direction: column; flex: 1; min-width: 0; font-size: 0.82rem; }
+.referral-tier-text span { font-size: 0.75rem; color: var(--muted, #888); }
+.referral-tier-state { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.referral-tier.got .referral-tier-state { color: var(--accent, #6366f1); }
+.invite-share-discord { background: #5865F2; color: #fff; border-color: #5865F2; }
 .referral-users {
   font-size: 0.75rem;
   color: var(--muted, #888);
   margin-top: 0.4rem;
 }
+
+/* ── Rewards panel (RewardsPanel.tsx) ─────────────────────────── */
+.crate-card {
+  display: flex; align-items: center; gap: 0.9rem; margin: 0.8rem 0 0.4rem;
+  padding: 0.8rem 0.9rem; border: 1px solid var(--input-border, rgba(0,0,0,0.12)); border-radius: 10px;
+}
+.crate-card.has-crates { border-color: var(--accent, #6366f1); background: var(--accent-muted, rgba(99,102,241,0.08)); }
+.crate-box { font-size: 2.2rem; line-height: 1; filter: grayscale(0.8); opacity: 0.6; }
+.crate-card.has-crates .crate-box { filter: none; opacity: 1; animation: crate-bob 2.4s ease-in-out infinite; }
+.crate-card.opening .crate-box { animation: crate-shake 0.35s ease-in-out infinite; filter: none; opacity: 1; }
+.crate-info { display: flex; flex-direction: column; flex: 1; min-width: 0; font-size: 0.85rem; }
+.crate-info span { font-size: 0.75rem; color: var(--muted, #888); }
+@keyframes crate-bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-4px) } }
+@keyframes crate-shake {
+  0%, 100% { transform: rotate(0) scale(1.05) } 25% { transform: rotate(-10deg) scale(1.15) } 75% { transform: rotate(10deg) scale(1.15) }
+}
+.crate-reveal {
+  display: flex; flex-direction: column; align-items: center; gap: 0.35rem; text-align: center;
+  margin: 0.6rem 0; padding: 1rem; border-radius: 12px; border: 2px solid var(--rarity);
+  background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--rarity) 22%, transparent), transparent 70%);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--rarity) 45%, transparent);
+  animation: crate-pop 0.5s cubic-bezier(.2, 1.4, .4, 1);
+}
+@keyframes crate-pop { from { transform: scale(0.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+.crate-reveal-rarity { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--rarity); }
+.crate-reveal-art .emoticon { display: block; }
+.crate-reveal-art.kind-emoticon .emoticon .emo, .crate-reveal-art.kind-effect .emoticon .emo { width: 64px; height: 64px; }
+.crate-reveal-how { font-size: 0.78rem; color: var(--muted, #888); max-width: 280px; }
+.crate-reveal-how code { background: rgba(127, 127, 127, 0.18); padding: 0 4px; border-radius: 4px; }
+.crate-reveal-actions { display: flex; gap: 0.5rem; margin-top: 0.3rem; }
+.rewards-sub { margin: 1rem 0 0.4rem; font-size: 0.85rem; }
+.rewards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.rewards-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px 4px;
+  border-radius: 8px; border: 1.5px solid var(--rarity);
+}
+.rewards-cell .emoticon.sticker-inline, .rewards-cell .emoticon { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; margin: 0; }
+.rewards-cell .emoticon .emo { width: 30px; height: 30px; }
+.rewards-cell.locked { border-style: dashed; opacity: 0.55; }
+.rewards-cell.locked .emoticon { filter: grayscale(1) brightness(0.55); }
+.rewards-cell-name { font-size: 0.65rem; color: var(--muted, #888); }
+.rewards-odds { margin-top: 0.7rem; }
+.rewards-craft {
+  font-size: 0.65rem; padding: 1px 6px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--accent, #6366f1); background: transparent; color: var(--accent, #6366f1);
+}
+.rewards-craft:disabled { opacity: 0.5; cursor: default; border-color: var(--input-border, #999); color: var(--muted, #888); }
+.rewards-cell.locked .rewards-craft { filter: none; }
