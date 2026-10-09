@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,8 +35,28 @@ func newTestServer(t *testing.T) (*NexusServer, *httptest.Server, string) {
 	srv := &NexusServer{DB: db, Clients: map[string][]*Client{}}
 	srv.initDB()
 
+	// Cleanup runs LIFO: client conns close, hs.Close, then wait for the
+	// /ws handlers, then db.Close, then TempDir removal. hs.Close doesn't
+	// wait for hijacked (WebSocket) conns, and a handler's disconnect path
+	// still writes to the DB — without this wait it could reopen the WAL
+	// files mid-RemoveAll and fail the test with "directory not empty".
+	var handlers sync.WaitGroup
+	t.Cleanup(func() {
+		done := make(chan struct{})
+		go func() { handlers.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(readDeadline):
+			t.Log("ws handlers still running at cleanup")
+		}
+	})
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", srv.handleConnections)
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		handlers.Add(1)
+		defer handlers.Done()
+		srv.handleConnections(w, r)
+	})
 	// Account-facing auth, so tests can exercise sign-in over HTTP the way a
 	// browser does — cookies included — rather than only over the WebSocket.
 	mux.HandleFunc("/api/v1/auth/login", srv.httpLoginHandler)
