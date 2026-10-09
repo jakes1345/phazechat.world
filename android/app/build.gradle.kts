@@ -1,8 +1,8 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.gms.google-services")
 }
@@ -18,12 +18,12 @@ fun localProp(key: String, fallback: String = "") =
     (localProps[key] as? String)?.takeIf { it.isNotBlank() } ?: fallback
 
 // ─── Version ──────────────────────────────────────────────────────────────────
-val appVersionCode = 32
-val appVersionName = "1.6.3"
+val appVersionCode = 33
+val appVersionName = "1.6.5"
 
 android {
     namespace = "world.phazechat.app"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "world.phazechat.app"
@@ -76,13 +76,16 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
     }
+}
+
+// AGP 9 compiles Kotlin itself (no kotlin-android plugin); this replaces
+// the old android { kotlinOptions { jvmTarget } } block it removed.
+kotlin {
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
 dependencies {
@@ -90,9 +93,16 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.material3:material3")
+    // Newer Material3 no longer pulls this in transitively, and the BOM stopped
+    // versioning it (1.7.8 is its final release), so it needs an explicit pin.
+    implementation("androidx.compose.material:material-icons-core:1.7.8")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.activity:activity-compose:1.9.3")
+    // CameraX pulls appcompat, which drags Fragment in at 1.0.0 on the compile
+    // classpath. ActivityResult permission requests (QRScannerActivity) need
+    // Fragment >= 1.3.0 to route results correctly, so pin it directly.
+    implementation("androidx.fragment:fragment-ktx:1.8.9")
     implementation("androidx.navigation:navigation-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
