@@ -118,7 +118,7 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.19.1@aar")
 
     // Core (NotificationCompat for the screen-share foreground service)
-    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-ktx:1.19.1")
 
     // WebRTC
     implementation("io.getstream:stream-webrtc-android:1.3.10")
