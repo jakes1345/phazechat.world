@@ -102,7 +102,7 @@ dependencies {
     // CameraX pulls appcompat, which drags Fragment in at 1.0.0 on the compile
     // classpath. ActivityResult permission requests (QRScannerActivity) need
     // Fragment >= 1.3.0 to route results correctly, so pin it directly.
-    implementation("androidx.fragment:fragment-ktx:1.8.9")
+    implementation("androidx.fragment:fragment-ktx:1.9.1")
     implementation("androidx.navigation:navigation-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
