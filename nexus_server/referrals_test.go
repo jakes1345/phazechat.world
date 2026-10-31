@@ -193,25 +193,76 @@ func TestOpenCrate_SpendsOneAndPrefersNewItems(t *testing.T) {
 	}
 }
 
-// Many crates: the inventory caps at the catalog, every duplicate pays
-// shards, and the balance equals exactly what duplicates paid.
+// Opening crates until the collection is complete: every crate gives
+// something new until the rarity it rolled is fully owned, the inventory
+// caps at the catalog, every duplicate pays shards, and the balance equals
+// exactly what duplicates paid.
+//
+// Drops come from crypto/rand, so how many crates completing the set takes
+// varies. Legendaries are 2% with no pity floor of their own, so a fixed
+// budget like "120 crates" misses one about 1 run in 8. Instead open until
+// the set is complete, with a ceiling no honest roll comes near: every
+// crate has at least a 2% legendary chance, so needing more than 2000
+// crates for the two legendaries happens with odds around 1e-16.
 func TestOpenCrate_DuplicatesBecomeShards(t *testing.T) {
 	srv, _, _ := newTestServer(t)
 	registerAndVerify(t, srv, "alice", "correct-horse-1")
-	grantCrates(srv, "alice", 120)
-	want := 0
-	for i := 0; i < 120; i++ {
+
+	const ceiling = 2000
+	const extraAfterComplete = 10
+	open := func(i int) (rewardItem, bool, int) {
+		t.Helper()
+		srv.DB.Exec("INSERT INTO reward_crates (owner, source) VALUES (?, ?)", "alice", fmt.Sprintf("src-alice-%d", i))
 		it, dupe, shards, err := srv.openCrate("alice")
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("open %d: %v", i, err)
 		}
 		if dupe != (shards > 0) || (dupe && shards != shardsForDuplicate[it.Rarity]) {
-			t.Fatalf("%s dupe=%v shards=%d", it.ID, dupe, shards)
+			t.Fatalf("open %d: %s dupe=%v shards=%d", i, it.ID, dupe, shards)
+		}
+		return it, dupe, shards
+	}
+	ownsAllOf := func(owned map[string]bool, rarity string) bool {
+		for _, c := range rewardCatalog {
+			if c.Rarity == rarity && !owned[c.ID] {
+				return false
+			}
+		}
+		return true
+	}
+
+	owned := map[string]bool{}
+	want, i := 0, 0
+	for ; len(owned) < len(rewardCatalog); i++ {
+		if i == ceiling {
+			t.Fatalf("%d crates did not complete the collection, have %d/%d", ceiling, len(owned), len(rewardCatalog))
+		}
+		it, dupe, shards := open(i)
+		// A duplicate only once every item of its rarity is owned;
+		// before that the crate must hand out something new.
+		if dupe != ownsAllOf(owned, it.Rarity) {
+			t.Fatalf("open %d: %s (%s) dupe=%v with rarity complete=%v", i, it.ID, it.Rarity, dupe, ownsAllOf(owned, it.Rarity))
+		}
+		if !dupe && owned[it.ID] {
+			t.Fatalf("open %d: %s handed out again but not marked a duplicate", i, it.ID)
+		}
+		owned[it.ID] = true
+		want += shards
+		if got := len(srv.openedItems("alice")); got != len(owned) {
+			t.Fatalf("open %d: inventory %d, expected %d", i, got, len(owned))
+		}
+	}
+	// With everything owned, every further crate is a duplicate paid in
+	// shards and the inventory stays capped at the catalog.
+	for n := 0; n < extraAfterComplete; n, i = n+1, i+1 {
+		it, dupe, shards := open(i)
+		if !dupe {
+			t.Fatalf("open %d: %s not a duplicate with the collection complete", i, it.ID)
 		}
 		want += shards
 	}
 	if got := len(srv.openedItems("alice")); got != len(rewardCatalog) {
-		t.Fatalf("120 crates should complete the collection, have %d/%d", got, len(rewardCatalog))
+		t.Fatalf("inventory %d after completing, catalog has %d", got, len(rewardCatalog))
 	}
 	if got := srv.shardBalance("alice"); got != want || want == 0 {
 		t.Fatalf("balance %d, duplicates paid %d", got, want)
