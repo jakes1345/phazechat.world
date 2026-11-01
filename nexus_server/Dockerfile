@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for the Phaze production image.
-# Build context: the repo root (fly.toml lives at the root and references
-# this Dockerfile as nexus_server/Dockerfile).
+# Build context: the repo root. Production runs it as a Cloudflare Container
+# (cloudflare/wrangler.jsonc points here); it also runs anywhere Docker does.
 
 # -----------------------------------------------------------------------
 # 1) Build the Go binaries (nexus-server + seed-admin).
@@ -20,7 +20,8 @@ RUN cd nexus_server \
  && VER="$(cat /src/VERSION)" \
  && CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=$VER" -o /out/nexus-server . \
  && CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/seed-admin ./cmd/seed-admin \
- && CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/grant-supporter ./cmd/grant-supporter
+ && CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/grant-supporter ./cmd/grant-supporter \
+ && CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/fetch-seed ./cmd/fetch-seed
 RUN cd nova_bot && CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/nova-bot .
 
 
@@ -54,6 +55,7 @@ WORKDIR /app
 COPY --from=go-build      /out/nexus-server                    /app/nexus-server
 COPY --from=go-build      /out/seed-admin                      /app/seed-admin
 COPY --from=go-build      /out/grant-supporter                 /app/grant-supporter
+COPY --from=go-build      /out/fetch-seed                      /app/fetch-seed
 COPY --from=go-build      /out/nova-bot                        /app/nova-bot
 COPY --from=litestream-dl /usr/local/bin/litestream            /usr/local/bin/litestream
 COPY --from=web-build     /src/web/dist                        /app/web
@@ -61,7 +63,7 @@ COPY nexus_server/templates                                    /app/templates
 COPY nexus_server/public                                       /app/public
 COPY nexus_server/litestream.yml                               /app/litestream.yml
 COPY nexus_server/entrypoint.sh                                /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && mkdir -p /data
 
 ENV PORT=8080
 ENV DB_PATH=/data/nexus.db

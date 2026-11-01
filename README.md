@@ -42,7 +42,7 @@ Set `PHAZE_TURN_URL` + `PHAZE_TURN_USERNAME` + `PHAZE_TURN_PASSWORD` for a TURN 
 
 ## Deployment
 
-Fly.io — `fly deploy -a skype7-reborn --dockerfile nexus_server/Dockerfile`
+Cloudflare Containers: every push to `master` deploys via `.github/workflows/cloudflare-deploy.yml`. Setup, secrets and the one-time data import are in [`cloudflare/README.md`](cloudflare/README.md).
 
 ---
 

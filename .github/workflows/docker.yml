@@ -6,7 +6,7 @@
 #
 # Image is tagged "latest" on every push to master and "v<version>" on each
 # git tag (matching release.yml). Image bundles the Go nexus server + the
-# compiled React web SPA, same as the Fly deploy.
+# compiled React web SPA, same as the Cloudflare deploy.
 
 name: Publish Nexus Container
 
@@ -18,7 +18,6 @@ on:
       - 'nexus_server/**'
       - 'web/**'
       - '.github/workflows/docker.yml'
-      - 'fly.toml'
   workflow_dispatch:
 
 permissions:
