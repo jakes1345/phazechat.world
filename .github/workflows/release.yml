@@ -56,7 +56,7 @@ jobs:
         # it years ago, so `sdkmanager tools` 404s and the action dies
         # before Gradle ever runs. platform-tools is all this build needs;
         # Gradle's own Android plugin resolves build-tools/platforms itself.
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
