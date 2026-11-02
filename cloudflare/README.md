@@ -46,16 +46,24 @@ has no database yet, and the container won't start until step 4 is done.
    Then R2 > Manage API tokens > Create API token with *Object Read & Write*
    on that bucket. Keep its Access Key ID, Secret Access Key and the S3
    endpoint (`https://<account-id>.r2.cloudflarestorage.com`).
-3. **Copy the data off Fly** (before step 4), from a machine signed in with
-   `fly auth login` and `npx wrangler login`:
+3. **Copy the data off Fly** (before step 4). The Fly half can run any
+   time, even before steps 1 and 2, so take it as early as you can:
 
    ```
-   ./cloudflare/seed-from-fly.sh phaze-data
+   fly auth login
+   ./cloudflare/seed-from-fly.sh backup
    ```
 
-   It downloads the database and uploads into `./phaze-fly-backup` (keep it)
-   and puts them in the bucket. The container imports the database on its
-   first start.
+   It starts the Fly machine if Fly stopped it and downloads the database
+   and uploads into `./phaze-fly-backup`. Keep that folder: it is a full
+   backup. Once the bucket exists, put the backup in it:
+
+   ```
+   npx wrangler login
+   ./cloudflare/seed-from-fly.sh upload phaze-data
+   ```
+
+   The container imports the database on its first start.
 4. **Worker secrets**, from `cloudflare/` (`npx wrangler secret put NAME`):
 
    | Secret | Value |
