@@ -118,7 +118,7 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.19.1@aar")
 
     // Core (NotificationCompat for the screen-share foreground service)
-    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.core:core-ktx:1.19.1")
 
     // Voice/video calls: the server hands every call off to a Jitsi Meet room
     // (see call_jitsi in nexus_server/ws_handlers.go), and the SDK runs it in
