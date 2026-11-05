@@ -60,7 +60,7 @@ Other
 
 These are the things I know are broken or partial right now.
 
-- Calls don't work in the Android app. It still uses direct WebRTC signalling, but the server now hands calls off to Jitsi and no longer relays ICE candidates or SDP answers (`nexus_server/ws_handlers.go`, `call_answer` and `ice_candidate`).
+- Android calls now go through Jitsi like the web ones: the call rings over the socket, then the app opens the room the server picks in the Jitsi Meet SDK's own call screen (`android/.../data/JitsiCalls.kt`). The `meet.jit.si` caveat below applies to them too, and they haven't been tested end to end on a device yet.
 - Web calls go through `meet.jit.si`, so call audio and video are not covered by Phaze's encryption. The privacy policy at `/privacy` explains this.
 - The Android app is hardwired to `phazechat.world` (`NexusClient.kt` and `PhazeViewModel.kt`). There is no server setting.
 - There is no macOS build. CI builds Windows and Linux desktop binaries only.
@@ -180,7 +180,7 @@ Some variable names start with `Phaze_` in mixed case rather than `PHAZE_`. That
 
 ### TURN
 
-The server hands TURN credentials to clients when they sign in. They're used by the WebRTC features that don't go through Jitsi: live streams, remote screen sessions and the Android call code. There are two ways to set it up.
+The server hands TURN credentials to clients when they sign in. They're used by the WebRTC features that don't go through Jitsi: live streams and remote screen sessions on the web. Calls on both web and Android go through Jitsi. There are two ways to set it up.
 
 Static credentials, for a hosted TURN provider:
 
