@@ -10,8 +10,10 @@ data class NexusMessage(
     val status: String? = null,
     val error: String? = null,
     val results: List<String>? = null,
+    // Only from old clients' call_offer, which carried an SDP offer.
     val sdp: String? = null,
-    val candidate: String? = null,
+    // Jitsi room for a call: on call_offer and call_jitsi.
+    val roomId: String? = null,
     val qrToken: String? = null,
     val email: String? = null,
     val mood: String? = null,
@@ -24,10 +26,6 @@ data class NexusMessage(
     val ts: Long? = null,
     // call length in seconds, present on call_log
     val duration: Int? = null,
-    val turnUrl: String? = null,
-    val turnUrls: List<String>? = null,
-    val turnUsername: String? = null,
-    val turnPassword: String? = null,
     val totpCode: String? = null,
     val totpUri: String? = null,
     val deviceInfo: String? = null,
@@ -80,8 +78,6 @@ data class NexusMessage(
         channelId?.let { put("channel_id", it) }
         serverName?.let { put("server_name", it) }
         channelName?.let { put("channel_name", it) }
-        candidate?.let { put("candidate", it) }
-        sdp?.let { put("sdp", it) }
         token?.let { put("token", it) }
         visibility?.let { put("visibility", it) }
         topic?.let { put("topic", it) }
@@ -119,21 +115,6 @@ data class NexusMessage(
                 } else null
             } catch (_: Exception) { null }
 
-            var turnUrl: String? = null
-            var turnUrls: List<String>? = null
-            var turnUser: String? = null
-            var turnPass: String? = null
-            if (j.has("turn_config")) {
-                val tc = j.getJSONObject("turn_config")
-                turnUrl = tc.optString("url", null)
-                turnUser = tc.optString("username", null)
-                turnPass = tc.optString("password", null)
-                if (tc.has("urls") && !tc.isNull("urls")) {
-                    val arr = tc.getJSONArray("urls")
-                    turnUrls = (0 until arr.length()).map { arr.getString(it) }
-                }
-            }
-
             return NexusMessage(
                 type = j.getString("type"),
                 sender = j.str("sender"),
@@ -143,7 +124,7 @@ data class NexusMessage(
                 error = j.str("error"),
                 results = results,
                 sdp = j.str("sdp"),
-                candidate = j.str("candidate"),
+                roomId = j.str("room_id"),
                 qrToken = j.str("qr_token"),
                 email = j.str("email"),
                 mood = j.str("mood"),
@@ -154,10 +135,6 @@ data class NexusMessage(
                 members = members,
                 ts = if (j.has("ts") && !j.isNull("ts")) j.optLong("ts") else null,
                 duration = if (j.has("duration") && !j.isNull("duration")) j.optInt("duration") else null,
-                turnUrl = turnUrl,
-                turnUrls = turnUrls,
-                turnUsername = turnUser,
-                turnPassword = turnPass,
                 totpCode = j.str("totp_code"),
                 totpUri = j.str("totp_uri"),
                 deviceInfo = j.str("device_info"),

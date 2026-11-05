@@ -120,8 +120,12 @@ dependencies {
     // Core (NotificationCompat for the screen-share foreground service)
     implementation("androidx.core:core-ktx:1.13.1")
 
-    // WebRTC
-    implementation("io.getstream:stream-webrtc-android:1.3.10")
+    // Voice/video calls: the server hands every call off to a Jitsi Meet room
+    // (see call_jitsi in nexus_server/ws_handlers.go), and the SDK runs it in
+    // its own activity. It brings its own WebRTC build (org.jitsi:webrtc), so
+    // no other WebRTC library may be added next to it: the classes and native
+    // libraries would clash. Its React Native modules are transitive deps.
+    implementation("org.jitsi.react:jitsi-meet-sdk:13.3.0") { isTransitive = true }
 
     // Firebase Cloud Messaging
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
