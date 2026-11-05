@@ -1,12 +1,10 @@
 package world.phazechat.app
 
 import android.Manifest
-import android.app.Activity
 import world.phazechat.app.data.ConnState
-import android.content.Context
+import world.phazechat.app.data.JitsiCalls
 import android.content.Intent
 import android.media.MediaRecorder
-import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.net.Uri
 import android.os.Bundle
@@ -40,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import world.phazechat.app.data.PhazeViewModel
 import world.phazechat.app.ui.*
@@ -111,6 +110,9 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     val connState by vm.connState.collectAsState()
 
     val pendingOpenChat by vm.pendingOpenChat.collectAsState()
+    // Only collected while the activity is started, so the conference is
+    // opened from the foreground (background activity starts are blocked).
+    val pendingConference by vm.pendingConference.collectAsStateWithLifecycle()
 
     // Consume deep-link navigation (e.g. from push notification tap)
     LaunchedEffect(pendingOpenChat, me) {
@@ -119,6 +121,14 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
             vm.consumePendingOpenChat()
             vm.selectChat(peer)
         }
+    }
+
+    // The server answered the call with a Jitsi room: open the conference.
+    val conferenceCtx = LocalContext.current
+    LaunchedEffect(pendingConference) {
+        val conf = pendingConference ?: return@LaunchedEffect
+        vm.consumePendingConference()
+        JitsiCalls.launch(conferenceCtx, conf.room, conf.displayName, conf.video)
     }
 
     val toastCtx = LocalContext.current
@@ -230,64 +240,55 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         uri?.let { vm.sendFile(it) }
     }
 
-    // Screen-share (MediaProjection) permission flow for video calls.
-    val mediaProjectionManager = remember {
-        context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-    }
-    val screenShareLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val data = result.data
-        if (result.resultCode == Activity.RESULT_OK && data != null) {
-            // Start the mediaProjection foreground service FIRST, then begin
-            // capture only once it's actually foregrounded — Android 14+ throws
-            // SecurityException if MediaProjection.start() runs before that.
-            ScreenShareService.start(context) {
-                vm.startScreenShare(data)
-            }
-        }
-    }
-
     // Voice recording state
     var recording by remember { mutableStateOf(false) }
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var voicePath by remember { mutableStateOf<String?>(null) }
 
+    // Calls need the microphone, and video calls the camera, before the Jitsi
+    // conference opens. Ask up front, when the call is placed or answered, so
+    // the conference never starts without them. Without the microphone there
+    // is no call; without the camera a video call still goes ahead.
     var pendingCallPeer by remember { mutableStateOf<String?>(null) }
     var pendingCallVideo by remember { mutableStateOf(false) }
     var pendingAnswer by remember { mutableStateOf(false) }
-    val callPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
+    fun hasPermission(permission: String) = androidx.core.content.ContextCompat.checkSelfPermission(
+        context, permission
+    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    fun callPermissions(video: Boolean) =
+        listOf(Manifest.permission.RECORD_AUDIO) + if (video) listOf(Manifest.permission.CAMERA) else emptyList()
+    val callPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
+        if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
             if (pendingAnswer) {
                 vm.answerCall()
             } else {
                 pendingCallPeer?.let { vm.startCall(it, pendingCallVideo) }
             }
-        } else if (pendingAnswer) {
-            vm.rejectCall()
+        } else {
+            if (pendingAnswer) vm.rejectCall()
+            android.widget.Toast.makeText(context, "Calls need microphone access", android.widget.Toast.LENGTH_SHORT).show()
         }
         pendingCallPeer = null
         pendingAnswer = false
     }
     fun requestCallWithPermission(peer: String, withVideo: Boolean = false) {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(
-                context, Manifest.permission.RECORD_AUDIO
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        val missing = callPermissions(withVideo).filterNot { hasPermission(it) }
+        if (missing.isEmpty()) {
             vm.startCall(peer, withVideo)
         } else {
             pendingCallPeer = peer
             pendingCallVideo = withVideo
-            callPermission.launch(Manifest.permission.RECORD_AUDIO)
+            pendingAnswer = false
+            callPermission.launch(missing.toTypedArray())
         }
     }
-    fun answerWithPermission() {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(
-                context, Manifest.permission.RECORD_AUDIO
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+    fun answerWithPermission(video: Boolean) {
+        val missing = callPermissions(video).filterNot { hasPermission(it) }
+        if (missing.isEmpty()) {
             vm.answerCall()
         } else {
             pendingAnswer = true
-            callPermission.launch(Manifest.permission.RECORD_AUDIO)
+            callPermission.launch(missing.toTypedArray())
         }
     }
 
@@ -355,31 +356,16 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         }
     }
 
-    // Call overlay
+    // Call overlay: ringing and connecting. The conference itself is the
+    // Jitsi SDK's activity, opened above once the server sends the room.
     if (callState != null) {
         val cs = callState!!
-        val cm = vm.callManager
         CallScreen(
             peer = cs.peer, isIncoming = cs.isIncoming, callStatus = cs.status,
-            isMuted = cs.isMuted, isCameraOn = cs.isCameraOn,
-            isVideo = cs.isVideo, isScreenSharing = cs.isScreenSharing,
-            hasRemoteVideo = cs.hasRemoteVideo,
-            eglContext = cm?.eglContext,
-            localVideoTrack = cm?.localVideoTrack,
-            remoteVideoTrack = cm?.remoteVideoTrack,
-            onAnswer = { answerWithPermission() }, onReject = { vm.rejectCall() },
-            onHangUp = { ScreenShareService.stop(context); vm.endCall() },
-            onToggleMute = { vm.toggleCallMute() },
-            onToggleCamera = { vm.toggleCallCamera() },
-            onToggleSpeakerphone = { vm.toggleSpeakerphone() },
-            onToggleScreenShare = {
-                if (cs.isScreenSharing) {
-                    vm.stopScreenShare()
-                    ScreenShareService.stop(context)
-                } else {
-                    screenShareLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
-                }
-            },
+            isVideo = cs.isVideo,
+            onAnswer = { answerWithPermission(cs.isVideo) }, onReject = { vm.rejectCall() },
+            onHangUp = { vm.endCall() },
+            onReturnToCall = { JitsiCalls.bringToFront(context) },
         )
         return
     }

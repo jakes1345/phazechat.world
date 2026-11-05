@@ -1,51 +1,49 @@
-# Skype eras — research index
+# Classic Skype release research
 
-Six source-verified research passes, one per Phaze era theme, checking and
-extending the project's earlier `skype-era-research.md` and
-`skype-era-gaps.md`. See `GATING-DIFF.md` for what this research means for
-`web/src/themes.ts`'s feature gating specifically.
+These are internal development notes, not user documentation. They record what each classic Skype release could actually do, so the era themes in the web app show the right features. The gating itself lives in `FEATURES_BY_ERA` in `web/src/themes.ts`.
 
-| Doc | Claims (verified/partial/unreachable/rejected of total) | Most interesting finding |
+There's one doc per theme. The theme ids in the code still use the Skype version numbers, while the labels people see in the app are Phaze 1 to Phaze 6+:
+
+| Doc | Theme id | In-app label | Release covered |
+|---|---|---|---|
+| [skype3.md](./skype3.md) | `skype3` | Phaze 1 | Skype 3.x (2006-2008) |
+| [skype4.md](./skype4.md) | `skype4` | Phaze 2 | Skype 4.x (2009-2010) |
+| [skype5.md](./skype5.md) | `skype5` | Phaze 3 | Skype 5.x (2010-2012) |
+| [skype6.md](./skype6.md) | `skype6` | Phaze 4 | Skype 6.x (2012-2014) |
+| [skype7.md](./skype7.md) | `skype7` | Phaze 5 | Skype 7.x (2014-2018) |
+| [skype8.md](./skype8.md) | `skype8` | Phaze 6+ | Skype 8.x (2017-2025) |
+
+They check and extend two older, unsourced docs, [`../skype-era-research.md`](../skype-era-research.md) and [`../skype-era-gaps.md`](../skype-era-gaps.md). [GATING-DIFF.md](./GATING-DIFF.md) compares the findings with the feature gates in `themes.ts` and lists suggested corrections.
+
+## Claim counts and main findings
+
+Each `skypeN.claims.json` file lists every claim checked for that release and its verdict. The counts below come from those files, in the order supported / partly supported / source unreachable / rejected. For Skype 5, "rejected" covers 5 claims marked `not_supported` and 3 marked `wrong_version_scope` (true, but about a different version).
+
+| Release | Claims | Main finding |
 |---|---|---|
-| [skype3.md](./skype3.md) | 55/2/0/5 of 62 | `edit_message` — "Edit chat messages" is documented as a new feature in Skype 3.2 (build 3.2.0.163, 2007), a decade before the app's current Skype-8 gate. |
-| [skype4.md](./skype4.md) | 49/3/2/4 of 58 | Screen sharing existed by 4.x, but was a paid, ~10-person-capped Premium feature for years, not the free capability the current gate implies. |
-| [skype5.md](./skype5.md) | 20/4/4/8 of 36 (thinnest era — real Skype 5 screenshots and documentation are genuinely scarce online) | Group video's real story is a free 5-person beta in May 2010 — five months earlier than assumed — that then became a paid Premium feature in January 2011. |
-| [skype6.md](./skype6.md) | 33/1/5/6 of 45 | Confirms Skype 6 added nothing to the conversation-feature set at all (account plumbing and the Messenger merge only) — and that group video stayed paid until April 28, 2014, deep into the 6.x era. |
-| [skype7.md](./skype7.md) | 46/1/3/4 of 54 | Found zero verified evidence for Mojis at all — the September 2015 date the app's gate relies on comes only from the older, non-source-verified research doc. |
-| [skype8.md](./skype8.md) | 57/3/2/4 of 66 | Found no evidence that message-level reactions or edit/delete mechanics ever shipped in real Skype — undercutting the assumption that these all launched together at the 8.0 release. |
+| Skype 3 | 55 / 2 / 0 / 5 of 62 | AfterDawn's changelog lists "Edit chat messages" as new in Skype 3.2 (build 3.2.0.163, 2007). The app had gated message editing to Skype 8. |
+| Skype 4 | 49 / 3 / 2 / 4 of 58 | Screen sharing was in 4.x, but as a paid Premium feature until summer 2014. A 10-person cap is reported but couldn't be confirmed word for word in the source. |
+| Skype 5 | 20 / 4 / 4 / 8 of 36 | Group video started as a free 5-person beta in May 2010, five months before the 5.0 release, then became a paid Premium feature in January 2011. This is the thinnest doc because screenshots and documentation from the period are hard to find. |
+| Skype 6 | 33 / 1 / 5 / 6 of 45 | Skype 6 added nothing to the set of conversation features. Its changes were account sign-in and the Messenger merge. Group video stayed paid until April 28, 2014. |
+| Skype 7 | 46 / 1 / 3 / 4 of 54 | No verified source mentions Mojis. The September 2015 date used for the Mojis gate comes only from the older unsourced doc. |
+| Skype 8 | 57 / 3 / 2 / 4 of 66 | @mentions are confirmed at the 8.0 launch. Nothing confirms that message reactions shipped with 8.0 or at any specific date, and nothing covers edit or delete in 8.x. |
 
-See [GATING-DIFF.md](./GATING-DIFF.md) for the full feature-by-feature
-comparison against `themes.ts`, a list of concrete corrections, real Skype
-capabilities with no Feature modeled at all, and the most consequential
-findings ranked by screen impact.
+## What has changed in themes.ts since
 
-## Methodology
+GATING-DIFF.md describes the gates as they were when the research was done. Since then, `themes.ts` has applied its first three corrections:
 
-This research is source-verified: every claim stated as fact in the body of
-each doc carries a citation to a URL that was actually fetched during the
-research pass, not recalled from general knowledge. An adversarial verify
-pass then re-fetched and checked each of those citations against the live
-page content. A further critique pass cross-checked the surviving claims
-against the app's prior docs (`skype-era-research.md`,
-`skype-era-gaps.md`) to surface contradictions, and ran an independent
-skeptic sample against the most consequential dated claims in each era.
-Anything that couldn't be verified this way — a source that returned an
-error, a claim traceable only to an AI-summarized search snippet rather than
-a fetched page, or a genuinely open question — is labelled "Refuted or
-unresolved" or "Unverified / open questions" rather than asserted as fact.
-Only body-section claims count as evidence anywhere this research is used;
-those two sections are deliberately excluded from `GATING-DIFF.md`'s
-comparisons.
+- `edit_message` moved from Skype 8 to Skype 3.
+- `delete_message` moved to Skype 7, as a lower bound rather than a confirmed date.
+- `stories` moved to Skype 7, since Skype's Highlights feature shipped under the 7.x version number in August 2017.
 
-## Known limitation
+The other suggestions are still open. These include lowering confidence in the `reactions` and `mojis` gates, marking screen sharing and group video as paid in the eras where they were, and removing `dark_mode` as an era gate.
 
-This pass has lower claim volume than a fully exhaustive audit would, and
-each era's skeptic re-check sampled a subset of claims rather than
-re-verifying every single one — both deliberate, to fit one usage-budget
-window. Skype 5 in particular is thin (20 of 36 claims verified) because
-real screenshots and contemporaneous documentation for that specific
-release are genuinely scarce online, not because the research pass was
-less careful there. Some point releases and most exact UI/settings dialog
-layouts (menu structures, Options tab contents, default sound files,
-profile-editor fields) remain undocumented across every era. See each doc's
-own "Remaining gaps" section for what's still missing era by era.
+## How the claims were checked
+
+Every claim stated as fact in the body of an era doc cites a page that was actually fetched, not something recalled from memory. A second pass fetched each cited page again and checked the claim against what the page says. A third pass compared the surviving claims with the two older docs to find contradictions, and checked a sample of the most important dates against a second, independent source.
+
+Anything that failed these checks is kept out of the main text. That covers sources that couldn't be loaded, claims that only appeared in a search-result summary, and open questions. They're listed in each doc's "Refuted or unresolved" and "Unverified / open questions" sections, and GATING-DIFF.md doesn't treat them as evidence.
+
+## Limitations
+
+Not every claim was re-checked against a second source. Only a sample per era was. Some point releases are missing, and most exact UI details are still undocumented for every era: menu structures, the contents of the Options dialog, default sounds and profile editor fields. Each doc ends with a "Remaining gaps" section listing what's missing for that release.
