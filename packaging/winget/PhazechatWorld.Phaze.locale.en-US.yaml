@@ -7,7 +7,7 @@ PublisherUrl: https://phazechat.world
 PublisherSupportUrl: https://github.com/jakes1345/phazechat.world/issues
 PackageName: Phaze
 PackageUrl: https://phazechat.world
-License: Proprietary
+License: MIT
 Copyright: Copyright © 2026 Phazechat World
 ShortDescription: Encrypted messaging, voice and video calls, free forever
 Description: |-
