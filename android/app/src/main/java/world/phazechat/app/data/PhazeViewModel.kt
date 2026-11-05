@@ -401,21 +401,28 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private val _channelDraft = MutableStateFlow("")
     val channelDraft = _channelDraft.asStateFlow()
 
-    // Calls
+    // Calls. Like the web client, a call rings over the socket and then runs
+    // in a Jitsi Meet room the server picks when it's answered (call_jitsi).
     data class CallState(
         val peer: String,
-        val status: String = "ringing", // ringing, connecting, connected, ended
+        // ringing: offer sent or received; connecting: answered here, waiting
+        // for the room; active: in the Jitsi conference.
+        val status: String = "ringing",
         val isIncoming: Boolean = false,
-        val isMuted: Boolean = false,
-        val isCameraOn: Boolean = false,
         val isVideo: Boolean = false,
-        val isScreenSharing: Boolean = false,
-        val hasRemoteVideo: Boolean = false,
-        val incomingSdp: String? = null,
+        val roomId: String? = null,
     )
     private val _callState = MutableStateFlow<CallState?>(null)
     val callState = _callState.asStateFlow()
-    var callManager: CallManager? = null; private set
+
+    /** A conference the UI should open (it needs an Activity to launch from). */
+    data class ConferenceLaunch(val room: String, val video: Boolean, val displayName: String?)
+    private val _pendingConference = MutableStateFlow<ConferenceLaunch?>(null)
+    val pendingConference = _pendingConference.asStateFlow()
+    fun consumePendingConference() { _pendingConference.value = null }
+
+    // Told by the Jitsi SDK when a conference ends, however it ended.
+    private val conferenceEndReceiver = JitsiCalls.registerEndListener(app) { url -> onConferenceEnded(url) }
 
     // Stories
     private val _stories = MutableStateFlow<List<world.phazechat.app.ui.Story>>(emptyList())
@@ -424,16 +431,6 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     // Crypto
     private var keyPair: NaClKeyPair
     private val peerKeys = mutableMapOf<String, ByteArray>()
-
-    // TURN
-    var turnUrl: String? = null; private set
-    var turnUrls: List<String>? = null; private set
-    var turnUsername: String? = null; private set
-    var turnPassword: String? = null; private set
-
-    // ICE candidates that arrived before the callee tapped "Answer".
-    // Flushed into the PeerConnection in answerCall() after setRemoteDescription.
-    private val pendingIceCandidates = mutableListOf<org.webrtc.IceCandidate>()
 
     init {
         keyPair = loadOrCreateKeys()
@@ -880,6 +877,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     fun clearTwoFactorStatus() { _twoFactorStatus.value = null }
 
     fun signOut() {
+        endCall()
         prefs.edit().remove("session_token").remove("username").apply()
         _me.value = null
         _sessionToken.value = null
@@ -1020,167 +1018,59 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     // Calls
     fun startCall(peer: String, withVideo: Boolean = false) {
         val me = _me.value ?: return
-        val cm = CallManager(getApplication())
-        callManager = cm
-        _callState.value = CallState(peer = peer, status = "ringing", isCameraOn = withVideo, isVideo = withVideo)
-
-        val iceServers = buildIceServers()
-        cm.createPeerConnection(iceServers)
-        cm.startLocalMedia(getApplication(), withVideo)
-
-        cm.onRemoteVideoTrack = {
-            _callState.value = _callState.value?.copy(hasRemoteVideo = true)
-        }
-
-        cm.onIceCandidate = { candidate ->
-            nexus.send(NexusMessage(
-                type = "ice_candidate", sender = me, recipient = peer,
-                candidate = org.json.JSONObject().apply {
-                    put("candidate", candidate.sdp)
-                    put("sdpMid", candidate.sdpMid)
-                    put("sdpMLineIndex", candidate.sdpMLineIndex)
-                }.toString(),
-            ))
-        }
-        cm.onConnectionChange = { state ->
-            when (state) {
-                org.webrtc.PeerConnection.IceConnectionState.CONNECTED,
-                org.webrtc.PeerConnection.IceConnectionState.COMPLETED ->
-                    _callState.value = _callState.value?.copy(status = "connected")
-                org.webrtc.PeerConnection.IceConnectionState.DISCONNECTED,
-                org.webrtc.PeerConnection.IceConnectionState.FAILED ->
-                    endCall()
-                else -> {}
-            }
-        }
-
-        viewModelScope.launch {
-            val offer = cm.createOffer() ?: return@launch
-            cm.setLocalDescription(offer)
-            nexus.send(NexusMessage(
-                type = "call_offer", sender = me, recipient = peer, sdp = offer.description,
-            ))
-        }
+        if (_callState.value != null) return
+        _callState.value = CallState(peer = peer, status = "ringing", isVideo = withVideo)
+        // No SDP: the server only needs the kind, and answers with a Jitsi room.
+        nexus.send(NexusMessage(type = "call_offer", sender = me, recipient = peer, body = callKind(withVideo)))
     }
 
     fun answerCall() {
         val cs = _callState.value ?: return
         val me = _me.value ?: return
-        val sdp = cs.incomingSdp ?: return
-        // Honor video: if the caller's offer advertises a video m-line, answer with video too.
-        val withVideo = sdp.contains("m=video")
-        val cm = CallManager(getApplication())
-        callManager = cm
-        _callState.value = cs.copy(status = "connecting", isVideo = withVideo, isCameraOn = withVideo)
-
-        val iceServers = buildIceServers()
-        cm.createPeerConnection(iceServers)
-        cm.startLocalMedia(getApplication(), withVideo)
-
-        cm.onRemoteVideoTrack = {
-            _callState.value = _callState.value?.copy(hasRemoteVideo = true)
-        }
-
-        cm.onIceCandidate = { candidate ->
-            nexus.send(NexusMessage(
-                type = "ice_candidate", sender = me, recipient = cs.peer,
-                candidate = org.json.JSONObject().apply {
-                    put("candidate", candidate.sdp)
-                    put("sdpMid", candidate.sdpMid)
-                    put("sdpMLineIndex", candidate.sdpMLineIndex)
-                }.toString(),
-            ))
-        }
-        cm.onConnectionChange = { state ->
-            when (state) {
-                org.webrtc.PeerConnection.IceConnectionState.CONNECTED,
-                org.webrtc.PeerConnection.IceConnectionState.COMPLETED ->
-                    _callState.value = _callState.value?.copy(status = "connected")
-                org.webrtc.PeerConnection.IceConnectionState.DISCONNECTED,
-                org.webrtc.PeerConnection.IceConnectionState.FAILED ->
-                    endCall()
-                else -> {}
-            }
-        }
-        cm.onRemoteStream = { /* audio plays automatically via AudioTrack */ }
-
-        viewModelScope.launch {
-            cm.setRemoteDescription(org.webrtc.SessionDescription(org.webrtc.SessionDescription.Type.OFFER, sdp))
-            // Flush any ICE candidates that arrived before the user tapped "Answer".
-            pendingIceCandidates.forEach { cm.addIceCandidate(it) }
-            pendingIceCandidates.clear()
-            val answer = cm.createAnswer() ?: return@launch
-            cm.setLocalDescription(answer)
-            nexus.send(NexusMessage(
-                type = "call_answer", sender = me, recipient = cs.peer, sdp = answer.description,
-            ))
-        }
+        if (!cs.isIncoming || cs.status != "ringing") return
+        _callState.value = cs.copy(status = "connecting")
+        // The server then sends call_jitsi with the room to both sides.
+        nexus.send(NexusMessage(type = "call_answer", sender = me, recipient = cs.peer, body = callKind(cs.isVideo)))
     }
 
     fun rejectCall() {
         val cs = _callState.value ?: return
         nexus.send(NexusMessage(type = "call_reject", sender = _me.value, recipient = cs.peer))
-        pendingIceCandidates.clear()
-        _callState.value = null
+        clearCall()
     }
 
     fun endCall() {
         val cs = _callState.value ?: return
         nexus.send(NexusMessage(type = "call_end", sender = _me.value, recipient = cs.peer))
-        pendingIceCandidates.clear()
-        callManager?.hangUp()
-        callManager = null
+        clearCall()
+    }
+
+    private fun callKind(video: Boolean) = if (video) "video" else "audio"
+
+    /** Drops the call state, hanging up the Jitsi conference if one was opened. */
+    private fun clearCall() {
+        val cs = _callState.value
         _callState.value = null
+        _pendingConference.value = null
+        if (cs?.status == "active") JitsiCalls.hangUp(getApplication())
     }
 
-    fun toggleCallMute() {
-        val muted = callManager?.toggleMute() ?: return
-        _callState.value = _callState.value?.copy(isMuted = muted)
+    /** The conference ended in Jitsi (hung up there, or it failed): tell the peer. */
+    private fun onConferenceEnded(url: String?) {
+        val cs = _callState.value ?: return
+        if (cs.status != "active" || !conferenceUrlMatchesRoom(url, cs.roomId)) return
+        nexus.send(NexusMessage(type = "call_end", sender = _me.value, recipient = cs.peer))
+        _callState.value = null
+        _pendingConference.value = null
     }
 
-    fun toggleCallCamera() {
-        val on = callManager?.toggleCamera() ?: return
-        _callState.value = _callState.value?.copy(isCameraOn = on)
-    }
-
-    fun toggleSpeakerphone(): Boolean {
-        return callManager?.toggleSpeakerphone() ?: false
+    override fun onCleared() {
+        JitsiCalls.unregister(getApplication(), conferenceEndReceiver)
+        super.onCleared()
     }
 
     fun openChat(peer: String) {
         _pendingOpenChat.value = peer
-    }
-
-    /** Begin screen sharing with the Intent returned by the MediaProjection permission prompt. */
-    fun startScreenShare(projectionData: android.content.Intent) {
-        val cm = callManager ?: return
-        cm.startScreenShare(projectionData)
-        _callState.value = _callState.value?.copy(isScreenSharing = true)
-    }
-
-    fun stopScreenShare() {
-        val cm = callManager ?: return
-        cm.stopScreenShare(getApplication())
-        _callState.value = _callState.value?.copy(isScreenSharing = cm.isScreenSharing)
-    }
-
-    private fun buildIceServers(): List<org.webrtc.PeerConnection.IceServer> {
-        val servers = mutableListOf(
-            org.webrtc.PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
-        )
-        if (turnUrl != null) {
-            // Collect all TURN URLs so the ICE agent can fall back to TCP/TLS
-            // endpoints if the primary UDP port is firewall-blocked.
-            val allUrls = mutableListOf(turnUrl!!)
-            turnUrls?.let { allUrls.addAll(it) }
-            servers.add(
-                org.webrtc.PeerConnection.IceServer.builder(allUrls)
-                    .setUsername(turnUsername ?: "")
-                    .setPassword(turnPassword ?: "")
-                    .createIceServer()
-            )
-        }
-        return servers
     }
 
     private fun appendChat(line: ChatLine) {
@@ -1211,10 +1101,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                     _sessionToken.value = msg.qrToken
                     prefs.edit().putString("session_token", msg.qrToken).apply()
                     msg.sender?.let { prefs.edit().putString("username", it).apply() }
-                    
-                    if (msg.turnUrl != null) {
-                        turnUrl = msg.turnUrl; turnUrls = msg.turnUrls; turnUsername = msg.turnUsername; turnPassword = msg.turnPassword
-                    }
+
                     nexus.send(NexusMessage(
                         type = "presence", sender = msg.sender, status = _myStatus.value,
                         publicKey = encodePublicKeyB64(keyPair.publicKey),
@@ -1267,9 +1154,6 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                         prefs.edit().putString("session_token", tok).apply()
                     }
                     msg.sender?.let { prefs.edit().putString("username", it).apply() }
-                    if (msg.turnUrl != null) {
-                        turnUrl = msg.turnUrl; turnUrls = msg.turnUrls; turnUsername = msg.turnUsername; turnPassword = msg.turnPassword
-                    }
                     nexus.send(NexusMessage(
                         type = "presence", sender = msg.sender, status = _myStatus.value,
                         publicKey = encodePublicKeyB64(keyPair.publicKey),
@@ -1427,9 +1311,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     msg.publicKey?.let { pk -> decodePublicKeyB64(pk)?.let { peerKeys[sender] = it } }
                     if (msg.status == "Offline" && _callState.value?.peer == sender) {
-                        callManager?.hangUp()
-                        callManager = null
-                        _callState.value = null
+                        clearCall()
                     }
                 }
             }
@@ -1628,52 +1510,53 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
-            // Call signaling
+            // Call signalling (server side: call_offer / call_answer in
+            // nexus_server/ws_handlers.go). Media goes through Jitsi.
             "call_offer" -> {
                 val from = msg.sender ?: return
-                _callState.value = CallState(peer = from, status = "ringing", isIncoming = true, incomingSdp = msg.sdp, isVideo = (msg.sdp?.contains("m=video") == true))
+                // The server reports busy before ringing us during a call
+                // that's been answered; don't let a stray offer clobber one.
+                val current = _callState.value
+                if (current != null && current.status != "ringing") return
+                _callState.value = CallState(
+                    peer = from, status = "ringing", isIncoming = true,
+                    isVideo = isVideoOffer(msg.body, msg.sdp),
+                    roomId = msg.roomId,
+                )
             }
-            "call_answer" -> {
-                val sdp = msg.sdp ?: return
-                viewModelScope.launch {
-                    callManager?.setRemoteDescription(
-                        org.webrtc.SessionDescription(org.webrtc.SessionDescription.Type.ANSWER, sdp)
-                    )
-                    _callState.value = _callState.value?.copy(status = "connecting")
+            "call_jitsi" -> {
+                val cs = _callState.value ?: return
+                val room = msg.roomId
+                if (room.isNullOrBlank()) {
+                    // The caller went away before the answer reached them.
+                    clearCall()
+                    _actionStatus.value = "Call ended."
+                    return
                 }
-            }
-            "ice_candidate" -> {
-                val raw = msg.candidate ?: return
-                try {
-                    val j = org.json.JSONObject(raw)
-                    val candidate = org.webrtc.IceCandidate(
-                        j.getString("sdpMid"), j.getInt("sdpMLineIndex"), j.getString("candidate")
-                    )
-                    val cm = callManager
-                    if (cm != null) cm.addIceCandidate(candidate)
-                    else pendingIceCandidates.add(candidate)
-                } catch (_: Exception) {}
+                if (cs.status == "active" && cs.roomId == room) return
+                val video = when (msg.body) { "video" -> true; "audio" -> false; else -> cs.isVideo }
+                _callState.value = cs.copy(status = "active", roomId = room, isVideo = video)
+                _pendingConference.value = ConferenceLaunch(room = room, video = video, displayName = _me.value)
             }
             "call_reject", "call_end" -> {
-                pendingIceCandidates.clear()
-                callManager?.hangUp()
-                callManager = null
-                _callState.value = null
+                val cs = _callState.value
+                if (msg.body == "answered_elsewhere") {
+                    // Picked up on another of our devices: just stop ringing here.
+                    if (cs != null && cs.isIncoming && cs.status == "ringing" && (msg.sender == null || msg.sender == cs.peer)) {
+                        _callState.value = null
+                    }
+                } else {
+                    clearCall()
+                }
             }
 
             "call_busy" -> {
-                pendingIceCandidates.clear()
-                callManager?.hangUp()
-                callManager = null
-                _callState.value = null
+                clearCall()
                 _actionStatus.value = "${msg.sender ?: "User"} is already in a call."
             }
 
             "call_error" -> {
-                pendingIceCandidates.clear()
-                callManager?.hangUp()
-                callManager = null
-                _callState.value = null
+                clearCall()
                 _actionStatus.value = msg.error ?: msg.body ?: "Call failed — user may be offline."
             }
 
