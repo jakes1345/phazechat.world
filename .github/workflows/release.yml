@@ -1,49 +1,79 @@
 name: Release
 
+# Push a tag `v<VERSION>` (VERSION is the repo-root file) to build and
+# publish every client:
+#
+#   Phaze.apk                    Android, signed (website "Direct APK download")
+#   Phaze.aab                    Android App Bundle for Play Console upload
+#   Phaze-windows-setup.exe      Windows NSIS installer (winget points at it)
+#   Phaze_linux_amd64.tar.gz     Linux desktop binary (`Phaze`) in a tarball
+#   checksums.txt                "<sha256>  <name>" for every asset above
+#
+# These names are what nexus_server/templates/download.html and the
+# server's /api/version (classifyAsset + checksums.txt) look for; keep them
+# in sync if you rename anything.
+
 on:
   push:
     tags:
       - 'v*'
-      - 'beta*'
-  release:
-    types: [published, prereleased]
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  # Every platform job below ends in `gh release upload $TAG ... --clobber`,
-  # which requires a GitHub Release to already exist for that tag — it does
-  # not create one. That was fine for the `release: [published]` trigger
-  # (the release already exists by definition), but it meant the OTHER
-  # documented trigger, a bare `push: tags: v*`, could never actually
-  # succeed: nothing in this file ever created the release a tag push needs.
-  # This job closes that gap. It's idempotent — `gh release view` short-
-  # circuits it when triggered by an actual `release` event, or by a re-run
-  # after a release already exists — so it's safe on both trigger paths.
+  # The platform jobs below upload with `gh release upload`, which needs the
+  # release to exist already. This job checks the tag against VERSION and
+  # creates the release (idempotent, so re-runs are safe).
   create-release:
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Check the tag matches VERSION
+        run: |
+          WANT="v$(tr -d '[:space:]' < VERSION)"
+          if [ "$GITHUB_REF_NAME" != "$WANT" ]; then
+            echo "::error title=Tag/VERSION mismatch::Tag is $GITHUB_REF_NAME but VERSION says $WANT. Bump VERSION in a commit, then tag that commit $WANT."
+            exit 1
+          fi
+
       - name: Ensure a release exists for this tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "$TAG" --generate-notes
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
           fi
 
-  # Android (Kotlin/Compose) — the Google Play client. Builds a signed APK
-  # (uploaded as Phaze.apk for the website's stable URL) and a release AAB
-  # (for Play Store upload).
+  # Android (Kotlin/Compose): the Google Play client. Builds a signed APK
+  # (Phaze.apk, the website's direct download) and a release AAB (Play).
   android:
     needs: create-release
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Check signing secrets
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+        run: |
+          missing=""
+          for name in GOOGLE_SERVICES_JSON ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_PASS ANDROID_KEY_ALIAS ANDROID_KEY_PASS; do
+            if [ -z "$(printenv "$name")" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error title=Android signing secrets missing::Set these repository secrets (Settings > Secrets and variables > Actions):$missing"
+            exit 1
+          fi
 
       - uses: actions/setup-java@v6
         with:
@@ -56,25 +86,33 @@ jobs:
         # it years ago, so `sdkmanager tools` 404s and the action dies
         # before Gradle ever runs. platform-tools is all this build needs;
         # Gradle's own Android plugin resolves build-tools/platforms itself.
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
-      - name: Write google-services.json from secret
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
-
-      - name: Write keystore from secret
-        run: echo '${{ secrets.ANDROID_KEYSTORE_B64 }}' | base64 -d > android/app/phaze-release.keystore
-
-      - name: Write local.properties (SDK path + signing secrets)
+      # Secrets go through env and printf, never into the script text, so a
+      # quote, `$` or backtick in a value can't break (or inject into) the
+      # shell.
+      - name: Write google-services.json, keystore and local.properties
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
         run: |
-          cat > android/local.properties <<EOF
-          sdk.dir=$ANDROID_SDK_ROOT
-          KEYSTORE_PATH=app/phaze-release.keystore
-          KEYSTORE_PASS=${{ secrets.ANDROID_KEYSTORE_PASS }}
-          KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASS=${{ secrets.ANDROID_KEY_PASS }}
-          EOF
+          set -euo pipefail
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > android/app/phaze-release.keystore
+          # local.properties is a Java properties file: escape backslashes.
+          prop() { printf '%s=%s\n' "$1" "$(printf '%s' "$2" | sed 's/\\/\\\\/g')"; }
+          {
+            prop sdk.dir "$ANDROID_SDK_ROOT"
+            prop KEYSTORE_PATH app/phaze-release.keystore
+            prop KEYSTORE_PASS "$ANDROID_KEYSTORE_PASS"
+            prop KEY_ALIAS "$ANDROID_KEY_ALIAS"
+            prop KEY_PASS "$ANDROID_KEY_PASS"
+          } > android/local.properties
 
       - name: Build signed APK + AAB
         run: |
@@ -87,18 +125,21 @@ jobs:
       - name: Upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          gh release upload "$TAG" Phaze.apk Phaze.aab --clobber
+        run: gh release upload "$GITHUB_REF_NAME" Phaze.apk Phaze.aab --clobber
 
-  # Windows desktop — Wails app with WebView2, packaged as an NSIS installer.
+  # Windows desktop: Wails app with WebView2, packaged as an NSIS installer.
   # The installer is what gets submitted to winget.
   desktop-windows:
     needs: create-release
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: windows-latest
+    # The desktop app embeds the web client and serves it from a local
+    # origin, so the build has to be told where the real server is.
+    env:
+      VITE_BASE: /
+      VITE_NEXUS_WS: wss://phazechat.world/ws
+      VITE_NEXUS_ORIGIN: https://phazechat.world
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v7
         with:
@@ -108,8 +149,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - name: Install Wails (version pinned by desktop/go.mod)
+        shell: bash
+        run: |
+          WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2 }' desktop/go.mod)"
+          test -n "$WAILS_VERSION"
+          go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
 
       - name: Install NSIS
         run: |
@@ -122,8 +167,6 @@ jobs:
 
       - name: Build web frontend
         working-directory: web
-        env:
-          VITE_BASE: /
         run: |
           npm ci
           npm run build
@@ -138,27 +181,29 @@ jobs:
         working-directory: desktop
         run: wails build -platform windows/amd64 -nsis
 
-      - name: Find and upload installer
+      - name: Upload installer
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $TAG = $env:GITHUB_REF -replace 'refs/tags/', ''
-          $installer = Get-ChildItem desktop/build/bin -Recurse -Include "*.exe","*.nsis" | Select-Object -First 1
-          if ($installer) {
-            Copy-Item $installer.FullName Phaze-windows-setup.exe
-          } else {
-            Copy-Item desktop/build/bin/Phaze.exe Phaze-windows-setup.exe
+          $installer = Get-ChildItem desktop/build/bin -Recurse -Filter "*installer*.exe" | Select-Object -First 1
+          if (-not $installer) {
+            Get-ChildItem desktop/build/bin -Recurse | Format-Table FullName
+            throw "NSIS installer not found under desktop/build/bin"
           }
-          gh release upload $TAG Phaze-windows-setup.exe --clobber
+          Copy-Item $installer.FullName Phaze-windows-setup.exe
+          gh release upload $env:GITHUB_REF_NAME Phaze-windows-setup.exe --clobber
 
-  # Linux desktop — Wails app using WebKit2GTK 4.1.
+  # Linux desktop: Wails app using WebKit2GTK 4.1.
   desktop-linux:
     needs: create-release
-    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: ubuntu-22.04
+    # See desktop-windows: point the embedded web client at the server.
+    env:
+      VITE_NEXUS_WS: wss://phazechat.world/ws
+      VITE_NEXUS_ORIGIN: https://phazechat.world
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-go@v7
         with:
@@ -173,19 +218,41 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - name: Install Wails (version pinned by desktop/go.mod)
+        run: |
+          WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2 }' desktop/go.mod)"
+          test -n "$WAILS_VERSION"
+          go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
 
+      # build.sh builds web/ with VITE_BASE=/ and inherits VITE_NEXUS_*.
       - name: Build desktop app
         working-directory: desktop
         run: bash build.sh
 
-      - name: Upload to GitHub Release
+      - name: Package and upload
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          cp desktop/build/bin/Phaze Phaze-linux-amd64
-          gh release upload "$TAG" Phaze-linux-amd64 --clobber
-          # Also update the stable download URL used by the website
-          cp Phaze-linux-amd64 nexus_server/public/downloads/Phaze.linux || true
+          install -Dm755 desktop/build/bin/Phaze stage/Phaze
+          tar -C stage -czf Phaze_linux_amd64.tar.gz Phaze
+          gh release upload "$GITHUB_REF_NAME" Phaze_linux_amd64.tar.gz --clobber
+
+  # checksums.txt (sha256sum format) over every other asset. The server's
+  # /api/version reads it to publish a SHA-256 per platform.
+  checksums:
+    needs: [android, desktop-windows, desktop-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate and upload checksums.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir assets && cd assets
+          gh release download "$GITHUB_REF_NAME" --pattern '*'
+          rm -f checksums.txt
+          sha256sum -- * > ../checksums.txt
+          cat ../checksums.txt
+          cd ..
+          gh release upload "$GITHUB_REF_NAME" checksums.txt --clobber
