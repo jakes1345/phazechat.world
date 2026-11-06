@@ -244,13 +244,33 @@ export type Feature =
   | 'live_streams'
   | 'spaces'
   | 'dark_mode'
+  /** Share a contact card into a chat. Skype had "Send Contacts" from the
+   *  2.x days, so every era has it. */
+  | 'send_contacts'
+  /** Leave a recorded message when a call goes unanswered. Classic Skype
+   *  offered voicemail from 2.x onwards and Skype 8 kept it. */
+  | 'voicemail'
+  /** Record a short video and send it — launched February 2013, inside the
+   *  Skype 6.x window. See docs/skype-era-gaps.md §6. */
+  | 'video_messages'
+  /** Quote a message in a reply. Skype 8. */
+  | 'quotes'
+  /** Unsent text kept per conversation, shown as "Draft:" in the list. Skype 8. */
+  | 'drafts'
+  /** Personal bookmarks on messages. Skype 8 (2019). */
+  | 'bookmarks'
+  /** Per-conversation gallery of shared media, files and links. Skype 8. */
+  | 'media_gallery'
+  /** Record a call and post the recording into the chat. Skype 8 (Sept 2018). */
+  | 'call_recording'
 
 const MODERN_ALL: Feature[] = [
   'text_chat', 'voice_call', 'video_call', 'screen_share', 'file_transfer',
   'group_chat', 'group_call', 'group_video', 'mood', 'emoticons', 'mojis',
   'reactions', 'edit_message', 'delete_message', 'mentions', 'read_receipts',
   'pinned_messages', 'remote_control', 'stories', 'live_streams', 'spaces',
-  'dark_mode',
+  'dark_mode', 'send_contacts', 'voicemail', 'video_messages', 'quotes',
+  'drafts', 'bookmarks', 'media_gallery', 'call_recording',
 ]
 
 /** Everything Skype could already do by the time of our earliest theme.
@@ -260,6 +280,7 @@ const MODERN_ALL: Feature[] = [
 const SKYPE3_BASE: Feature[] = [
   'text_chat', 'voice_call', 'video_call', 'file_transfer',
   'group_chat', 'group_call', 'mood', 'emoticons', 'edit_message',
+  'send_contacts', 'voicemail',
 ]
 
 /* Each era is the one before it plus what that release actually added.
@@ -268,10 +289,9 @@ const SKYPE3_BASE: Feature[] = [
 const SKYPE4 = [...SKYPE3_BASE, 'screen_share'] as Feature[]
 const SKYPE5 = [...SKYPE4, 'group_video'] as Feature[]
 /* Skype 6's headline changes were Microsoft account sign-in and the
-   Messenger merge — account plumbing, not conversation features. It
-   genuinely adds nothing to this table, which is a finding rather than
-   an omission. */
-const SKYPE6 = SKYPE5
+   Messenger merge — account plumbing. The one conversation feature that
+   landed in its window is video messaging (February 2013). */
+const SKYPE6 = [...SKYPE5, 'video_messages'] as Feature[]
 /* Mojis (Sept 2015) and Highlights, Skype's real Stories clone, which
    shipped under the Skype 7 version number in August 2017 and was
    removed again in September 2018 — see docs/skype-eras/skype8.md.
@@ -298,4 +318,60 @@ export function hasFeature(theme: ThemeId, feature: Feature): boolean {
 /** All features enabled for a theme, useful for building filtered UIs. */
 export function featuresOf(theme: ThemeId): readonly Feature[] {
   return FEATURES_BY_ERA[theme]
+}
+
+/** Plain-language names for each feature, used by the era pickers to say
+ *  what an era includes. Every Feature has one, so the picker can never
+ *  show a raw id. */
+export const FEATURE_LABELS: Record<Feature, string> = {
+  text_chat: 'Instant messages',
+  voice_call: 'Voice calls',
+  video_call: 'Video calls',
+  screen_share: 'Screen sharing in calls',
+  file_transfer: 'File transfer',
+  group_chat: 'Group chats',
+  group_call: 'Group voice calls',
+  group_video: 'Group video calls',
+  mood: 'Mood messages',
+  emoticons: 'Emoticons',
+  mojis: 'Mojis',
+  reactions: 'Reactions',
+  edit_message: 'Edit sent messages',
+  delete_message: 'Delete sent messages',
+  mentions: '@mentions',
+  read_receipts: 'Read receipts',
+  pinned_messages: 'Pinned messages',
+  remote_control: 'Remote screen sessions',
+  stories: 'Stories',
+  live_streams: 'Live streams',
+  spaces: 'Spaces',
+  dark_mode: 'Dark mode',
+  send_contacts: 'Send contacts',
+  voicemail: 'Voicemail',
+  video_messages: 'Video messages',
+  quotes: 'Quote replies',
+  drafts: 'Saved drafts',
+  bookmarks: 'Bookmarks',
+  media_gallery: 'Chat gallery',
+  call_recording: 'Call recording',
+}
+
+/** Features that exist in the table but have no implementation, so the
+ *  pickers don't advertise them. Mojis were licensed film and TV clips —
+ *  see docs/skype-era-gaps.md §6. dark_mode is a palette, not a feature. */
+const NOT_ADVERTISED: ReadonlySet<Feature> = new Set<Feature>(['mojis', 'dark_mode'])
+
+/** What a selectable era adds over the era before it in the picker order,
+ *  oldest first. The first era lists everything it has. */
+export function newInEra(theme: ThemeId): Feature[] {
+  const idx = SELECTABLE_THEMES.findIndex(t => t.id === theme)
+  const mine = FEATURES_BY_ERA[theme].filter(f => !NOT_ADVERTISED.has(f))
+  if (idx <= 0) return mine
+  const before = new Set(FEATURES_BY_ERA[SELECTABLE_THEMES[idx - 1].id])
+  return mine.filter(f => !before.has(f))
+}
+
+/** Everything an era offers, for the full list under the picker. */
+export function advertisedFeatures(theme: ThemeId): Feature[] {
+  return FEATURES_BY_ERA[theme].filter(f => !NOT_ADVERTISED.has(f))
 }
