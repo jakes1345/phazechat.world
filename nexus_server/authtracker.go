@@ -13,6 +13,11 @@ type authFailTracker struct {
 	userFails   map[string]*authFail // keyed by username
 	totpFails   map[string]*authFail // keyed by username — TOTP code attempts
 	signupCounts map[string]*authFail // keyed by IP — successful registrations
+	// deviceCodeFails counts wrong new-device codes per user across every
+	// challenge. Each challenge allows only a few guesses, but anyone with
+	// the password can mint a fresh challenge by signing in again, so
+	// without a per-user cap the 6-digit code is brute-forceable.
+	deviceCodeFails map[string]*authFail
 }
 
 type authFail struct {
@@ -26,6 +31,8 @@ var authTracker = &authFailTracker{
 	userFails:    make(map[string]*authFail),
 	totpFails:    make(map[string]*authFail),
 	signupCounts: make(map[string]*authFail),
+
+	deviceCodeFails: make(map[string]*authFail),
 }
 
 const (
@@ -42,7 +49,61 @@ const (
 	// Per-IP signup: max 3 successful registrations per IP per 24 hours.
 	signupIPMax    = 3
 	signupIPWindow = 24 * time.Hour
+	// New-device codes: max 10 wrong guesses per user per hour, across all
+	// of that user's challenges.
+	deviceCodeMaxFails = 10
+	deviceCodeWindow   = time.Hour
 )
+
+// countFail bumps a windowed counter in m. Caller must hold t.mu.
+func countFail(m map[string]*authFail, key string, window time.Duration) {
+	now := time.Now()
+	if f, ok := m[key]; ok && now.Sub(f.firstAt) <= window {
+		f.count++
+		f.lastAt = now
+		return
+	}
+	m[key] = &authFail{count: 1, firstAt: now, lastAt: now}
+}
+
+// overLimit reports whether key has reached limit in the window. Caller must
+// hold t.mu.
+func overLimit(m map[string]*authFail, key string, limit int, window time.Duration) bool {
+	f, ok := m[key]
+	if !ok {
+		return false
+	}
+	if time.Since(f.firstAt) > window {
+		delete(m, key)
+		return false
+	}
+	return f.count >= limit
+}
+
+// isDeviceCodeThrottled reports whether this user has used up their
+// new-device code guesses for now.
+func (t *authFailTracker) isDeviceCodeThrottled(username string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return overLimit(t.deviceCodeFails, username, deviceCodeMaxFails, deviceCodeWindow)
+}
+
+// recordDeviceCodeFail counts a wrong new-device code for the user.
+func (t *authFailTracker) recordDeviceCodeFail(username string) {
+	if username == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	countFail(t.deviceCodeFails, username, deviceCodeWindow)
+}
+
+// recordDeviceCodeSuccess clears the counter once a code is accepted.
+func (t *authFailTracker) recordDeviceCodeSuccess(username string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.deviceCodeFails, username)
+}
 
 func (t *authFailTracker) recordFail(ip, username string) {
 	t.mu.Lock()
@@ -224,6 +285,11 @@ func sweepAuthTracker() {
 		for ip, f := range authTracker.signupCounts {
 			if now.Sub(f.lastAt) > signupIPWindow {
 				delete(authTracker.signupCounts, ip)
+			}
+		}
+		for u, f := range authTracker.deviceCodeFails {
+			if now.Sub(f.lastAt) > deviceCodeWindow {
+				delete(authTracker.deviceCodeFails, u)
 			}
 		}
 		authTracker.mu.Unlock()

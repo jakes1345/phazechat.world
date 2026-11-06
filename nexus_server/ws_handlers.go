@@ -70,6 +70,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var username string
+	// Device identity for password sign-ins on this socket (see wsDeviceID).
+	wsDeviceCookie := deviceIDFromRequest(r)
+	wsUserAgent := r.UserAgent()
 
 	// Cookie pre-auth: web clients set an HttpOnly cookie at login time.
 	// The browser sends it automatically with every WS upgrade request, so
@@ -389,6 +392,50 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			authTracker.recordTOTPSuccess(msg.Sender)
+
+			// ── New-device check, same rules as /api/v1/auth/login ──
+			// Without this, the WebSocket was a way around new-device
+			// approval: password (+TOTP) alone got a full session.
+			deviceID := wsDeviceID(wsDeviceCookie, msg.DeviceID, msg.Sender, msg.DeviceInfo, client.IP)
+			deviceKnown := s.isKnownDevice(msg.Sender, deviceID)
+			if deviceVerificationEnabled() && !deviceKnown && s.canDeliverChallenge(msg.Sender) {
+				label := wsDeviceLabel(wsUserAgent, msg.DeviceInfo)
+				pendingTok, err := s.issueSessionToken(msg.Sender, msg.DeviceInfo)
+				if err == nil {
+					err = s.markSessionPendingDevice(pendingTok)
+				}
+				if err != nil {
+					client.Send(NexusMessage{Type: "auth_result", Error: "Session error — try again"})
+					continue
+				}
+				// The held session exists so an in-app approval (or the
+				// emailed code) has something to lift; its token is not
+				// handed out. Approving also trusts deviceID, so signing
+				// in again from this device then goes straight through.
+				challengeID, _ := s.createDeviceChallenge(msg.Sender, deviceID, pendingTok, label, client.IP)
+				log.Printf("[device] %s: WS sign-in from new device %q held for approval", msg.Sender, label)
+				// Both clients show Error for any auth_result that isn't
+				// ok/totp_required. Failure counters are deliberately left
+				// alone until the sign-in actually completes.
+				client.Send(NexusMessage{
+					Type:        "auth_result",
+					Status:      "device_verification_required",
+					Error:       "New device: approve this sign-in from a device where you're already signed in to Phaze (or sign in here with a link code from it), then sign in again.",
+					Body:        label,
+					ChallengeID: challengeID,
+				})
+				continue
+			}
+			if !deviceKnown {
+				if deviceVerificationEnabled() {
+					log.Printf("[device] %s: no session open and no mail transport — allowing WS sign-in from %q unverified",
+						msg.Sender, wsDeviceLabel(wsUserAgent, msg.DeviceInfo))
+				}
+				s.rememberDevice(msg.Sender, deviceID, wsDeviceLabel(wsUserAgent, msg.DeviceInfo), client.IP)
+			} else {
+				s.touchDevice(msg.Sender, deviceID, client.IP)
+			}
+
 			metrics.authSuccess.Add(1)
 			authTracker.recordSuccess(client.IP, msg.Sender) // clear fail counters
 			if s.reauthConnection(client, username, msg.Sender) {

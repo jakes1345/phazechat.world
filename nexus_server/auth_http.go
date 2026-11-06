@@ -75,8 +75,10 @@ func (s *NexusServer) httpLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authTracker.recordTOTPSuccess(body.Username)
-	authTracker.recordSuccess(ip, body.Username)
-	metrics.authSuccess.Add(1)
+	// Failure counters are cleared only once the sign-in is complete (below,
+	// or on device approval). Clearing them here, before the new-device
+	// check, let anyone with the password reset the per-user lockout on
+	// every attempt and keep guessing emailed device codes indefinitely.
 
 	device := body.Device
 	if device == "" {
@@ -145,6 +147,8 @@ func (s *NexusServer) httpLoginHandler(w http.ResponseWriter, r *http.Request) {
 			setDeviceCookie(w, deviceID)
 		}
 		setSessionCookie(w, tok)
+		authTracker.recordSuccess(ip, body.Username)
+		metrics.authSuccess.Add(1)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
@@ -55,7 +58,7 @@ func deviceVerificationEnabled() bool {
 // This identifies the *browser or install*, not the session: it outlives
 // logout so signing back in on a machine you've already approved is silent.
 func deviceIDFromRequest(r *http.Request) string {
-	if c, err := r.Cookie(deviceCookieName); err == nil && c.Value != "" {
+	if c, err := r.Cookie(deviceCookieName); err == nil && validClaimedDeviceID(c.Value) {
 		return c.Value
 	}
 	return ""
@@ -74,6 +77,56 @@ func setDeviceCookie(w http.ResponseWriter, id string) {
 		// machines approved.
 		MaxAge: 2 * 365 * 24 * 3600,
 	})
+}
+
+// wsDeviceID picks the device identity for a password sign-in over the
+// WebSocket.
+//
+// Browsers send the long-lived device cookie with the upgrade request, so
+// that's preferred. A client may also name its own install id (DeviceID on
+// the auth message) — like the cookie, it only helps if it's secret. Clients
+// with neither (the Android app today) get an id derived from the account,
+// the client's device_info and the source IP: approving a sign-in then lets
+// the same app on the same network sign in again without a second prompt,
+// while the same password used from anywhere else is still challenged.
+func wsDeviceID(cookieID, claimed, username, deviceInfo, ip string) string {
+	if validClaimedDeviceID(cookieID) {
+		return cookieID
+	}
+	if validClaimedDeviceID(claimed) {
+		return claimed
+	}
+	sum := sha256.Sum256([]byte(username + "\x00" + deviceInfo + "\x00" + ip))
+	return "ws-" + hex.EncodeToString(sum[:16])
+}
+
+// validClaimedDeviceID accepts ids a client may present (cookie or message
+// field). The "ws-" namespace is reserved for derived ids: those are
+// computable from public-ish inputs, so a client must never be able to
+// present one as its own.
+func validClaimedDeviceID(id string) bool {
+	if len(id) < 16 || len(id) > 128 || strings.HasPrefix(id, "ws-") {
+		return false
+	}
+	for _, r := range id {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
+}
+
+// wsDeviceLabel names a WebSocket sign-in for the approval prompt. Native
+// clients put something readable in device_info ("android/Pixel 8"); their
+// User-Agent is just the HTTP library's.
+func wsDeviceLabel(userAgent, deviceInfo string) string {
+	if d := strings.TrimSpace(deviceInfo); d != "" {
+		if len(d) > 64 {
+			d = d[:64]
+		}
+		return d
+	}
+	return deviceLabel(userAgent, "")
 }
 
 // deviceLabel turns a User-Agent into something a person can recognise in an
@@ -263,10 +316,18 @@ func (s *NexusServer) verifyDeviceChallenge(sessionToken, code string) (string, 
 	if attempts >= maxDeviceChallengeAttempts {
 		return "", errTooManyAttempts
 	}
-	if strings.TrimSpace(code) != want {
+	// Per-challenge attempts alone don't bound guessing: whoever has the
+	// password can start a new challenge by signing in again. Cap wrong
+	// codes per user across all of their challenges too.
+	if authTracker.isDeviceCodeThrottled(username) {
+		return "", errTooManyAttempts
+	}
+	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(code)), []byte(want)) != 1 {
 		s.DB.Exec(`UPDATE device_challenges SET attempts = attempts + 1 WHERE id = ?`, id)
+		authTracker.recordDeviceCodeFail(username)
 		return "", errBadCode
 	}
+	authTracker.recordDeviceCodeSuccess(username)
 	s.approveDeviceChallenge(id, username, deviceID, sessionToken, label, ip)
 	return username, nil
 }
