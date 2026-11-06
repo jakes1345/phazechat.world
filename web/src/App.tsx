@@ -1,6 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react'
 import faviconUrl from '/icon-192.png'
-import jsQR from 'jsqr'
 import type { NexusMessage, TurnConfig } from './nexusTypes'
 import {
   decryptFromPeer,
@@ -44,6 +43,15 @@ import { AvatarImg } from './AvatarImg'
 import GroupChat from './GroupChat'
 import { loadMutedConvos, saveMutedConvos } from './groupCommands'
 import './App.css'
+
+// The QR decoder (~130 kB) is only needed on the sign-in screen's
+// "scan a code" option, so it loads on first use instead of with the app.
+type JsQR = typeof import('jsqr').default
+let jsQRModule: JsQR | null = null
+async function loadJsQR(): Promise<JsQR> {
+  if (!jsQRModule) jsQRModule = (await import('jsqr')).default
+  return jsQRModule
+}
 
 // Wails desktop bridge — only present when running inside the Wails desktop app.
 const wails = (() => {
@@ -546,6 +554,7 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const animationFrameIdRef = useRef<number | null>(null)
+  const scanCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
     return () => {
@@ -562,6 +571,7 @@ export default function App() {
     try {
       setErr('')
       setCameraActive(true)
+      await loadJsQR()
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       streamRef.current = stream
       if (videoRef.current) {
@@ -594,14 +604,15 @@ export default function App() {
       return
     }
 
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (ctx) {
+    // One canvas for the whole scan instead of a new one every frame.
+    const canvas = (scanCanvasRef.current ??= document.createElement('canvas'))
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (ctx && jsQRModule) {
       canvas.width = videoRef.current.videoWidth
       canvas.height = videoRef.current.videoHeight
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      const code = jsQRModule(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: 'dontInvert',
       })
       if (code && code.data) {
@@ -633,7 +644,8 @@ export default function App() {
     const reader = new FileReader()
     reader.onload = (event) => {
       const img = new Image()
-      img.onload = () => {
+      img.onload = async () => {
+        const jsQR = await loadJsQR()
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
         if (ctx) {
