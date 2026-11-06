@@ -87,6 +87,16 @@ android {
     }
 }
 
+// The Firebase config (app/google-services.json, gitignored) is required for
+// real builds. The PR compile check in CI has no copy, so it passes
+// -Pphaze.noFirebaseConfig to build without the push-notification resources.
+if (providers.gradleProperty("phaze.noFirebaseConfig").isPresent) {
+    googleServices {
+        missingGoogleServicesStrategy =
+            com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy.WARN
+    }
+}
+
 // AGP 9 compiles Kotlin itself (no kotlin-android plugin); this replaces
 // the old android { kotlinOptions { jvmTarget } } block it removed.
 kotlin {

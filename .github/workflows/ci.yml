@@ -85,10 +85,10 @@ jobs:
         run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
       # The Firebase config (google-services.json) only feeds push-notification
-      # resources, not the code, so this check skips that one task rather than
+      # resources, not the code, so this check builds without it rather than
       # depend on the release secret. Release builds still need the real file.
       - name: Compile, shrink and unit-test the release build
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew :app:testReleaseUnitTest :app:minifyReleaseWithR8 -x :app:processReleaseGoogleServices --no-daemon
+          ./gradlew :app:testReleaseUnitTest :app:minifyReleaseWithR8 -Pphaze.noFirebaseConfig --no-daemon
