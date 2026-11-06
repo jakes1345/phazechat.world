@@ -620,9 +620,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			log.Printf("[delete_account] erased account %s", username)
 			s.broadcastPresence(username, "Offline")
 			client.Send(NexusMessage{Type: "delete_account_result", Status: "ok"})
-			s.Mu.Lock()
-			delete(s.Clients, username)
-			s.Mu.Unlock()
+			// Every other session of the deleted account goes too. Only
+			// removing the map entry left those sockets running with the
+			// old name in their handler — still able to act as the deleted
+			// user, or as whoever registers the name next.
+			s.detachClient(username, client)
+			s.dropAllClients(username, NexusMessage{Type: "kicked", Body: "This account has been deleted."})
 			ws.Close()
 			return
 
