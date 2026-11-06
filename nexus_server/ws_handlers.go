@@ -2515,6 +2515,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if parseErr != nil {
 				continue
 			}
+			// Message ids are sequential across every channel, so membership
+			// of the named channel proves nothing about the message: check it
+			// really lives there, or a member of any space could react to
+			// (and read back reactions on) messages in private ones.
+			var inChannel int
+			if err := s.DB.QueryRow(`SELECT 1 FROM channel_messages WHERE id = ? AND channel_id = ?`,
+				id64, msg.ChannelID).Scan(&inChannel); err != nil {
+				continue
+			}
 			// Toggle: if exists, remove; else insert. Same UX as DMs.
 			var existed int
 			s.DB.QueryRow(`SELECT 1 FROM channel_reactions WHERE msg_id=? AND emoji=? AND username=?`,
