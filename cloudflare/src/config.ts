@@ -33,6 +33,12 @@ const WORKER_ONLY = new Set(["SLEEP_AFTER"]);
 export const DEFAULT_SLEEP_AFTER = "30m";
 
 /**
+ * How long a cold start may take before the first request gives up: the
+ * entrypoint restores the database from R2 before the server opens its port.
+ */
+export const COLD_START_TIMEOUT_MS = 120_000;
+
+/**
  * Builds the container's environment from the Worker's bindings: every
  * plain string binding (vars and secrets) is passed through, so app secrets
  * such as BREVO_API_KEY or VAPID_PRIVATE_KEY only need adding once, as

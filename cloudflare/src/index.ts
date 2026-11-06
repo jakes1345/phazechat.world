@@ -1,5 +1,11 @@
 import { Container, getContainer, type StopParams } from "@cloudflare/containers";
-import { containerEnv, missingStorageSettings, sleepAfter, withClientIP } from "./config";
+import {
+  COLD_START_TIMEOUT_MS,
+  containerEnv,
+  missingStorageSettings,
+  sleepAfter,
+  withClientIP,
+} from "./config";
 
 export interface Env {
   NEXUS: DurableObjectNamespace<PhazeNexus>;
@@ -23,6 +29,29 @@ export class PhazeNexus extends Container<Env> {
     super(ctx, env);
     this.envVars = containerEnv(env);
     this.sleepAfter = sleepAfter(env);
+  }
+
+  /**
+   * Starts the container with room for Litestream to restore the database
+   * before the server listens. The package's own start allows 20 seconds
+   * in total, which a cold start with a large database can overrun, and
+   * the visitor then gets a 500 while the container is still coming up.
+   */
+  override async fetch(request: Request): Promise<Response> {
+    const state = await this.getState();
+    if (!this.ctx.container?.running || state.status !== "healthy") {
+      try {
+        await this.startAndWaitForPorts(this.defaultPort, {
+          abort: request.signal,
+          portReadyTimeoutMS: COLD_START_TIMEOUT_MS,
+        });
+      } catch (error) {
+        // super.fetch retries the start and turns the failure into the
+        // package's usual 503/429/500 response.
+        console.error("[phaze] cold start did not finish", error);
+      }
+    }
+    return super.fetch(request);
   }
 
   override onStart(): void {
