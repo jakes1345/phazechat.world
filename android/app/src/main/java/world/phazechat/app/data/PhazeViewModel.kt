@@ -101,6 +101,41 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private val _pendingVerifyUsername = MutableStateFlow("")
     val pendingVerifyUsername = _pendingVerifyUsername.asStateFlow()
 
+    // Stable id for this install, sent with password sign-ins so the server
+    // can recognise the device once it's been approved. Random, kept in
+    // prefs; it outlives sign-out on purpose (like the web's device cookie).
+    private val deviceId: String = prefs.getString("device_id", null)
+        ?: java.util.UUID.randomUUID().toString().also { prefs.edit().putString("device_id", it).apply() }
+
+    /** A password sign-in held for new-device approval, waiting for the emailed code. */
+    data class DeviceVerifyPrompt(val username: String, val label: String?, val challengeId: Long?)
+    private val _deviceVerify = MutableStateFlow<DeviceVerifyPrompt?>(null)
+    val deviceVerify = _deviceVerify.asStateFlow()
+
+    /** Someone is signing in to this account from a new device: approve or deny. */
+    data class DeviceChallenge(val id: Long, val label: String, val ip: String, val ts: Long)
+    private val _deviceChallenge = MutableStateFlow<DeviceChallenge?>(null)
+    val deviceChallenge = _deviceChallenge.asStateFlow()
+
+    // True while the last auth sent on this socket was session_auth, so a
+    // failure can be told apart from a wrong password.
+    private var sessionAuthPending = false
+
+    // A message waiting on the user's OK to go out without end-to-end
+    // encryption (the contact's key isn't known on this device yet).
+    data class PlaintextPrompt(val peer: String, internal val send: () -> Unit, internal val cancel: () -> Unit)
+    private val _plaintextPrompt = MutableStateFlow<PlaintextPrompt?>(null)
+    val plaintextPrompt = _plaintextPrompt.asStateFlow()
+    // Contacts the user agreed to message unencrypted this session.
+    private val plaintextOk = mutableSetOf<String>()
+    // Contacts we've already sent a key_request to this session.
+    private val keyRequested = mutableSetOf<String>()
+
+    /** A contact presented a different key from the one pinned on this device. */
+    data class KeyChangeWarning(val peer: String, val pinned: String, val offered: String, internal val publicKeyB64: String)
+    private val _keyChangeWarning = MutableStateFlow<KeyChangeWarning?>(null)
+    val keyChangeWarning = _keyChangeWarning.asStateFlow()
+
     // Profile
     private val _myDisplayName = MutableStateFlow(prefs.getString("display_name", "") ?: "")
     val myDisplayName = _myDisplayName.asStateFlow()
@@ -467,10 +502,15 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             nexus.state.collect { st ->
                 if (st == ConnState.CONNECTED) {
                     val tok = _sessionToken.value ?: return@collect
-                    nexus.send(NexusMessage(type = "session_auth", qrToken = tok, deviceInfo = "android/${Build.MODEL}"))
+                    sendSessionAuth(tok)
                 }
             }
         }
+    }
+
+    private fun sendSessionAuth(token: String) {
+        sessionAuthPending = true
+        nexus.send(NexusMessage(type = "session_auth", qrToken = token, deviceInfo = "android/${Build.MODEL}"))
     }
 
     private var linkPollJob: Job? = null
@@ -484,12 +524,38 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         _authError.value = null
         pendingTotpUsername = username
         pendingTotpPassword = password
-        nexus.send(NexusMessage(type = "auth", sender = username, body = password, deviceInfo = "android/${Build.MODEL}"))
+        sessionAuthPending = false
+        nexus.send(NexusMessage(type = "auth", sender = username, body = password, deviceInfo = "android/${Build.MODEL}", deviceId = deviceId))
     }
 
     fun loginWithTotp(totpCode: String) {
         _authError.value = null
-        nexus.send(NexusMessage(type = "auth", sender = pendingTotpUsername, body = pendingTotpPassword, totpCode = totpCode, deviceInfo = "android/${Build.MODEL}"))
+        sessionAuthPending = false
+        nexus.send(NexusMessage(type = "auth", sender = pendingTotpUsername, body = pendingTotpPassword, totpCode = totpCode, deviceInfo = "android/${Build.MODEL}", deviceId = deviceId))
+    }
+
+    /** Finishes a sign-in held for new-device approval with the emailed 6-digit code. */
+    fun verifyNewDevice(code: String) {
+        val p = _deviceVerify.value ?: return
+        // An empty code asks the server to finish the sign-in if it was
+        // approved from another session meanwhile.
+        val c = code.trim()
+        _authError.value = null
+        nexus.send(NexusMessage(type = "device_verify", sender = p.username, body = c, challengeId = p.challengeId, deviceId = deviceId))
+    }
+
+    fun cancelNewDeviceVerification() {
+        _deviceVerify.value = null
+        _authError.value = null
+        pendingTotpUsername = ""
+        pendingTotpPassword = ""
+    }
+
+    /** Approve or deny a sign-in from a new device, asked for by [deviceChallenge]. */
+    fun answerDeviceChallenge(approve: Boolean) {
+        val ch = _deviceChallenge.value ?: return
+        _deviceChallenge.value = null
+        nexus.send(NexusMessage(type = if (approve) "device_approve" else "device_deny", challengeId = ch.id))
     }
 
     fun cancelTotp() {
@@ -1097,27 +1163,20 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private fun handleMessage(msg: NexusMessage) {
         when (msg.type) {
             "link_check" -> {
+                // Only the device signing in with a link code acts on this;
+                // a signed-in device polling its own link must not take over
+                // the new device's session (mirrors the web client).
                 if (msg.status == "approved" && msg.qrToken != null) {
+                    if (_me.value != null || linkPollJob?.isActive != true) return
                     linkPollJob?.cancel()
-                    _me.value = msg.sender
+                    linkPollJob = null
                     _authError.value = null
+                    // The link only hands over a session token: sign this
+                    // socket in with it. The user is set on auth_result ok.
+                    // Kept in memory so a reconnect resumes it; persisted on ok.
                     _sessionToken.value = msg.qrToken
-                    prefs.edit().putString("session_token", msg.qrToken).apply()
-                    msg.sender?.let { prefs.edit().putString("username", it).apply() }
-
-                    nexus.send(NexusMessage(
-                        type = "presence", sender = msg.sender, status = _myStatus.value,
-                        publicKey = encodePublicKeyB64(keyPair.publicKey),
-                        keyFingerprint = fingerprint(keyPair.publicKey),
-                    ))
-                    // Re-announce the picked status so the server persists it for this session.
-                    nexus.send(NexusMessage(type = "status_update", body = _myStatus.value))
-                    val fcmToken = prefs.getString("fcm_token", null)
-                    if (!fcmToken.isNullOrEmpty()) {
-                        nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
-                    }
-                    loadSpaces()
-                } else if (msg.error != null) {
+                    sendSessionAuth(msg.qrToken)
+                } else if (msg.error != null && linkPollJob?.isActive == true) {
                     linkPollJob?.cancel()
                     _authError.value = msg.error
                 }
@@ -1144,38 +1203,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
-            "auth_result" -> {
-                if (msg.status == "totp_required") {
-                    _totpRequired.value = true
-                    _authError.value = null
-                } else if (msg.status == "ok") {
-                    _totpRequired.value = false
-                    _me.value = msg.sender
-                    _authError.value = null
-                    msg.qrToken?.let { tok ->
-                        _sessionToken.value = tok
-                        prefs.edit().putString("session_token", tok).apply()
-                    }
-                    msg.sender?.let { prefs.edit().putString("username", it).apply() }
-                    nexus.send(NexusMessage(
-                        type = "presence", sender = msg.sender, status = _myStatus.value,
-                        publicKey = encodePublicKeyB64(keyPair.publicKey),
-                        keyFingerprint = fingerprint(keyPair.publicKey),
-                    ))
-                    // Refresh open chat after reconnect so missed messages appear
-                    _selectedChat.value?.let { peer ->
-                        nexus.send(NexusMessage(type = "dm_history", sender = msg.sender, recipient = peer))
-                    }
-                    // Register FCM token so push notifications work on this device
-                    val fcmToken = prefs.getString("fcm_token", null)
-                    if (!fcmToken.isNullOrEmpty()) {
-                        nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
-                    }
-                    loadSpaces()
-                } else {
-                    _authError.value = msg.error ?: msg.status ?: "Auth failed"
-                }
-            }
+            "auth_result" -> handleAuthResult(msg)
 
             "register_result" -> {
                 when (msg.status) {
@@ -1388,6 +1416,32 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
             "dm_history" -> handleDmHistory(msg)
 
+            // Someone signed in to this account from a device it hasn't
+            // approved; their session is held until we approve or deny.
+            "device_challenge" -> {
+                val id = msg.challengeId ?: return
+                if (_me.value == null) return
+                _deviceChallenge.value = DeviceChallenge(
+                    id = id,
+                    label = msg.body ?: "an unrecognised device",
+                    ip = msg.status ?: "",
+                    ts = msg.ts ?: System.currentTimeMillis(),
+                )
+            }
+            // Resolved, possibly from another of our sessions or by the
+            // emailed code: close the prompt if it's this one.
+            "device_result" -> {
+                val cur = _deviceChallenge.value
+                if (cur != null && (msg.challengeId == null || msg.challengeId == cur.id)) {
+                    _deviceChallenge.value = null
+                }
+                when {
+                    msg.error != null -> _actionStatus.value = msg.error
+                    msg.status == "approved" -> _actionStatus.value = "Approved sign-in from ${msg.body ?: "a new device"}."
+                    msg.status == "denied" -> _actionStatus.value = "Blocked sign-in from ${msg.body ?: "a new device"}."
+                }
+            }
+
             "key_request" -> {
                 msg.sender?.let { sender ->
                     nexus.send(NexusMessage(
@@ -1584,6 +1638,78 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 msg.error != null -> _twoFactorStatus.value = msg.error
             }
         }
+    }
+
+    private fun handleAuthResult(msg: NexusMessage) {
+        val wasSessionAuth = sessionAuthPending
+        sessionAuthPending = false
+        when (msg.status) {
+            "totp_required" -> {
+                _totpRequired.value = true
+                _authError.value = if (msg.error?.contains("Too many") == true) msg.error else null
+            }
+            "device_verification_required" -> {
+                // Password (and 2FA) were right, but this install is new to
+                // the account: the server emailed a code and asked the
+                // account's other sessions to approve. Collect the code.
+                val prev = _deviceVerify.value
+                _totpRequired.value = false
+                _deviceVerify.value = DeviceVerifyPrompt(
+                    username = prev?.username ?: pendingTotpUsername,
+                    label = msg.body ?: prev?.label,
+                    challengeId = msg.challengeId ?: prev?.challengeId,
+                )
+                // The first answer's text is written for clients without a
+                // code screen; the screen explains it. Later ones (wrong
+                // code etc.) are shown.
+                _authError.value = if (prev != null) msg.error else null
+            }
+            "device_verification_failed" -> {
+                _deviceVerify.value = null
+                _authError.value = msg.error ?: "Sign-in could not be verified. Sign in again."
+            }
+            "ok" -> onSignedIn(msg)
+            else -> {
+                if (wasSessionAuth && msg.error?.contains("Too many") != true) {
+                    // The stored session is dead (expired, revoked, banned):
+                    // forget it, or every reconnect would retry it forever.
+                    _sessionToken.value = null
+                    prefs.edit().remove("session_token").apply()
+                }
+                _authError.value = msg.error ?: msg.status ?: "Auth failed"
+            }
+        }
+    }
+
+    private fun onSignedIn(msg: NexusMessage) {
+        _totpRequired.value = false
+        _deviceVerify.value = null
+        pendingTotpUsername = ""
+        pendingTotpPassword = ""
+        _me.value = msg.sender
+        _authError.value = null
+        msg.qrToken?.let { tok ->
+            _sessionToken.value = tok
+            prefs.edit().putString("session_token", tok).apply()
+        }
+        msg.sender?.let { prefs.edit().putString("username", it).apply() }
+        nexus.send(NexusMessage(
+            type = "presence", sender = msg.sender, status = _myStatus.value,
+            publicKey = encodePublicKeyB64(keyPair.publicKey),
+            keyFingerprint = fingerprint(keyPair.publicKey),
+        ))
+        // Re-announce the picked status so the server persists it for this session.
+        nexus.send(NexusMessage(type = "status_update", body = _myStatus.value))
+        // Refresh open chat after reconnect so missed messages appear
+        _selectedChat.value?.let { peer ->
+            nexus.send(NexusMessage(type = "dm_history", sender = msg.sender, recipient = peer))
+        }
+        // Register FCM token so push notifications work on this device
+        val fcmToken = prefs.getString("fcm_token", null)
+        if (!fcmToken.isNullOrEmpty()) {
+            nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
+        }
+        loadSpaces()
     }
 
     private fun handleKeyBackupResult(msg: NexusMessage) {

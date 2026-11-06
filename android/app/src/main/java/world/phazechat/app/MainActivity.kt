@@ -108,6 +108,8 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     val actionStatus by vm.actionStatus.collectAsState()
     val globalNotice by vm.globalNotice.collectAsState()
     val connState by vm.connState.collectAsState()
+    val deviceVerify by vm.deviceVerify.collectAsState()
+    val deviceChallenge by vm.deviceChallenge.collectAsState()
 
     val pendingOpenChat by vm.pendingOpenChat.collectAsState()
     // Only collected while the activity is started, so the conference is
@@ -147,6 +149,25 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
             title = { Text("📢 Phaze Announcement") },
             text = { Text(gn.message) },
             confirmButton = { Button(onClick = { vm.clearGlobalNotice() }) { Text("Got it") } },
+        )
+    }
+
+    // A sign-in to this account from a new device is waiting for approval.
+    deviceChallenge?.let { ch ->
+        val whenText = remember(ch.ts) {
+            java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(ch.ts))
+        }
+        AlertDialog(
+            onDismissRequest = { /* must be answered: approve or deny */ },
+            title = { Text("New sign-in to your account") },
+            text = {
+                Text(
+                    "${ch.label}" + (if (ch.ip.isNotBlank()) " from ${ch.ip}" else "") + " at $whenText " +
+                        "is trying to sign in to your Phaze account.\n\nIf this wasn't you, deny it and change your password."
+                )
+            },
+            confirmButton = { Button(onClick = { vm.answerDeviceChallenge(true) }) { Text("Approve") } },
+            dismissButton = { TextButton(onClick = { vm.answerDeviceChallenge(false) }) { Text("Deny") } },
         )
     }
 
@@ -391,7 +412,10 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
             },
             onScanGallery = {
                 galleryLauncher.launch("image/*")
-            }
+            },
+            newDeviceLabel = deviceVerify?.let { it.label ?: "" },
+            onVerifyNewDevice = { vm.verifyNewDevice(it) },
+            onCancelNewDevice = { vm.cancelNewDeviceVerification() },
         )
         return
     }

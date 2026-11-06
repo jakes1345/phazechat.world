@@ -35,6 +35,11 @@ fun AuthScreen(
     scannedLinkCode: String = "",
     onScanQR: (() -> Unit)? = null,
     onScanGallery: (() -> Unit)? = null,
+    // Non-null while a sign-in is held for new-device approval: the device
+    // label the server recorded (may be blank).
+    newDeviceLabel: String? = null,
+    onVerifyNewDevice: ((String) -> Unit)? = null,
+    onCancelNewDevice: (() -> Unit)? = null,
 ) {
     var mode by remember { mutableStateOf("login") } // login, register, link
     var username by remember { mutableStateOf("") }
@@ -43,6 +48,8 @@ fun AuthScreen(
     var linkCode by remember { mutableStateOf("") }
     var verifyCode by remember { mutableStateOf("") }
     var totpCode by remember { mutableStateOf("") }
+    var deviceCode by remember { mutableStateOf("") }
+    val newDevicePending = newDeviceLabel != null
     val focus = LocalFocusManager.current
 
     LaunchedEffect(scannedLinkCode) {
@@ -55,6 +62,9 @@ fun AuthScreen(
     val submit = {
         focus.clearFocus()
         when {
+            newDevicePending -> {
+                if (deviceCode.length == 6) onVerifyNewDevice?.invoke(deviceCode)
+            }
             totpRequired -> {
                 if (totpCode.length == 6) onLoginWithTotp?.invoke(totpCode)
             }
@@ -98,7 +108,52 @@ fun AuthScreen(
         Text("Encrypted chat for everyone", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         Spacer(Modifier.height(32.dp))
 
-        if (totpRequired) {
+        if (newDevicePending) {
+            // ── New-device approval step ──────────────────────────────
+            Text("New device", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "This is the first time this account has signed in on this device" +
+                    (if (!newDeviceLabel.isNullOrBlank()) " ($newDeviceLabel)" else "") +
+                    ". We emailed a 6-digit code to the address on your account. Enter it below, " +
+                    "or approve the sign-in from a device where you're already signed in to Phaze.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            OutlinedTextField(
+                value = deviceCode,
+                onValueChange = { if (it.length <= 6) deviceCode = it.filter { c -> c.isDigit() } },
+                label = { Text("6-digit code") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { submit() }),
+            )
+            Spacer(Modifier.height(16.dp))
+            if (error != null) {
+                Text(error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+            }
+            Button(
+                onClick = { submit() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                enabled = deviceCode.length == 6,
+            ) { Text("Verify", fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.height(12.dp))
+            // Approved on another device instead: an empty code asks the
+            // server to finish the held sign-in if it's been approved.
+            OutlinedButton(
+                onClick = { onVerifyNewDevice?.invoke("") },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("I approved it on another device") }
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = { deviceCode = ""; onCancelNewDevice?.invoke() }) {
+                Text("Back to sign in")
+            }
+
+        } else if (totpRequired) {
             // ── 2FA / TOTP step ───────────────────────────────────────
             Text(
                 "Two-factor authentication is enabled. Enter the 6-digit code from your authenticator app, or a backup code (e.g. abcde-f0123).",

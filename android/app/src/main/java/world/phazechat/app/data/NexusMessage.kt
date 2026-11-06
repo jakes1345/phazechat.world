@@ -49,6 +49,10 @@ data class NexusMessage(
     val rawMessages: String? = null,
     val rawDmHistory: String? = null,
     val backupCodes: List<String>? = null,
+    // Stable per-install id sent with auth; and the pending new-device
+    // sign-in that device_verify / device_approve / device_deny act on.
+    val deviceId: String? = null,
+    val challengeId: Long? = null,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("type", type)
@@ -85,6 +89,8 @@ data class NexusMessage(
         rawServers?.let { put("raw_servers", it) }
         rawChannels?.let { put("raw_channels", it) }
         rawMessages?.let { put("raw_messages", it) }
+        deviceId?.let { put("device_id", it) }
+        challengeId?.let { put("challenge_id", it) }
     }
 
     companion object {
@@ -158,6 +164,8 @@ data class NexusMessage(
                 rawMessages = j.optJSONArray("messages")?.toString(),
                 rawDmHistory = j.optJSONArray("dm_history")?.toString(),
                 backupCodes = backupCodes,
+                deviceId = j.str("device_id"),
+                challengeId = if (j.has("challenge_id") && !j.isNull("challenge_id")) j.optLong("challenge_id").takeIf { it != 0L } else null,
             )
         }
     }
