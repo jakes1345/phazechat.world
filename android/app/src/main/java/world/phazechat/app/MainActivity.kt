@@ -51,11 +51,20 @@ class MainActivity : ComponentActivity() {
         ViewModelProvider(this)[PhazeViewModel::class.java]
     }
 
+    /** Where a tapped notification wants to go: a person's chat, or a Space channel. */
+    private fun routeIntent(intent: Intent?) {
+        intent ?: return
+        intent.getStringExtra("open_chat")?.takeIf { it.isNotBlank() }?.let { peer ->
+            vm.openChat(peer)
+            return
+        }
+        val space = intent.getStringExtra("open_space")?.takeIf { it.isNotBlank() } ?: return
+        vm.openSpace(space, intent.getStringExtra("open_channel").orEmpty())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        intent?.getStringExtra("open_chat")?.takeIf { it.isNotBlank() }?.let { peer ->
-            vm.openChat(peer)
-        }
+        routeIntent(intent)
         enableEdgeToEdge()
         setContent {
             val vm: PhazeViewModel = viewModel()  // same instance as this.vm
@@ -74,9 +83,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getStringExtra("open_chat")?.takeIf { it.isNotBlank() }?.let { peer ->
-            vm.openChat(peer)
-        }
+        routeIntent(intent)
     }
 }
 
@@ -116,6 +123,14 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         if (peer != null && me != null) {
             vm.consumePendingOpenChat()
             vm.selectChat(peer)
+        }
+    }
+    // A Space push only lands on the main pages, so leave any open chat first.
+    val spacePushWaiting by vm.pendingOpenSpace.collectAsState()
+    LaunchedEffect(spacePushWaiting) {
+        if (spacePushWaiting != null) {
+            vm.selectChat("")
+            vm.selectConvo("")
         }
     }
 
@@ -446,6 +461,16 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     }
 
     var page by remember { mutableStateOf("chats") }
+    val pendingOpenSpace by vm.pendingOpenSpace.collectAsState()
+    LaunchedEffect(pendingOpenSpace, me) {
+        if (pendingOpenSpace != null && me != null) {
+            val (space, channel) = vm.consumePendingOpenSpace() ?: return@LaunchedEffect
+            page = "spaces"
+            vm.loadSpaces()
+            vm.selectSpace(space)
+            if (channel.isNotBlank()) vm.selectChannel(channel)
+        }
+    }
     var showStatusSheet by remember { mutableStateOf(false) }
     var showMoodDialog by remember { mutableStateOf(false) }
     val myStatusNow by vm.myStatus.collectAsState()

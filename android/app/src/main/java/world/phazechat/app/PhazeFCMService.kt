@@ -20,17 +20,30 @@ class PhazeFCMService : FirebaseMessagingService() {
     companion object {
         private const val TAG = "PhazeFCM"
         const val CHANNEL_ID = "phaze_messages"
+        const val ACTIVITY_CHANNEL_ID = "phaze_activity"
+
+        /** Kinds the server sends; see nexus_server/push.go. */
+        private val CHAT_KINDS = setOf("dm", "missed_call")
+        private val SPACE_KINDS = setOf("channel", "mention")
+        private val ACTIVITY_KINDS = setOf("missed_call", "friend_request")
     }
 
     override fun onCreate() {
         super.onCreate()
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(CHANNEL_ID, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "Phaze message notifications"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 200, 100, 200)
-        }
-        nm.createNotificationChannel(channel)
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Phaze message notifications"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 200, 100, 200)
+            }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(ACTIVITY_CHANNEL_ID, "Calls and requests", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Missed calls and friend requests"
+                enableVibration(true)
+            }
+        )
     }
 
     override fun onNewToken(token: String) {
@@ -51,39 +64,67 @@ class PhazeFCMService : FirebaseMessagingService() {
         val prefs = getSharedPreferences("phaze_prefs", Context.MODE_PRIVATE)
         if (prefs.getString("my_status", "Online") == "Do Not Disturb") return
 
-        val title = message.notification?.title ?: message.data["title"] ?: "Phaze"
-        val body = message.notification?.body ?: message.data["body"] ?: ""
-        val senderUsername = message.data["sender"] ?: message.data["from"] ?: ""
+        val data = message.data
+        val title = message.notification?.title ?: data["title"] ?: "Phaze"
+        val body = message.notification?.body ?: data["body"] ?: ""
+        val kind = data["kind"].orEmpty()
+        val sender = data["sender"] ?: data["from"] ?: ""
+        val serverId = data["server_id"].orEmpty()
+        val channelId = data["channel_id"].orEmpty()
+        val convoId = data["convo_id"].orEmpty()
 
+        // What a tap opens: the person's chat, or the Space channel. Older
+        // servers sent no kind, so a sender alone still opens their chat.
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            if (senderUsername.isNotBlank()) putExtra("open_chat", senderUsername)
+            when {
+                kind in SPACE_KINDS && serverId.isNotBlank() -> {
+                    putExtra("open_space", serverId)
+                    putExtra("open_channel", channelId)
+                }
+                (kind in CHAT_KINDS || kind.isEmpty()) && sender.isNotBlank() -> putExtra("open_chat", sender)
+            }
+        }
+        // One notification per conversation, replaced as new messages arrive.
+        val threadKey = when {
+            kind in SPACE_KINDS && channelId.isNotBlank() -> "ch:$channelId"
+            convoId.isNotBlank() -> "convo:$convoId"
+            kind == "friend_request" -> "req:$sender"
+            kind == "missed_call" -> "call:$sender"
+            sender.isNotBlank() -> "dm:$sender"
+            else -> message.messageId ?: System.currentTimeMillis().toString()
         }
         val pendingIntent = PendingIntent.getActivity(
-            this, senderUsername.hashCode(), intent,
+            this, threadKey.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = if (kind in ACTIVITY_KINDS) ACTIVITY_CHANNEL_ID else CHANNEL_ID
 
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, channel)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(body)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(
+                when (kind) {
+                    "missed_call" -> NotificationCompat.CATEGORY_MISSED_CALL
+                    "friend_request" -> NotificationCompat.CATEGORY_SOCIAL
+                    else -> NotificationCompat.CATEGORY_MESSAGE
+                }
+            )
 
-        // Android 11+ Messaging Style for People & Conversations
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && senderUsername.isNotBlank()) {
-            val sender = Person.Builder().setName(senderUsername).build()
-            val style = NotificationCompat.MessagingStyle(sender)
-                .addMessage(body, System.currentTimeMillis(), sender)
+        // Messaging style for direct messages, so Android groups them as a conversation.
+        if ((kind == "dm" || kind.isEmpty()) && sender.isNotBlank()) {
+            val person = Person.Builder().setName(sender).build()
+            val style = NotificationCompat.MessagingStyle(person)
+                .addMessage(body, System.currentTimeMillis(), person)
             builder.setStyle(style)
         }
 
-        // Use sender hashCode as notification ID so one notification per conversation
-        val notifId = if (senderUsername.isNotBlank()) senderUsername.hashCode() else message.messageId?.hashCode() ?: System.currentTimeMillis().toInt()
-        nm.notify(notifId, builder.build())
+        nm.notify(threadKey.hashCode(), builder.build())
     }
 }
