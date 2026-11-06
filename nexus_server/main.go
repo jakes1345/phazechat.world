@@ -905,6 +905,21 @@ func (s *NexusServer) userRole(username string) string {
 	return r
 }
 
+// staffRank is the user's role rank, counting legacy is_admin=1 accounts
+// (made by seed-admin before roles existed) as super_admin, the same way
+// adminLoginHandler does.
+func (s *NexusServer) staffRank(username string) int {
+	rank := roleRank(s.userRole(username))
+	if rank < roleRank("admin") {
+		var isAdmin int
+		s.DB.QueryRow(`SELECT COALESCE(is_admin,0) FROM users WHERE username=?`, username).Scan(&isAdmin)
+		if isAdmin == 1 {
+			return roleRank("super_admin")
+		}
+	}
+	return rank
+}
+
 // roleAtLeast returns true when the user's role rank >= required rank.
 func (s *NexusServer) roleAtLeast(username, minRole string) bool {
 	return roleRank(s.userRole(username)) >= roleRank(minRole)
@@ -3158,6 +3173,14 @@ func (s *NexusServer) adminBanHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&reqBody)
 	}
 	reason := strings.TrimSpace(reqBody.Reason)
+
+	// Ban, unban, 2FA reset and delete follow the same hierarchy as role
+	// changes: you can only act on users ranked below you. Without this a
+	// plain admin could ban, delete or strip 2FA from a super_admin.
+	if action != "role" && s.staffRank(target) >= s.staffRank(admin) {
+		http.Error(w, "cannot act on a peer or higher-ranked user", http.StatusForbidden)
+		return
+	}
 
 	switch action {
 	case "ban":
