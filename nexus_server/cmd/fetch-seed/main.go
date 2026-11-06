@@ -3,7 +3,7 @@
 //
 // The container's entrypoint runs it after `litestream restore` found no
 // replica in the bucket. If the bucket holds an object at seed/nexus.db
-// (put there by cloudflare/seed-from-fly.sh), it is downloaded together
+// (put there by hand to import an existing database; see cloudflare/README.md), it is downloaded together
 // with seed/nexus.db-wal when present (a copy taken from a running server
 // keeps recent writes in the WAL), folded into one file, checked to be a
 // sound SQLite database, and moved into place; Litestream then makes

@@ -14,7 +14,7 @@
 #   - a bucket is required,
 #   - a failed restore stops the boot instead of starting on an empty DB,
 #   - with no replica yet, a one-time seed (seed/nexus.db, uploaded by
-#     cloudflare/seed-from-fly.sh) is imported before replication starts.
+#     a copy put there by hand, see cloudflare/README.md) is imported before replication starts.
 
 set -eu
 

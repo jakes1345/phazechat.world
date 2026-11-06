@@ -424,6 +424,17 @@ var (
 )
 
 func (s *NexusServer) generateMediaToken(username string) *TurnConfig {
+	// Cloudflare Realtime TURN — set PHAZE_CF_TURN_KEY_ID + PHAZE_CF_TURN_API_TOKEN.
+	// Falls through to the modes below if Cloudflare can't be reached.
+	if cloudflareTURN != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		cfg := cloudflareTURN.Config(ctx)
+		cancel()
+		if cfg != nil {
+			return cfg
+		}
+	}
+
 	// Static credentials mode — for Metered.ca, Xirsys, etc.
 	// Set PHAZE_TURN_URL (comma-separated for multiple) + PHAZE_TURN_USERNAME + PHAZE_TURN_PASSWORD.
 	if TurnURL != "" && TurnUsername != "" && TurnPassword != "" {
@@ -455,7 +466,7 @@ func (s *NexusServer) generateMediaToken(username string) *TurnConfig {
 	}
 
 	// No TURN configured — calls may fail between users on different NATs.
-	log.Printf("[TURN] No TURN server configured for %s — set PHAZE_TURN_URL + credentials", username)
+	log.Printf("[TURN] No TURN server configured for %s — set PHAZE_CF_TURN_KEY_ID + PHAZE_CF_TURN_API_TOKEN, or PHAZE_TURN_URL + credentials", username)
 	return nil
 }
 

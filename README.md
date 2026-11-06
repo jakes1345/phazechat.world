@@ -15,11 +15,10 @@ The hosted version is at [phazechat.world](https://phazechat.world). This repo h
 | `android/` | Native Android app in Kotlin and Jetpack Compose. Package `world.phazechat.app`, minSdk 26. |
 | `desktop/` | Wails v2 desktop app that embeds the web client build. |
 | `nova_bot/` | Optional bot account backed by Gemini. The container starts it only when `NOVA_PASSWORD` and `GEMINI_API_KEY` are set. |
-| `infra/coturn/` | Dockerfile and Fly config for a coturn TURN server. |
 | `packaging/` | Draft Debian, Flatpak and winget manifests. Not used by CI yet. |
 | `docs/` | Design notes, audits and research. Written for development, not as user documentation. |
 | `Makefile`, `VERSION` | Build targets and the version stamped into the server binary. |
-| `cloudflare/` | Cloudflare Worker and Container config that runs the hosted server, plus the Fly data import script. |
+| `cloudflare/` | Cloudflare Worker and Container config that runs the hosted server. |
 
 ## Features
 
@@ -181,7 +180,14 @@ Some variable names start with `Phaze_` in mixed case rather than `PHAZE_`. That
 
 ### TURN
 
-The server hands TURN credentials to clients when they sign in. They're used by the WebRTC features that don't go through Jitsi: live streams and remote screen sessions on the web. Calls on both web and Android go through Jitsi. There are two ways to set it up.
+The server hands TURN credentials to clients when they sign in. They're used by the WebRTC features that don't go through Jitsi: live streams and remote screen sessions on the web. Calls on both web and Android go through Jitsi. There are three ways to set it up.
+
+Cloudflare Realtime TURN, which the hosted instance uses. The server fetches short-lived `turn.cloudflare.com` credentials and refreshes them in the background:
+
+| Variable | Purpose |
+|---|---|
+| `PHAZE_CF_TURN_KEY_ID` | Token ID of a TURN key (Dashboard > Realtime > TURN Server). |
+| `PHAZE_CF_TURN_API_TOKEN` | That key's API token. |
 
 Static credentials, for a hosted TURN provider:
 
@@ -199,7 +205,7 @@ Time-limited credentials, for your own coturn with `use-auth-secret`:
 | `PHAZE_TURN_SECRET` | Must match coturn's `static-auth-secret`. |
 | `PHAZE_TURN_SHORT_TERM` | `true` makes credentials last 10 minutes instead of 24 hours. |
 
-If both sets are present, static credentials win. With neither, clients fall back to a public STUN server and connections between some networks will fail.
+Cloudflare wins over the other two when it's set and reachable; between those two, static credentials win. With neither, clients fall back to a public STUN server and connections between some networks will fail.
 
 ### Email
 
@@ -267,18 +273,13 @@ Put it behind a reverse proxy that terminates TLS and passes WebSocket upgrades 
 
 ### TURN server
 
-For calls and streams to work across strict NATs you need a TURN server. There are two options in the repo:
-
-- `scripts/phaze_turnserver.conf` is a coturn config for a VPS. Replace `static-auth-secret` and use the same value for `PHAZE_TURN_SECRET`.
-- `infra/coturn/` deploys coturn as its own Fly app (`phaze-turn`). Run `fly launch --copy-config --no-deploy` in that directory, set the secret with `fly secrets set TURN_SECRET=...`, then `fly deploy`. `TURN_REALM` and the optional `PUBLIC_IP` go in the environment too. As configured, only relay ports 49160 and 49161 are open; widen `min-port`/`max-port` in `entrypoint.sh` and add matching services in `fly.toml` if you need more.
-
-Then set `PHAZE_TURN_URL=turn:<your-turn-host>:3478` and `PHAZE_TURN_SECRET` on the Nexus server.
+The hosted instance uses Cloudflare's TURN service (see [TURN](#turn)), so there is nothing to run. To host your own instead, `scripts/phaze_turnserver.conf` is a coturn config for a VPS. Replace `static-auth-secret`, then set `PHAZE_TURN_URL=turn:<your-turn-host>:3478` and the same value as `PHAZE_TURN_SECRET` on the Nexus server.
 
 ## Deploying to Cloudflare
 
 The hosted instance runs as a Cloudflare Container behind a Worker (`cloudflare/`). The container's disk is wiped on restart, so the database replicates to an R2 bucket with Litestream and uploads and avatars are stored in the same bucket.
 
-`.github/workflows/cloudflare-deploy.yml` deploys on every push to `master`. Account setup, the secrets it needs and the one-time import of the old Fly data are in [`cloudflare/README.md`](cloudflare/README.md).
+`.github/workflows/cloudflare-deploy.yml` deploys on every push to `master`. Account setup, the secrets it needs and how to start from an existing database are in [`cloudflare/README.md`](cloudflare/README.md).
 
 ## Releases
 

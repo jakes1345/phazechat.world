@@ -38,48 +38,32 @@ it sleeps. Set `SLEEP_AFTER` to e.g. `720h` to keep it effectively always on.
 
 ## One-time setup
 
-Order matters in steps 3 and 4: the data import only runs when the bucket
-has no database yet, and the container won't start until step 4 is done.
-
-1. **Workers Paid plan.** Dashboard > Workers & Pages > Plans.
-2. **R2 bucket.** Dashboard > R2 > Create bucket, e.g. `phaze-data`.
-   Then R2 > Manage API tokens > Create API token with *Object Read & Write*
-   on that bucket. Keep its Access Key ID, Secret Access Key and the S3
-   endpoint (`https://<account-id>.r2.cloudflarestorage.com`).
-3. **Copy the data off Fly** (before step 4). The Fly half can run any
-   time, even before steps 1 and 2, so take it as early as you can:
-
-   ```
-   fly auth login
-   ./cloudflare/seed-from-fly.sh backup
-   ```
-
-   It starts the Fly machine if Fly stopped it and downloads the database
-   and uploads into `./phaze-fly-backup`. Keep that folder: it is a full
-   backup. Once the bucket exists, put the backup in it:
-
-   ```
-   npx wrangler login
-   ./cloudflare/seed-from-fly.sh upload phaze-data
-   ```
-
-   The container imports the database on its first start.
+1. **Workers Paid plan.** Dashboard > Workers & Pages > Plans. Containers
+   don't run on the free plan.
+2. **R2 token.** The bucket `phazechat-data` already exists. R2 > Manage API
+   tokens > Create API token with *Object Read & Write* on that bucket. Keep
+   its Access Key ID, Secret Access Key and the S3 endpoint
+   (`https://<account-id>.r2.cloudflarestorage.com`).
+3. **TURN key** (free up to 1,000 GB of relay traffic a month, no plan
+   needed). Dashboard > Realtime > TURN Server > Create. Keep the Token ID
+   and API token. The server uses them to hand out short-lived
+   `turn.cloudflare.com` credentials, so there is no relay of our own to run.
 4. **Worker secrets**, from `cloudflare/` (`npx wrangler secret put NAME`):
 
    | Secret | Value |
    | --- | --- |
-   | `BUCKET_NAME` | the bucket name |
+   | `BUCKET_NAME` | `phazechat-data` |
    | `AWS_ENDPOINT_URL_S3` | the S3 endpoint from step 2 |
    | `AWS_ACCESS_KEY_ID` | from the R2 API token |
    | `AWS_SECRET_ACCESS_KEY` | from the R2 API token |
+   | `PHAZE_CF_TURN_KEY_ID` | Token ID from step 3 |
+   | `PHAZE_CF_TURN_API_TOKEN` | API token from step 3 |
 
-   Then every app secret that was set on Fly (`fly secrets list -a
-   skype7-reborn` shows the names), for example `BREVO_API_KEY`,
-   `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `PHAZE_ADMIN_USERS`,
-   `PHAZE_TURN_URL`/`PHAZE_TURN_SECRET`, `GEMINI_API_KEY`, `NOVA_PASSWORD`,
-   `SENTRY_DSN`. Every string secret is passed to the server as an
-   environment variable. Don't copy Fly's `BUCKET_NAME` or `AWS_*` (those
-   were Tigris) or `PHAZE_TRUST_PROXY_HEADER` (the Worker sets it).
+   Then the app's own settings, as needed: `PHAZE_ALLOWED_ORIGINS`,
+   `PHAZE_ADMIN_USERS`, `BREVO_API_KEY`, `VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY`, `GEMINI_API_KEY`, `NOVA_PASSWORD`, `SENTRY_DSN`.
+   Every string secret is passed to the server as an environment variable.
+   Don't set `PHAZE_TRUST_PROXY_HEADER`; the Worker sets it.
 5. **GitHub secrets** (repo Settings > Secrets and variables > Actions):
    `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN` made from the
    *Edit Cloudflare Workers* template under Account API tokens. Then run
@@ -87,8 +71,20 @@ has no database yet, and the container won't start until step 4 is done.
    to `master`.
 6. **Domain.** Once the deploy is green and the `*.workers.dev` URL works:
    Workers & Pages > phazechat > Settings > Domains & Routes > Add >
-   Custom domain > `phazechat.world` (the zone must be on this Cloudflare
-   account). That moves the site off Fly; then the Fly app can be shut down.
+   Custom domain > `phazechat.world` (the zone is already on this
+   Cloudflare account).
+
+The first start creates a new, empty database. To start from an existing
+one instead, upload it to the bucket as `seed/nexus.db` (and
+`seed/nexus.db-wal` if it has one) before the first deploy:
+
+```
+npx wrangler r2 object put phazechat-data/seed/nexus.db --file ./nexus.db --remote
+```
+
+The container imports it once, on a start that finds no database in R2.
+Uploads that belong to it go under `uploads/` and avatars under `avatars/`
+with the same file names they had on disk.
 
 ## Day to day
 

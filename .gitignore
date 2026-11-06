@@ -81,7 +81,6 @@ docs/*.md
 !docs/livekit-evaluation.md
 !docs/website-audit.md
 !docs/slop-audit.md
-infra/coturn/README.md
 web/README.md
 kai_bot/
 desktop/dist/
