@@ -137,7 +137,6 @@ jobs:
     env:
       VITE_BASE: /
       VITE_NEXUS_WS: wss://phazechat.world/ws
-      VITE_NEXUS_ORIGIN: https://phazechat.world
     steps:
       - uses: actions/checkout@v7
 
@@ -201,7 +200,6 @@ jobs:
     # See desktop-windows: point the embedded web client at the server.
     env:
       VITE_NEXUS_WS: wss://phazechat.world/ws
-      VITE_NEXUS_ORIGIN: https://phazechat.world
     steps:
       - uses: actions/checkout@v7
 

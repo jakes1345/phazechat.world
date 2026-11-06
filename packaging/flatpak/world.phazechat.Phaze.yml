@@ -29,7 +29,6 @@ build-options:
     # point it at the real server (same values as .github/workflows/release.yml).
     VITE_BASE: /
     VITE_NEXUS_WS: wss://phazechat.world/ws
-    VITE_NEXUS_ORIGIN: https://phazechat.world
 
 modules:
   - name: Phaze
