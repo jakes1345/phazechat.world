@@ -555,8 +555,8 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Encrypt this device's NaCl keypair with [pin] and upload to server. */
     fun backupKeys(pin: String) {
-        if (pin.length < 4) {
-            _keyBackupError.value = "PIN must be at least 4 characters"
+        KeyBackup.pinProblem(pin)?.let {
+            _keyBackupError.value = it
             return
         }
         _keyBackupError.value = null
@@ -585,8 +585,9 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Fetch the encrypted keypair backup from server and decrypt with [pin]. */
     fun restoreKeys(pin: String) {
-        if (pin.length < 4) {
-            _keyBackupError.value = "PIN must be at least 4 characters"
+        // Any length: backups made before the 8-character minimum must stay restorable.
+        if (pin.isEmpty()) {
+            _keyBackupError.value = "Enter your backup PIN"
             return
         }
         _keyBackupError.value = null

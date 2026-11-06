@@ -1,8 +1,8 @@
 package world.phazechat.app.crypto
 
-import android.util.Base64
 import org.json.JSONObject
 import java.security.SecureRandom
+import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
@@ -16,16 +16,32 @@ data class KeyBackupBlob(
 )
 
 object KeyBackup {
-    private const val ITERATIONS = 200000
+    // Same parameters and wire format as web/src/keyBackup.ts. New backups
+    // use 600k PBKDF2 iterations (OWASP guidance for PBKDF2-SHA256); older
+    // ones were written with 200k. The count comes back from the server, so
+    // restore refuses anything outside 200k..5M: a tampered blob could
+    // otherwise make the PIN cheap to guess (or hang the device).
+    const val ITERATIONS = 600_000
+    const val MIN_RESTORE_ITERATIONS = 200_000
+    const val MAX_RESTORE_ITERATIONS = 5_000_000
+    /** Recovery PINs shorter than this are refused. */
+    const val MIN_PIN_LENGTH = 8
     private const val SALT_BYTES = 16
     private const val IV_BYTES = 12
     private const val KEY_LENGTH = 256
 
-    private fun b64(bytes: ByteArray): String = Base64.encodeToString(bytes, Base64.NO_WRAP)
-    private fun unb64(str: String): ByteArray = Base64.decode(str, Base64.NO_WRAP)
+    private fun b64(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)
+    private fun unb64(str: String): ByteArray = Base64.getMimeDecoder().decode(str)
+
+    /** Null when [pin] is acceptable for a new backup, else the reason it isn't. */
+    fun pinProblem(pin: String): String? =
+        if (pin.length < MIN_PIN_LENGTH) "PIN must be at least $MIN_PIN_LENGTH characters" else null
+
+    fun restoreIterationsAllowed(iterations: Int): Boolean =
+        iterations in MIN_RESTORE_ITERATIONS..MAX_RESTORE_ITERATIONS
 
     fun encryptKeypair(pub: ByteArray, sec: ByteArray, pin: String): KeyBackupBlob {
-        if (pin.length < 4) throw IllegalArgumentException("PIN must be at least 4 characters")
+        pinProblem(pin)?.let { throw IllegalArgumentException(it) }
         
         val random = SecureRandom()
         val salt = ByteArray(SALT_BYTES)
@@ -72,6 +88,9 @@ object KeyBackup {
         val ct = combined.sliceArray(IV_BYTES until combined.size)
 
         val iterations = if (blob.iterations <= 0) ITERATIONS else blob.iterations
+        if (!restoreIterationsAllowed(iterations)) {
+            throw IllegalArgumentException("This backup uses unsafe settings and was not restored")
+        }
 
         // PBKDF2 key derivation
         val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, KEY_LENGTH)
