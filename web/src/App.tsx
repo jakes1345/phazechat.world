@@ -3123,6 +3123,12 @@ export default function App() {
                         <PresenceIcon status={shownStatus} size={10} /> {shownStatus} ▾
                       </button>
                     </span>
+                    {/* Skype-era themes hide the top bar, and Phaze 6+ (the theme
+                        that enables remote sessions) hides the menu bar too, so
+                        this is the only way in on that theme. */}
+                    {hasFeature(theme, 'remote_control') && (
+                      <button className="hub-me-settings" onClick={() => setRemoteOpen(true)} title="Remote Control" aria-label="Remote Control">🖥</button>
+                    )}
                     <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
                     {statusMenuOpen && (
                       <div className="presence-menu" onMouseLeave={() => setStatusMenuOpen(false)}>

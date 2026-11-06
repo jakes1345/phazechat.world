@@ -281,12 +281,18 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
     setJoinCode('')
   }
 
+  // End the session when the panel closes. Runs on unmount only: with
+  // `peer` as a dependency it ran on every peer change, so accepting a
+  // viewer tore down the connection just made for them and stopped the
+  // shared screen. sendRef keeps the latest send without re-running it.
+  const sendRef = useRef(send)
+  useEffect(() => { sendRef.current = send }, [send])
   useEffect(() => {
     return () => {
-      if (peer) send({ type: 'remote_end', recipient: peer })
+      if (peerRef.current) sendRef.current({ type: 'remote_end', recipient: peerRef.current })
       tearDown()
     }
-  }, [peer, send, tearDown])
+  }, [tearDown])
 
   const sendInputEvent = (payload: string) => {
     if (inputChannelRef.current && inputChannelRef.current.readyState === 'open') {
@@ -339,13 +345,13 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
       <div className="rc-modal">
         <button type="button" className="rc-close" onClick={onClose}>✕</button>
         <h2 className="rc-title">Remote Control</h2>
-        <p className="rc-sub">Share your screen with remote input — like TeamViewer, but encrypted and built into Phaze.</p>
+        <p className="rc-sub">Share your screen with a friend, point at things together and send files. Works in the browser.</p>
 
         {mode === 'idle' && (
           <div className="rc-options">
             <div className="rc-card">
               <h3>Share your screen</h3>
-              <p>Let someone view and control your screen. You'll get a 6-digit code to share.</p>
+              <p>Let someone see your screen and point at things. You'll get a 6-digit code to share.</p>
               <button type="button" className="rc-btn primary" onClick={() => void startHosting()}>🖥 Start sharing</button>
             </div>
             <div className="rc-card">
