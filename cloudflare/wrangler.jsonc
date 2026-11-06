@@ -1,5 +1,5 @@
 // Phaze on Cloudflare Containers.
-// Deployed by .github/workflows/cloudflare-deploy.yml on every push to master.
+// Deployed by .github/workflows/cloudflare-deploy.yml after Phaze CI passes on master.
 // Settings and secrets are listed in cloudflare/README.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
