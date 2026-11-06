@@ -432,13 +432,19 @@ type Convo = {
   creator: string
 }
 
+// Server the desktop app connects to. The desktop build serves this client
+// from Wails' own asset server (wails://wails or http://wails.localhost),
+// which proxies HTTP calls to the server but can't carry the WebSocket.
+const DESKTOP_WS_URL = 'wss://phazechat.world/ws'
+
 function defaultWsUrl(): string {
   const u = import.meta.env.VITE_NEXUS_WS as string | undefined
   if (u) return u
-  const { protocol, hostname, port } = window.location
+  const { protocol, host, hostname } = window.location
+  if (protocol === 'wails:' || hostname === 'wails.localhost') return DESKTOP_WS_URL
   const p = protocol === 'https:' ? 'wss:' : 'ws:'
-  const h = port && protocol !== 'https:' ? `${hostname}:${port}` : hostname
-  return `${p}//${h}/ws`
+  // location.host keeps a non-default port for both http and https.
+  return `${p}//${host}/ws`
 }
 
 function loadOrCreateKeys(): { publicKey: Uint8Array; secretKey: Uint8Array } {

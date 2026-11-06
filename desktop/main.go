@@ -18,12 +18,14 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:            "Phaze",
-		Width:            1280,
-		Height:           800,
-		MinWidth:         900,
-		MinHeight:        600,
-		AssetServer:      &assetserver.Options{Assets: assets},
+		Title:     "Phaze",
+		Width:     1280,
+		Height:    800,
+		MinWidth:  900,
+		MinHeight: 600,
+		// Assets serves the embedded web client; anything it doesn't have
+		// (the client's relative /api, /uploads… calls) goes to the server.
+		AssetServer:      &assetserver.Options{Assets: assets, Handler: newServerProxy(serverURL())},
 		Frameless:        true,
 		BackgroundColour: &options.RGBA{R: 13, G: 13, B: 13, A: 255},
 		OnStartup:        app.startup,
@@ -37,12 +39,12 @@ func main() {
 			},
 		},
 		Windows: &windows.Options{
-			WebviewIsTransparent:              false,
-			WindowIsTranslucent:               false,
-			DisableWindowIcon:                 false,
-			IsZoomControlEnabled:              false,
-			EnableSwipeGestures:               false,
-			Theme:                             windows.Dark,
+			WebviewIsTransparent: false,
+			WindowIsTranslucent:  false,
+			DisableWindowIcon:    false,
+			IsZoomControlEnabled: false,
+			EnableSwipeGestures:  false,
+			Theme:                windows.Dark,
 		},
 		Linux: &linux.Options{
 			ProgramName: "Phaze",
