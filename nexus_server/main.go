@@ -2075,10 +2075,16 @@ var abuseReasons = map[string]bool{
 
 const maxAbuseReportBody = 2000
 
+// normalizeAbuseReason maps what a client sent to one of abuseReasons. The
+// Android app sends labels such as "Inappropriate content", so the first
+// word is enough to match.
 func normalizeAbuseReason(reason string) string {
 	r := strings.ToLower(strings.TrimSpace(reason))
 	if abuseReasons[r] {
 		return r
+	}
+	if f := strings.Fields(r); len(f) > 0 && abuseReasons[f[0]] {
+		return f[0]
 	}
 	return "other"
 }

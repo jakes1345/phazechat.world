@@ -71,6 +71,24 @@ func TestAbuseReport_LongBodyIsCapped(t *testing.T) {
 	}
 }
 
+// The Android app sends its menu labels as the reason.
+func TestNormalizeAbuseReason_AndroidLabels(t *testing.T) {
+	cases := map[string]string{
+		"Spam":                  "spam",
+		"Harassment":            "harassment",
+		"Inappropriate content": "inappropriate",
+		"Impersonation":         "impersonation",
+		"Other":                 "other",
+		"":                      "other",
+		"nonsense words":        "other",
+	}
+	for in, want := range cases {
+		if got := normalizeAbuseReason(in); got != want {
+			t.Errorf("normalizeAbuseReason(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 // A group message queued while a member was offline must still say which
 // group it belongs to, or the app can't show it.
 func TestOfflineDelivery_GroupMessageKeepsConvoID(t *testing.T) {
