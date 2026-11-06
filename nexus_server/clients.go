@@ -287,6 +287,28 @@ func (s *NexusServer) detachClient(username string, client *Client) int {
 	return remaining
 }
 
+// reauthConnection is called before a socket that may already be signed in
+// is registered under `newUser` (auth, session_auth, qr_login_check).
+//
+// Registering again without this appended the same *Client a second time —
+// duplicate deliveries and a ghost entry that kept the user "online" after
+// the socket closed — and a socket re-authed as someone else stayed in the
+// first user's list, so it kept receiving their messages.
+//
+// Returns true when the socket is already registered as newUser: the caller
+// should just confirm success and not register it again. When it was signed
+// in as someone else, it is detached from that account first.
+func (s *NexusServer) reauthConnection(client *Client, current, newUser string) (alreadyThisUser bool) {
+	if current == "" {
+		return false
+	}
+	if current == newUser {
+		return true
+	}
+	s.detachClient(current, client)
+	return false
+}
+
 // ── Remote screen sessions ────────────────────────────────────────────────
 //
 // A viewer earns the right to signal a host by looking up the host's 6-digit

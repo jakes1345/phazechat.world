@@ -391,6 +391,11 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			authTracker.recordTOTPSuccess(msg.Sender)
 			metrics.authSuccess.Add(1)
 			authTracker.recordSuccess(client.IP, msg.Sender) // clear fail counters
+			if s.reauthConnection(client, username, msg.Sender) {
+				// Already signed in as this user on this socket.
+				client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username})
+				continue
+			}
 			username = msg.Sender
 			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
 			s.autoJoinGlobalSpace(username)
@@ -487,6 +492,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				}
 				s.revokeSession(msg.QRToken)
 				client.Send(NexusMessage{Type: "auth_result", Error: body, Status: "banned"})
+				continue
+			}
+			if s.reauthConnection(client, username, u) {
+				client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username, QRToken: msg.QRToken})
 				continue
 			}
 			username = u
@@ -770,6 +779,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			authTracker.recordSuccess(client.IP, u)
+			if s.reauthConnection(client, username, u) {
+				client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username, QRToken: sess})
+				continue
+			}
 			// Promote this socket onto the approved session.
 			username = u
 			// Register alongside any sessions the user already has open
