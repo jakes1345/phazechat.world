@@ -4,7 +4,6 @@
 .git
 .github
 .cursor
-.claude
 **/node_modules
 *.md
 docs
