@@ -12,16 +12,34 @@
 //   - -admin only flips is_admin to 1 (never demotes). Pair with the
 //     env-driven PHAZE_ADMIN_USERS list on the server for redundancy.
 //
-// Run on Fly:
+// Production (Cloudflare Containers, see cloudflare/README.md): there is no
+// shell into the container, and its disk is rebuilt from the Litestream
+// replica in R2 on every start, so this isn't run against the live
+// database. Instead, for the first admin or an admin lockout, set
+// PHAZE_ADMIN_USERS (comma-separated usernames) with
+// `npx wrangler secret put PHAZE_ADMIN_USERS`; the server promotes them to
+// super_admin on its next start. Register the account normally; an admin
+// can mark it verified in the admin portal (PHAZE_ADMIN_PATH, default
+// /nexus-cmd, Users > Verify). Lost passwords use the normal email reset.
 //
-//   fly ssh console -a skype7-reborn -C \
-//     "/app/seed-admin -username jack -password 'CHANGE-ME-IMMEDIATELY' \
-//                      -email jack@example.com -admin"
+// Offline, against a copy restored from the bucket (with the bucket's env
+// vars set), e.g. to inspect it or to prepare a database for a new bucket:
+//
+//	litestream restore -config nexus_server/litestream.yml -o ./copy.db /data/nexus.db
+//	go run ./cmd/seed-admin -db ./copy.db -username jack -email jack@example.com -admin
+//
+// Edits to a copy never reach production by themselves: the container only
+// imports a database (seed/nexus.db, see cmd/fetch-seed) into a bucket that
+// has no replica yet.
+//
+// Self-hosted Docker:
+//
+//	docker exec -it <container> /app/seed-admin -username jack -email jack@example.com -admin
 //
 // The same binary runs locally for dev DB pokes:
 //
-//   go run ./cmd/seed-admin -db ./nexus.db -username dev -password test1234 \
-//                           -email dev@example.com -admin
+//	go run ./cmd/seed-admin -db ./nexus.db -username dev -password test1234 \
+//	                        -email dev@example.com -admin
 package main
 
 import (

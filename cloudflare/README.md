@@ -39,6 +39,12 @@ don't run while it sleeps.
 
 ## One-time setup
 
+> **Back up the Fly data first, today.** The Fly account has an overdue
+> invoice and Fly can suspend it, taking the machine and its volume (the
+> only copy of the database and uploads) with it. Step 3's
+> `./cloudflare/seed-from-fly.sh backup` needs nothing from Cloudflare, so
+> run it before anything else and keep `./phaze-fly-backup` somewhere safe.
+
 Order matters in steps 3 and 4: the data import only runs when the bucket
 has no database yet, and the container won't start until step 4 is done.
 
@@ -77,19 +83,88 @@ has no database yet, and the container won't start until step 4 is done.
    Then every app secret that was set on Fly (`fly secrets list -a
    skype7-reborn` shows the names), for example `BREVO_API_KEY`,
    `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `PHAZE_ADMIN_USERS`,
-   `PHAZE_TURN_URL`/`PHAZE_TURN_SECRET`, `GEMINI_API_KEY`, `NOVA_PASSWORD`,
-   `SENTRY_DSN`. Every string secret is passed to the server as an
-   environment variable. Don't copy Fly's `BUCKET_NAME` or `AWS_*` (those
-   were Tigris) or `PHAZE_TRUST_PROXY_HEADER` (the Worker sets it).
+   `GEMINI_API_KEY`, `NOVA_PASSWORD`, `SENTRY_DSN`, and the TURN settings
+   (see [Calls (TURN)](#calls-turn)). Every string secret is passed to the
+   server as an environment variable. Don't copy Fly's `BUCKET_NAME` or
+   `AWS_*` (those were Tigris) or `PHAZE_TRUST_PROXY_HEADER` (the Worker
+   sets it).
+
+   Also set `Phaze_ALLOWED_ORIGINS` (the name is case-sensitive) to
+   `https://phazechat.world,https://www.phazechat.world`. Without it the
+   server accepts WebSocket and CORS requests from any origin.
 5. **GitHub secrets** (repo Settings > Secrets and variables > Actions):
    `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN` made from the
    *Edit Cloudflare Workers* template under Account API tokens. Then run
-   the *Deploy to Cloudflare* workflow (Actions tab > Run workflow), or push
-   to `master`.
+   the *Deploy to Cloudflare* workflow (Actions tab > Run workflow, on
+   `master`). After that it deploys by itself whenever *Phaze CI* passes
+   on a push to `master`, using the exact commit CI tested.
 6. **Domain.** Once the deploy is green and the `*.workers.dev` URL works:
    Workers & Pages > phazechat > Settings > Domains & Routes > Add >
-   Custom domain > `phazechat.world` (the zone must be on this Cloudflare
-   account). That moves the site off Fly; then the Fly app can be shut down.
+   Custom domain, once for `phazechat.world` and once for
+   `www.phazechat.world` (the zone must be on this Cloudflare account, and
+   any old A/AAAA/CNAME records for those names pointing at Fly have to go
+   first). That moves the site off Fly; then the Fly app can be shut down.
+
+## Cutover checklist
+
+- [ ] Fly data backed up (`seed-from-fly.sh backup`); the Fly account is
+      overdue and may be suspended at any time, so this comes first.
+- [ ] Workers Paid plan, R2 bucket and R2 API token (steps 1-2).
+- [ ] Backup uploaded to the bucket (`seed-from-fly.sh upload`) before the
+      first container start.
+- [ ] Worker secrets: storage (`BUCKET_NAME`, `AWS_ENDPOINT_URL_S3`,
+      `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) and the app secrets
+      copied from Fly.
+- [ ] `Phaze_ALLOWED_ORIGINS=https://phazechat.world,https://www.phazechat.world`.
+      The desktop app sends its embedded page's origin; if desktop users
+      can't connect after this, add that origin too (Wails uses
+      `http://wails.localhost` on Windows and `wails://wails` on Linux).
+- [ ] TURN decided and configured (see [Calls (TURN)](#calls-turn)): if
+      it was the `phaze-turn` Fly app, it goes down with the Fly account.
+- [ ] GitHub secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`;
+      first deploy green; the `*.workers.dev` URL shows the site and you
+      can log in with an existing account (proves the import worked).
+- [ ] Custom domains for **both** `phazechat.world` and
+      `www.phazechat.world`.
+- [ ] After a day of normal traffic: check `nexus.db/` keeps growing in
+      R2, then shut down the Fly apps.
+
+## Calls (TURN)
+
+Cloudflare Containers only receive HTTP(S)/WebSocket traffic through the
+Worker. TURN needs raw UDP (and TCP 3478/5349) on a public IP, so it
+cannot run in this container and has to stay a separate service.
+
+How the server hands out TURN credentials (`generateMediaToken` in
+`nexus_server/main.go`):
+
+- `PHAZE_TURN_URL` + `PHAZE_TURN_USERNAME` + `PHAZE_TURN_PASSWORD`: one
+  fixed username/password given to every client (for providers that issue
+  long-lived static credentials).
+- `PHAZE_TURN_URL` + `PHAZE_TURN_SECRET`: coturn-style time-limited
+  credentials (HMAC of `<expiry>:<username>`, 24h, or 10 min with
+  `PHAZE_TURN_SHORT_TERM=true`).
+
+Cloudflare's own TURN service (Realtime TURN) doesn't fit either mode: its
+credentials are short-lived and have to be minted per session by calling
+the Cloudflare API with a TURN key, and the server has no code for that.
+Pasting one generated credential into `PHAZE_TURN_USERNAME`/`PASSWORD`
+would work only until it expires. Until the server learns to mint them,
+use one of:
+
+1. **coturn on a small VPS (recommended).** Any VPS with a public IPv4 and
+   UDP open. Use `scripts/phaze_turnserver.conf` (set `static-auth-secret`
+   to `openssl rand -hex 32`, set `realm`, open 3478/udp+tcp, 5349/tcp and
+   the relay port range), or run the `infra/coturn` image with
+   `TURN_SECRET`, `TURN_REALM` and `PUBLIC_IP`. Then set Worker secrets
+   `PHAZE_TURN_URL=turn:<vps-host>:3478` and `PHAZE_TURN_SECRET=<same
+   secret>`.
+2. **A TURN provider with static credentials** (e.g. Metered, Xirsys):
+   set `PHAZE_TURN_URL` (comma-separated for several URLs),
+   `PHAZE_TURN_USERNAME` and `PHAZE_TURN_PASSWORD`.
+
+`infra/coturn/fly.toml` (the `phaze-turn` Fly app) is only an option while
+the Fly account is in good standing.
 
 ## Day to day
 

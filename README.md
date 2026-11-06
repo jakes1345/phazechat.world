@@ -261,6 +261,10 @@ docker run -p 8080:8080 -v nexus_data:/data \
   phaze-nexus
 ```
 
+Or `cd nexus_server && docker compose up -d --build`, which does the same with a named volume and listens on `127.0.0.1:8080`.
+
+The container runs as an unprivileged user (uid 10001) and keeps everything it writes under `/data`: the database, chat uploads (`PHAZE_UPLOAD_DIR=/data/uploads`) and avatars. A new named volume gets the right owner automatically. A volume created by an older image, which ran as root, needs a one-time `chown`; the entrypoint stops with the exact command if `/data` isn't writable. For a bind mount, `chown -R 10001:10001` the host directory. The image has a `HEALTHCHECK` on `/health` and is built for `linux/amd64` and `linux/arm64`.
+
 CI also publishes this image to GitHub Container Registry on every push to `master` and on version tags (`.github/workflows/docker.yml`), as `ghcr.io/jakes1345/phazechat.world-nexus`.
 
 Put it behind a reverse proxy that terminates TLS and passes WebSocket upgrades through on `/ws`. Set `PHAZE_TRUST_PROXY_HEADER` to whatever header your proxy uses for the client IP. `/health` returns the server's status for health checks, and `/status` is a public status page.
@@ -270,21 +274,23 @@ Put it behind a reverse proxy that terminates TLS and passes WebSocket upgrades 
 For calls and streams to work across strict NATs you need a TURN server. There are two options in the repo:
 
 - `scripts/phaze_turnserver.conf` is a coturn config for a VPS. Replace `static-auth-secret` and use the same value for `PHAZE_TURN_SECRET`.
-- `infra/coturn/` deploys coturn as its own Fly app (`phaze-turn`). Run `fly launch --copy-config --no-deploy` in that directory, set the secret with `fly secrets set TURN_SECRET=...`, then `fly deploy`. `TURN_REALM` and the optional `PUBLIC_IP` go in the environment too. As configured, only relay ports 49160 and 49161 are open; widen `min-port`/`max-port` in `entrypoint.sh` and add matching services in `fly.toml` if you need more.
+- `infra/coturn/` is a coturn image (`Dockerfile` + `entrypoint.sh`) for any host with public UDP ports. Its `fly.toml` deploys it as its own Fly app (`phaze-turn`). Run `fly launch --copy-config --no-deploy` in that directory, set the secret with `fly secrets set TURN_SECRET=...`, then `fly deploy`. `TURN_REALM` and the optional `PUBLIC_IP` go in the environment too. As configured, only relay ports 49160 and 49161 are open; widen `min-port`/`max-port` in `entrypoint.sh` and add matching services in `fly.toml` if you need more.
 
 Then set `PHAZE_TURN_URL=turn:<your-turn-host>:3478` and `PHAZE_TURN_SECRET` on the Nexus server.
+
+TURN can't run on Cloudflare Containers (they only take HTTP traffic, no UDP), so the hosted instance needs one of these separately; see [`cloudflare/README.md`](cloudflare/README.md#calls-turn).
 
 ## Deploying to Cloudflare
 
 The hosted instance runs as a Cloudflare Container behind a Worker (`cloudflare/`). The container's disk is wiped on restart, so the database replicates to an R2 bucket with Litestream and uploads and avatars are stored in the same bucket.
 
-`.github/workflows/cloudflare-deploy.yml` deploys on every push to `master`. Account setup, the secrets it needs and the one-time import of the old Fly data are in [`cloudflare/README.md`](cloudflare/README.md).
+`.github/workflows/cloudflare-deploy.yml` deploys after the `Phaze CI` workflow passes on a push to `master`, using exactly the commit CI tested; it can also be run by hand. Pull requests that change the image get a Docker build check in CI. Account setup, the secrets it needs and the one-time import of the old Fly data are in [`cloudflare/README.md`](cloudflare/README.md).
 
 ## Releases
 
 `VERSION` holds the version stamped into the server binary. The Android version lives in `android/app/build.gradle.kts` (`appVersionName` and `appVersionCode`) and is bumped by hand.
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`. It creates a GitHub release and attaches a signed Android APK and AAB, a Windows NSIS installer and a Linux amd64 binary. The Android job expects `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASS` as repository secrets.
+To release, bump `VERSION`, commit, and push a tag `v<VERSION>` (for example `v1.6.5`). `.github/workflows/release.yml` fails straight away if the tag doesn't match `VERSION`. It creates a GitHub release and attaches `Phaze.apk` and `Phaze.aab` (signed Android), `Phaze-windows-setup.exe` (NSIS installer), `Phaze_linux_amd64.tar.gz` (the Linux binary) and `checksums.txt` (SHA-256 of each). The download page and the server's update manifest look for exactly these names. The desktop builds point the embedded web client at `wss://phazechat.world/ws`. The Android job expects `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASS` as repository secrets.
 
 ## License
 
