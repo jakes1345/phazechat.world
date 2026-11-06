@@ -4043,6 +4043,28 @@ func initSentry(component string) {
 	log.Printf("[sentry] error reporting enabled (env=%s)", env)
 }
 
+// jitsiOrigin hosts the rooms that calls and voice channels open in an
+// iframe (web/src/CallScreen.tsx, VoiceRoom.tsx).
+const jitsiOrigin = "https://meet.jit.si"
+
+// Headers for the React SPA under /web/. Without frame-src the browser
+// refuses to load the Jitsi iframe, so no web call can connect.
+const webPermissionsPolicy = "camera=(self \"" + jitsiOrigin + "\"), " +
+	"microphone=(self \"" + jitsiOrigin + "\"), " +
+	"display-capture=(self \"" + jitsiOrigin + "\"), " +
+	"autoplay=(self \"" + jitsiOrigin + "\"), " +
+	"fullscreen=(self \"" + jitsiOrigin + "\")"
+
+const webContentSecurityPolicy = "default-src 'self'; " +
+	"connect-src 'self' wss://phazechat.world wss://*.phazechat.world; " +
+	"img-src 'self' data: blob:; " +
+	"media-src 'self' blob:; " +
+	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+	"font-src 'self' https://fonts.gstatic.com; " +
+	"script-src 'self'; " +
+	"frame-src " + jitsiOrigin + "; " +
+	"frame-ancestors 'none'"
+
 func main() {
 	resolveWorkingDir()
 	initSentry("nexus")
@@ -4117,19 +4139,12 @@ func main() {
 		http.HandleFunc("/web/", func(w http.ResponseWriter, r *http.Request) {
 			// Explicit Permissions-Policy so getUserMedia/getDisplayMedia work
 			// even when the SPA is reached via embedding proxies or CDN paths
-			// that strip defaults. Top-level HTTPS already allows these, but
-			// being explicit avoids edge-case "permission denied" silently.
-			w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), autoplay=(self)")
+			// that strip defaults. Calls and voice channels run in a Jitsi
+			// iframe, so the Jitsi origin has to be delegated the same
+			// features or its allow= attribute is ignored.
+			w.Header().Set("Permissions-Policy", webPermissionsPolicy)
 			// M1: Content-Security-Policy for the React SPA.
-			w.Header().Set("Content-Security-Policy",
-				"default-src 'self'; "+
-					"connect-src 'self' wss://phazechat.world wss://*.phazechat.world; "+
-					"img-src 'self' data: blob:; "+
-					"media-src 'self' blob:; "+
-					"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
-					"font-src 'self' https://fonts.gstatic.com; "+
-					"script-src 'self'; "+
-					"frame-ancestors 'none'")
+			w.Header().Set("Content-Security-Policy", webContentSecurityPolicy)
 			rel := strings.TrimPrefix(r.URL.Path, "/web/")
 			candidate := filepath.Join(webDir, filepath.FromSlash(rel))
 			if rel != "" {
