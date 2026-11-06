@@ -28,6 +28,36 @@ type NexusMessage struct {
 	QRToken   string `json:"qr_token,omitempty"`
 	ServerID  string `json:"server_id,omitempty"`
 	ChannelID string `json:"channel_id,omitempty"`
+	// Identify this install to the server's new-device check, so the bot
+	// signs in as the same device every time.
+	DeviceID   string `json:"device_id,omitempty"`
+	DeviceInfo string `json:"device_info,omitempty"`
+}
+
+// novaDeviceID is the stable device id the bot signs in with: NOVA_DEVICE_ID
+// if set, else derived from the username. The server accepts 16-128 chars of
+// [A-Za-z0-9_-] and reserves the "ws-" prefix.
+func novaDeviceID(username string) string {
+	id := strings.TrimSpace(os.Getenv("NOVA_DEVICE_ID"))
+	if id == "" {
+		var b strings.Builder
+		b.WriteString("nova-bot-")
+		for _, r := range username {
+			if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
+				b.WriteRune(r)
+			} else {
+				b.WriteRune('_')
+			}
+		}
+		id = b.String()
+	}
+	for len(id) < 16 {
+		id += "0"
+	}
+	if len(id) > 128 {
+		id = id[:128]
+	}
+	return id
 }
 
 type Memory struct {
@@ -258,7 +288,7 @@ func (k *NovaBot) connect() error {
 	k.conn = c
 
 	// Authenticate
-	k.send(NexusMessage{Type: "auth", Body: k.password})
+	k.send(NexusMessage{Type: "auth", Body: k.password, DeviceID: novaDeviceID(k.username), DeviceInfo: "nova-bot"})
 
 	var authResp NexusMessage
 	if err := c.ReadJSON(&authResp); err != nil {
