@@ -1955,7 +1955,7 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 		return
 	}
 
-	rows, err := s.DB.Query("SELECT id, sender, body, msg_type, created_at, COALESCE(msg_id,'') FROM offline_messages WHERE recipient = ? ORDER BY created_at ASC", username)
+	rows, err := s.DB.Query("SELECT id, sender, body, msg_type, created_at, COALESCE(msg_id,''), COALESCE(convo,'') FROM offline_messages WHERE recipient = ? ORDER BY created_at ASC", username)
 	if err != nil {
 		return
 	}
@@ -1964,8 +1964,8 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 	var ids []int64
 	for rows.Next() {
 		var id int64
-		var sender, body, msgType, createdAt, msgID string
-		if err := rows.Scan(&id, &sender, &body, &msgType, &createdAt, &msgID); err != nil {
+		var sender, body, msgType, createdAt, msgID, convo string
+		if err := rows.Scan(&id, &sender, &body, &msgType, &createdAt, &msgID, &convo); err != nil {
 			log.Printf("[db] deliverOfflineMessages scan: %v", err)
 			continue
 		}
@@ -1974,7 +1974,10 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 			Sender: sender,
 			Body:   body,
 			MsgID:  msgID,
-			Status: "offline:" + createdAt,
+			// Group messages queued while offline need their conversation,
+			// or the client can't tell which group they belong to.
+			ConvoID: convo,
+			Status:  "offline:" + createdAt,
 		})
 		ids = append(ids, id)
 	}
