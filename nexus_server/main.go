@@ -12,6 +12,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"math/big"
@@ -2607,27 +2608,57 @@ func (s *NexusServer) legalHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "templates/legal.html")
 }
 
+// resetPage renders every state of the password-reset page. html/template
+// escapes the token and error text: the token comes straight from the URL,
+// and printing it raw let a crafted link run script on phazechat.world.
+var resetPage = template.Must(template.New("reset").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>{{.Title}}</title><style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:520px;margin:80px auto;padding:20px;color:#1a1a1a}input{box-sizing:border-box;width:100%;padding:10px;margin:8px 0;font-size:1rem}button{background:#0077B3;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:1rem;cursor:pointer}a{color:#0077B3}</style></head><body><h1>{{.Title}}</h1>{{if .Form}}<form method="POST" action="/reset"><input type="hidden" name="token" value="{{.Token}}"><label>New password (min. 8 chars)<input type="password" name="password" minlength="8" autocomplete="new-password" required></label><button type="submit">Set new password</button></form>{{else}}<p>{{.Message}}</p><p><a href="/">Back to Phaze</a></p>{{end}}</body></html>`))
+
+type resetPageData struct {
+	Title, Token, Message string
+	Form                  bool
+}
+
+func (s *NexusServer) renderReset(w http.ResponseWriter, status int, d resetPageData) {
+	h := w.Header()
+	writeSecurityHeaders(w)
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	// The token is in the URL: don't leak it to other sites via Referer.
+	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+	w.WriteHeader(status)
+	if err := resetPage.Execute(w, d); err != nil {
+		log.Printf("[reset] render: %v", err)
+	}
+}
+
 func (s *NexusServer) resetHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if r.Method == http.MethodPost {
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "bad form", http.StatusBadRequest)
+			s.renderReset(w, http.StatusBadRequest, resetPageData{Title: "Reset failed", Message: "The form could not be read. Please try the link again."})
 			return
 		}
-		token = r.FormValue("token")
-		pw := r.FormValue("password")
+		token = r.PostFormValue("token")
+		pw := r.PostFormValue("password")
 		if err := s.consumePasswordReset(token, pw); err != nil {
-			fmt.Fprintf(w, `<!doctype html><meta charset=utf-8><title>Reset failed</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:20px"><h1>Reset failed</h1><p>%s</p><p><a href="/">Back to Phaze</a></p>`, err.Error())
+			s.renderReset(w, http.StatusBadRequest, resetPageData{Title: "Reset failed", Message: err.Error()})
 			return
 		}
-		fmt.Fprint(w, `<!doctype html><meta charset=utf-8><title>Password reset</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:20px"><h1>Password updated</h1><p>You can now log in with your new password.</p><p><a href="/">Back to Phaze</a></p>`)
+		s.renderReset(w, http.StatusOK, resetPageData{Title: "Password updated", Message: "You can now log in with your new password."})
+		return
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if token == "" {
-		http.Error(w, "missing token", http.StatusBadRequest)
+		s.renderReset(w, http.StatusBadRequest, resetPageData{Title: "Reset link incomplete", Message: "This reset link is missing its token. Request a new one from the sign-in screen."})
 		return
 	}
-	fmt.Fprintf(w, `<!doctype html><html><head><meta charset=utf-8><title>Reset Phaze password</title><style>body{font-family:system-ui;max-width:520px;margin:80px auto;padding:20px}input{width:100%%;padding:10px;margin:8px 0;font-size:1rem}button{background:#00AFF0;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:1rem;cursor:pointer}</style></head><body><h1>Reset your Phaze password</h1><form method="POST"><input type="hidden" name="token" value="%s"><label>New password (min. 8 chars)<input type="password" name="password" minlength="8" required></label><button type="submit">Set new password</button></form></body></html>`, token)
+	s.renderReset(w, http.StatusOK, resetPageData{Title: "Reset your Phaze password", Token: token, Form: true})
 }
 
 // adminFromRequest authenticates an admin caller. Expects phaze_admin_token cookie
