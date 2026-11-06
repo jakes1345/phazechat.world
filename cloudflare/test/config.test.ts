@@ -3,24 +3,20 @@ import {
   CLIENT_IP_HEADER,
   DEFAULT_SLEEP_AFTER,
   containerEnv,
-  missingStorageSettings,
+  hasStorageBinding,
   sleepAfter,
   withClientIP,
 } from "../src/config";
+import { S3_ENDPOINT } from "../src/s3";
 
-const storage = {
-  BUCKET_NAME: "phaze",
-  AWS_ENDPOINT_URL_S3: "https://acct.r2.cloudflarestorage.com",
-  AWS_ACCESS_KEY_ID: "id",
-  AWS_SECRET_ACCESS_KEY: "secret",
-};
+const storage = { BUCKET: { get() {}, put() {} } };
 
 describe("containerEnv", () => {
   it("passes string bindings through and skips the rest", () => {
     const env = containerEnv({ ...storage, BREVO_API_KEY: "k", NEXUS: { idFromName() {} }, SLEEP_AFTER: "1h" });
     expect(env.BREVO_API_KEY).toBe("k");
-    expect(env.BUCKET_NAME).toBe("phaze");
     expect(env).not.toHaveProperty("NEXUS");
+    expect(env).not.toHaveProperty("BUCKET");
     expect(env).not.toHaveProperty("SLEEP_AFTER");
   });
 
@@ -33,22 +29,28 @@ describe("containerEnv", () => {
     expect(env.PHAZE_EPHEMERAL_DISK).toBe("1");
   });
 
-  it("defaults the R2 region but lets it be set", () => {
-    expect(containerEnv(storage).AWS_REGION).toBe("auto");
-    expect(containerEnv({ ...storage, AWS_REGION: "wnam" }).AWS_REGION).toBe("wnam");
+  it("points storage at the Worker's R2 binding and overrides old R2 key secrets", () => {
+    const env = containerEnv({
+      ...storage,
+      BUCKET_NAME: "other",
+      AWS_ENDPOINT_URL_S3: "https://acct.r2.cloudflarestorage.com",
+      AWS_ACCESS_KEY_ID: "real-looking-id",
+      AWS_SECRET_ACCESS_KEY: "real-looking-secret",
+      AWS_REGION: "wnam",
+    });
+    expect(env.AWS_ENDPOINT_URL_S3).toBe(S3_ENDPOINT);
+    expect(env.BUCKET_NAME).toBe("phazechat-data");
+    expect(env.AWS_REGION).toBe("auto");
+    expect(env.AWS_ACCESS_KEY_ID).toBe("r2-binding");
+    expect(env.AWS_SECRET_ACCESS_KEY).toBe("r2-binding");
   });
 });
 
-describe("missingStorageSettings", () => {
-  it("is empty when R2 is configured", () => {
-    expect(missingStorageSettings(storage)).toEqual([]);
-  });
-
-  it("names each missing or blank setting", () => {
-    expect(missingStorageSettings({ ...storage, BUCKET_NAME: " ", AWS_SECRET_ACCESS_KEY: undefined })).toEqual([
-      "BUCKET_NAME",
-      "AWS_SECRET_ACCESS_KEY",
-    ]);
+describe("hasStorageBinding", () => {
+  it("needs the BUCKET binding", () => {
+    expect(hasStorageBinding(storage)).toBe(true);
+    expect(hasStorageBinding({})).toBe(false);
+    expect(hasStorageBinding({ BUCKET: "phazechat-data" })).toBe(false);
   });
 });
 
