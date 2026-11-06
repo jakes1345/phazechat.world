@@ -241,3 +241,33 @@ test('when a contact reinstalls, trusting their new key lets them read new messa
     await b.close()
   }
 })
+
+test('a contact on two devices is confirmed once, not on every chat open', async ({ browser }) => {
+  const a = await signIn(browser, ALICE)
+  const b1 = await signIn(browser, BOB)
+  const b2 = await signIn(browser, BOB)
+  try {
+    const dialogs: string[] = []
+    a.page.on('dialog', (d) => { dialogs.push(d.message()); void d.accept() })
+    await openChat(a.page, BOB)
+    await expect(composer(a.page)).toHaveAttribute('placeholder', /🔒/, { timeout: 10_000 })
+    await a.page.waitForTimeout(1_500) // both of bob's devices answer
+    await send(a.page, uniq('first'))
+    const asked = dialogs.length
+    expect(asked).toBeLessThanOrEqual(1)
+
+    // Reopen the chat a few times: both of bob's keys are trusted now.
+    for (let i = 0; i < 3; i++) {
+      await a.page.reload()
+      await expect(a.page.locator('.friend-row').first()).toBeVisible({ timeout: 15_000 })
+      await openChat(a.page, BOB)
+      await a.page.waitForTimeout(1_500)
+      await send(a.page, uniq(`again ${i}`))
+    }
+    expect(dialogs.length).toBe(asked)
+  } finally {
+    await a.close()
+    await b1.close()
+    await b2.close()
+  }
+})

@@ -10,7 +10,7 @@ import {
   fingerprint,
   generateKeyPair,
 } from './e2ee'
-import { loadPins, pinnedPublicKeys, savePins } from './keyPins'
+import { isTrusted, loadPins, pinnedPublicKeys, savePins, trustKey } from './keyPins'
 import { decryptKeypair, encryptKeypair as encryptKeyBackup, type KeyBackupBlob } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
@@ -994,16 +994,20 @@ export default function App() {
         return
       }
       const prev = pinsRef.current[peer]
-      if (prev && prev.fingerprint !== fp) {
-        // Keep the pinned key, but remember the new one: the next send asks
-        // whether to trust it (reinstall or another device) instead of
-        // encrypting to a key the contact may no longer have.
+      if (prev && !isTrusted(prev, fp)) {
+        // A key we've never trusted for this contact: keep using the pinned
+        // one, and ask on the next send whether to trust this one (a
+        // reinstall or another device) instead of encrypting to a key the
+        // contact may no longer have.
         keyChangesRef.current[peer] = { pk, fp, pinned: prev.fingerprint }
         setErr(`${peer}'s encryption key changed (was ${prev.fingerprint}, now ${fp}). You'll be asked before your next message.`)
         return
       }
-      if (!prev) {
-        pinsRef.current[peer] = { fingerprint: fp, publicKeyB64: encodePublicKeyB64(pk) }
+      // First key, or one of the contact's already trusted devices: encrypt
+      // to whichever of their devices answered last, as before pinning.
+      delete keyChangesRef.current[peer]
+      if (!prev || prev.fingerprint !== fp) {
+        pinsRef.current[peer] = trustKey(prev, fp, encodePublicKeyB64(pk))
         savePins(pinsRef.current)
       }
       const hadKey = !!peerKeysRef.current[peer]
@@ -2033,7 +2037,7 @@ export default function App() {
         'Trust the new key and send?',
       )
       if (!trust) return false
-      pinsRef.current[peer] = { fingerprint: changed.fp, publicKeyB64: encodePublicKeyB64(changed.pk) }
+      pinsRef.current[peer] = trustKey(pinsRef.current[peer], changed.fp, encodePublicKeyB64(changed.pk))
       savePins(pinsRef.current)
       peerKeysRef.current[peer] = changed.pk
       delete keyChangesRef.current[peer]
