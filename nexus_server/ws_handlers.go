@@ -1460,16 +1460,43 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			_ = s.rejectFriendRequest(msg.Sender, username)
-			log.Printf("Friend reject: %s rejected %s", username, msg.Sender)
-
-		case "friend_remove":
-			if username == "" {
+			// The person who sent the request, named the same way as in
+			// friend_accept. Older clients put it in Sender, which on
+			// every other message type means the caller, so it's only
+			// taken from there when it isn't the caller.
+			requester := msg.Recipient
+			if requester == "" {
+				requester = msg.Body
+			}
+			if requester == "" && msg.Sender != username {
+				requester = msg.Sender
+			}
+			if requester == "" {
 				continue
 			}
-			_ = s.removeFriend(username, msg.Recipient)
+			if err := s.rejectFriendRequest(requester, username); err != nil {
+				log.Printf("Friend reject error: %v", err)
+				client.Send(NexusMessage{Type: "friend_error", Error: "Could not decline friend request"})
+				continue
+			}
+			log.Printf("Friend reject: %s declined %s", username, requester)
+			// Every one of the caller's sessions drops the request. The
+			// requester isn't told, the same as on other messengers.
+			s.sendTo(username, NexusMessage{Type: "friend_request_declined", Sender: requester})
+
+		case "friend_remove":
+			if username == "" || msg.Recipient == "" || msg.Recipient == username {
+				continue
+			}
+			if err := s.removeFriend(username, msg.Recipient); err != nil {
+				log.Printf("Friend remove error: %v", err)
+				client.Send(NexusMessage{Type: "friend_error", Error: "Could not remove contact"})
+				continue
+			}
 			log.Printf("Friend removed: %s <-> %s", username, msg.Recipient)
+			// Both sides drop each other, on every open session.
 			s.sendTo(msg.Recipient, NexusMessage{Type: "friend_removed", Sender: username})
+			s.sendTo(username, NexusMessage{Type: "friend_removed", Sender: msg.Recipient})
 
 		// Contact groups ("Groups panel" — see docs/skype-eras/skype3.md).
 		// Recipient is the contact being filed; Body is the group name, or
