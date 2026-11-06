@@ -53,6 +53,13 @@ async function loadJsQR(): Promise<JsQR> {
   return jsQRModule
 }
 
+// User-authored messages worth holding while the socket reconnects. Typing,
+// presence and other live signals are dropped instead; they'd be stale.
+const QUEUED_WHILE_OFFLINE = new Set([
+  'msg', 'msg_edit', 'msg_delete', 'msg_react', 'convo_msg', 'channel_msg', 'channel_edit', 'channel_react',
+])
+const OUTBOX_LIMIT = 200
+
 // Wails desktop bridge — only present when running inside the Wails desktop app.
 const wails = (() => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -868,6 +875,9 @@ export default function App() {
   const meRef = useRef<string | null>(null)
   const selectedRef = useRef<string | null>(null)
   const sendRef = useRef<(m: NexusMessage) => void>(() => {})
+  // Messages the user sent while the socket was down; flushed after the next
+  // successful sign-in on this connection.
+  const outboxRef = useRef<NexusMessage[]>([])
   const callStateRef = useRef<CallState | null>(null)
   const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const outTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1070,7 +1080,14 @@ export default function App() {
     sendRef.current = (m: NexusMessage) => {
       const w = wsRef.current
       if (!w || w.readyState !== WebSocket.OPEN) {
-        setErr('Not connected')
+        // Keep what the user wrote and send it once the connection is back
+        // and signed in, instead of showing it as sent and dropping it.
+        if (m.type && QUEUED_WHILE_OFFLINE.has(m.type) && outboxRef.current.length < OUTBOX_LIMIT) {
+          outboxRef.current.push(m)
+          setErr('Reconnecting… your message will be sent when Phaze is back online.')
+        } else {
+          setErr('Not connected')
+        }
         return
       }
       w.send(JSON.stringify(m))
@@ -1091,6 +1108,16 @@ export default function App() {
             const wasLoggedIn = !!meRef.current
             setMe(msg.sender ?? null)
             setErr('')
+            // Send anything written while the connection was down, but only
+            // if this is the same account it was written from.
+            if (outboxRef.current.length) {
+              const queued = outboxRef.current
+              outboxRef.current = []
+              if (!wasLoggedIn || meRef.current === msg.sender) {
+                const w = wsRef.current
+                for (const q of queued) w?.send(JSON.stringify(q))
+              }
+            }
             if (msg.turn_config) setTurn(msg.turn_config)
             if (!wasLoggedIn) playPhazeSound('Login.wav')
             sendRef.current({
@@ -1609,6 +1636,7 @@ export default function App() {
 
         case 'kicked':
           localStorage.removeItem(SESSION_KEY)
+          outboxRef.current = []
           peerKeysRef.current = pinnedPublicKeys(pinsRef.current)
           keyAskedRef.current.clear()
           plaintextOkRef.current.clear()
@@ -2486,7 +2514,17 @@ export default function App() {
           onClose={() => { setSettingsOpen(false); setSettingsInitialTab('profile') }}
           onSignOut={() => {
             localStorage.removeItem(SESSION_KEY)
-            fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
+            outboxRef.current = []
+            keyAskedRef.current.clear()
+            plaintextOkRef.current.clear()
+            setLog([])
+            // The socket is still signed in as this account; once the
+            // server has cleared the session cookie, drop it so the client
+            // reconnects signed out and stops receiving this account's
+            // messages and notifications.
+            void fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' })
+              .catch(() => {})
+              .finally(() => wsRef.current?.close())
             setSessionToken(null)
             setMe(null)
             setSettingsOpen(false)
