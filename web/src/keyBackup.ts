@@ -5,7 +5,16 @@
 // salt + iteration count opaquely — it can never decrypt without the PIN.
 // PBKDF2 (rather than Argon2) keeps this in pure WebCrypto with no deps.
 
-const ITERATIONS = 200_000
+// New backups use 600k iterations (OWASP's PBKDF2-SHA256 guidance). Older
+// backups were written with 200k; anything below that is refused on restore,
+// since the iteration count comes back from the server and a tampered blob
+// could otherwise make a PIN cheap to guess.
+const ITERATIONS = 600_000
+const MIN_RESTORE_ITERATIONS = 200_000
+const MAX_RESTORE_ITERATIONS = 5_000_000
+
+/** Recovery passphrases shorter than this are refused. */
+export const MIN_PIN_LENGTH = 8
 const SALT_BYTES = 16
 const IV_BYTES = 12 // AES-GCM standard
 
@@ -51,7 +60,7 @@ export async function encryptKeypair(
   secretKey: Uint8Array,
   pin: string,
 ): Promise<KeyBackupBlob> {
-  if (pin.length < 6) throw new Error('PIN must be at least 6 characters')
+  if (pin.length < MIN_PIN_LENGTH) throw new Error(`Recovery PIN must be at least ${MIN_PIN_LENGTH} characters`)
   const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES))
   const key = await deriveKey(pin, salt, ITERATIONS)
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
@@ -78,7 +87,11 @@ export async function decryptKeypair(
   if (combined.length < IV_BYTES + 16) throw new Error('backup blob malformed')
   const iv = combined.slice(0, IV_BYTES)
   const ct = combined.slice(IV_BYTES)
-  const key = await deriveKey(pin, salt, blob.iterations || ITERATIONS)
+  const iterations = blob.iterations || ITERATIONS
+  if (iterations < MIN_RESTORE_ITERATIONS || iterations > MAX_RESTORE_ITERATIONS) {
+    throw new Error('This backup uses unsafe settings and was not restored')
+  }
+  const key = await deriveKey(pin, salt, iterations)
   let pt: ArrayBuffer
   try {
     pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: toBuf(iv) }, key, toBuf(ct))

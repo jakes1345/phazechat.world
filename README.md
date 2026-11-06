@@ -77,7 +77,7 @@ How it works:
 3. Each message gets a random 24-byte nonce. The body goes over the wire as `E2EE:` followed by hex-encoded nonce and ciphertext. The server stores and relays that string as-is.
 4. The web client pins each contact's key fingerprint (first 8 bytes of SHA-256 of the key) the first time it sees it. If the key later changes, it refuses the new key and shows a warning. Android doesn't pin keys yet.
 
-Key backup is optional. Your keypair is encrypted on the device with a key derived from a PIN (PBKDF2-SHA256, 200,000 iterations, AES-256-GCM) and only the ciphertext, salt and iteration count are uploaded. Restoring the backup on a new device lets you keep the same identity, which matters because a new keypair looks like a key change to contacts using the web client.
+Key backup is optional. Your keypair is encrypted on the device with a key derived from a recovery PIN of at least 8 characters (PBKDF2-SHA256, 600,000 iterations, AES-256-GCM) and only the ciphertext, salt and iteration count are uploaded. On the web, Settings → Backup & Devices restores it on a new device, and a browser that had to create a new identity is reminded that a backup exists. Restoring lets you keep the same identity, which matters because a new keypair looks like a key change to contacts using the web client. The PIN is the only thing protecting the backup from the server, so use a long one.
 
 What isn't encrypted end to end:
 

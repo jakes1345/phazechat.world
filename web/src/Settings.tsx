@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import type { NexusMessage } from './nexusTypes'
 import { bumpAvatarVersion } from './avatarVersions'
 import { SELECTABLE_THEMES, type ThemeId } from './themes'
+import { MIN_PIN_LENGTH } from './keyBackup'
 import RewardsPanel from './RewardsPanel'
 import './settings.css'
 
@@ -24,6 +25,9 @@ interface Props {
   onSignOut: () => void
   onSetBackupPin: (pin: string) => Promise<void>
   onDeleteBackup: () => void
+  /** Decrypts the account's key backup with the PIN and switches this
+   *  device to that identity. Rejects with a readable message. */
+  onRestoreBackup: (pin: string) => Promise<void>
   initialTab?: Tab
   /** Current theme and its setter, threaded down from App so Appearance
    *  can always change it here — regardless of which theme is active.
@@ -36,7 +40,7 @@ interface Props {
   onSetTheme: (t: ThemeId) => void
 }
 
-export default function Settings({ me, sessionToken, send, subscribe, onClose, onSignOut, onSetBackupPin, onDeleteBackup, initialTab, theme, onSetTheme }: Props) {
+export default function Settings({ me, sessionToken, send, subscribe, onClose, onSignOut, onSetBackupPin, onDeleteBackup, onRestoreBackup, initialTab, theme, onSetTheme }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'profile')
 
   // Profile
@@ -330,7 +334,7 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
 
   const handleSetPin = async () => {
     setBackupMsg('')
-    if (backupPin1.length < 4) { setBackupMsg('PIN must be at least 4 characters'); return }
+    if (backupPin1.length < MIN_PIN_LENGTH) { setBackupMsg(`Recovery PIN must be at least ${MIN_PIN_LENGTH} characters`); return }
     if (backupPin1 !== backupPin2) { setBackupMsg('PINs do not match'); return }
     setBackupBusy(true)
     try {
@@ -342,6 +346,25 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
       setBackupMsg((e as Error).message || 'Failed to save backup')
     } finally {
       setBackupBusy(false)
+    }
+  }
+
+  const [restorePin, setRestorePin] = useState('')
+  const [restoreBusy, setRestoreBusy] = useState(false)
+  const [restoreMsg, setRestoreMsg] = useState('')
+  const handleRestore = async () => {
+    setRestoreMsg('')
+    if (!restorePin) { setRestoreMsg('Enter your recovery PIN'); return }
+    if (!confirm('Replace this device\'s encryption keys with the ones in your backup? Messages encrypted to this device\'s current keys will no longer be readable here.')) return
+    setRestoreBusy(true)
+    try {
+      await onRestoreBackup(restorePin)
+      setRestorePin('')
+      setRestoreMsg('✓ Keys restored. This device now uses your backed-up encryption identity.')
+    } catch (e) {
+      setRestoreMsg((e as Error).message || 'Restore failed')
+    } finally {
+      setRestoreBusy(false)
     }
   }
 
@@ -631,12 +654,24 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
                 Without this, signing in on a new device or after clearing your browser will
                 give you a fresh identity (your old messages stay readable on the original device only).
               </p>
-              <input className="settings-input" type="password" placeholder="Recovery PIN (4+ chars)" value={backupPin1} onChange={(e) => setBackupPin1(e.target.value)} />
+              <input className="settings-input" type="password" placeholder={`Recovery PIN (${MIN_PIN_LENGTH}+ characters)`} value={backupPin1} onChange={(e) => setBackupPin1(e.target.value)} />
               <input className="settings-input" type="password" placeholder="Confirm PIN" value={backupPin2} onChange={(e) => setBackupPin2(e.target.value)} />
               {backupMsg && <p className={`settings-msg ${backupMsg.startsWith('✓') ? 'ok' : 'err'}`}>{backupMsg}</p>}
               <div className="settings-row">
                 <button className="settings-btn" onClick={() => void handleSetPin()} disabled={backupBusy}>{backupBusy ? 'Saving…' : 'Save backup'}</button>
                 <button className="settings-btn-secondary" onClick={handleDeleteBackup}>Delete backup</button>
+              </div>
+
+              <h3 className="settings-section-title">Restore from backup</h3>
+              <p className="settings-empty">
+                On a new device or after clearing your browser, enter your recovery PIN to bring back
+                your encryption identity. Contacts keep seeing the same key, and messages encrypted to
+                it become readable here again.
+              </p>
+              <input className="settings-input" type="password" placeholder="Recovery PIN" value={restorePin} onChange={(e) => setRestorePin(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void handleRestore() }} />
+              {restoreMsg && <p className={`settings-msg ${restoreMsg.startsWith('✓') ? 'ok' : 'err'}`}>{restoreMsg}</p>}
+              <div className="settings-row">
+                <button className="settings-btn" onClick={() => void handleRestore()} disabled={restoreBusy}>{restoreBusy ? 'Restoring…' : 'Restore keys'}</button>
               </div>
 
               <hr className="settings-divider" />

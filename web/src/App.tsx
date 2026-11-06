@@ -11,7 +11,7 @@ import {
   generateKeyPair,
 } from './e2ee'
 import { loadPins, pinnedPublicKeys, savePins } from './keyPins'
-import { encryptKeypair as encryptKeyBackup } from './keyBackup'
+import { decryptKeypair, encryptKeypair as encryptKeyBackup, type KeyBackupBlob } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
 import { statusesForEra, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
@@ -462,6 +462,20 @@ function defaultWsUrl(): string {
   return `${p}//${host}/ws`
 }
 
+// True when this page load had to create a new identity (first visit, or
+// cleared storage); then a server-side backup is worth offering to restore.
+let keysGeneratedThisLoad = false
+
+function saveKeys(kp: { publicKey: Uint8Array; secretKey: Uint8Array }) {
+  localStorage.setItem(
+    KEYS_KEY,
+    JSON.stringify({
+      pub: btoa(String.fromCharCode(...kp.publicKey)),
+      sec: btoa(String.fromCharCode(...kp.secretKey)),
+    }),
+  )
+}
+
 function loadOrCreateKeys(): { publicKey: Uint8Array; secretKey: Uint8Array } {
   try {
     const raw = localStorage.getItem(KEYS_KEY)
@@ -475,13 +489,8 @@ function loadOrCreateKeys(): { publicKey: Uint8Array; secretKey: Uint8Array } {
     /* fallthrough */
   }
   const kp = generateKeyPair()
-  localStorage.setItem(
-    KEYS_KEY,
-    JSON.stringify({
-      pub: btoa(String.fromCharCode(...kp.publicKey)),
-      sec: btoa(String.fromCharCode(...kp.secretKey)),
-    }),
-  )
+  saveKeys(kp)
+  keysGeneratedThisLoad = true
   return kp
 }
 
@@ -878,6 +887,9 @@ export default function App() {
   // Messages the user sent while the socket was down; flushed after the next
   // successful sign-in on this connection.
   const outboxRef = useRef<NexusMessage[]>([])
+  // Latest PIN-encrypted key backup the server returned for this account.
+  const backupBlobRef = useRef<KeyBackupBlob | null>(null)
+  const restoreOfferedRef = useRef(false)
   const callStateRef = useRef<CallState | null>(null)
   const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const outTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1484,8 +1496,17 @@ export default function App() {
 
         case 'key_backup_result':
           if (msg.status === 'ok' && msg.key_backup) {
-            // Silently keep the backup available but don't auto-prompt restore.
-            // Users can restore from Settings → Backup & Devices if needed.
+            backupBlobRef.current = msg.key_backup as KeyBackupBlob
+            // This browser just made a new identity but the account has a
+            // backup: point the user at restoring it, so contacts don't see
+            // a key change and older messages stay readable.
+            if (keysGeneratedThisLoad && !restoreOfferedRef.current) {
+              restoreOfferedRef.current = true
+              setGlobalNotice({
+                from: 'Encryption',
+                msg: 'Your account has a key backup. Restore it in Settings → Backup & Devices with your recovery PIN to keep your encryption identity on this device.',
+              })
+            }
           } else if (msg.status === 'stored') {
             setErr('✓ Recovery PIN saved')
           } else if (msg.status === 'deleted') {
@@ -2541,6 +2562,29 @@ export default function App() {
             send({ type: 'key_backup_put', key_backup: blob })
           }}
           onDeleteBackup={() => send({ type: 'key_backup_delete' })}
+          onRestoreBackup={async (pin: string) => {
+            // Always fetch the current backup, in case it was saved from
+            // another device since this one signed in.
+            const blob = await new Promise<KeyBackupBlob | null>((resolve) => {
+              const timer = setTimeout(() => { off(); resolve(backupBlobRef.current) }, 8000)
+              const off = subscribe((m) => {
+                if (m.type !== 'key_backup_result' || m.status === 'stored' || m.status === 'deleted') return
+                clearTimeout(timer)
+                off()
+                resolve(m.status === 'ok' && m.key_backup ? (m.key_backup as KeyBackupBlob) : null)
+              })
+              send({ type: 'key_backup_get' })
+            })
+            if (!blob) throw new Error('No key backup found for this account.')
+            const kp = await decryptKeypair(blob, pin)
+            keysRef.current = kp
+            saveKeys(kp)
+            keysGeneratedThisLoad = false
+            // Tell contacts' clients about the restored key and re-pull the
+            // open chat so it decrypts with the restored identity.
+            send({ type: 'presence', sender: me, status: (localStorage.getItem(STATUS_KEY) as UserStatus) || 'Online', public_key: encodePublicKeyB64(kp.publicKey) })
+            if (selected) send({ type: 'dm_history', sender: me, recipient: selected })
+          }}
         />
       )}
 
