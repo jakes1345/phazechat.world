@@ -1,16 +1,34 @@
-# Self-hosted Nexus on your own VPS (e.g. phazechat.world behind Caddy/nginx).
+# Self-hosted Nexus on your own VPS (e.g. behind Caddy/nginx).
 # TLS is expected on the reverse proxy; Nexus listens on localhost only.
+#
+#   cd nexus_server && docker compose up -d --build
+#
+# The image is built from the repo root (it also compiles web/ and
+# nova_bot/). Or skip the build and use the published image:
+#   image: ghcr.io/jakes1345/phazechat.world-nexus:latest
+#
+# The container runs as uid 10001. A fresh named volume gets the right
+# owner automatically; a volume created by an older (root) image needs a
+# one-time `chown -R 10001:10001` (the entrypoint prints the command).
 services:
   nexus:
-    build: .
+    build:
+      context: ..
+      dockerfile: nexus_server/Dockerfile
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080"
     environment:
       PORT: "8080"
       DB_PATH: /data/nexus.db
+      PHAZE_UPLOAD_DIR: /data/uploads
       # Required for browser WebSocket from your real web origin(s):
       Phaze_ALLOWED_ORIGINS: "https://phazechat.world,https://www.phazechat.world"
+      # Behind a reverse proxy, set the header it puts the client IP in:
+      # PHAZE_TRUST_PROXY_HEADER: X-Forwarded-For
+      # Optional: stream the DB to S3-compatible storage with Litestream
+      # (BUCKET_NAME, AWS_ENDPOINT_URL_S3, AWS_REGION, AWS_ACCESS_KEY_ID,
+      # AWS_SECRET_ACCESS_KEY) — see litestream.yml.
     volumes:
       - nexus_data:/data
 
