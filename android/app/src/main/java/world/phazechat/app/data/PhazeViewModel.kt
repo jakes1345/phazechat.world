@@ -84,6 +84,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private const val TAG = "PhazeVM"
         private const val PREFS = "phaze_prefs"
+        private const val KEY_PINS_PREF = "key_pins_v1"
     }
 
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -465,7 +466,13 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     // Crypto
     private var keyPair: NaClKeyPair
-    private val peerKeys = mutableMapOf<String, ByteArray>()
+    // Contacts' keys pinned on this device (persisted), and the keys usable
+    // for encryption right now. Loaded from the pins at startup so chats
+    // decrypt immediately and offline contacts can still be messaged.
+    private var keyPins: Map<String, KeyPin> = decodePins(prefs.getString(KEY_PINS_PREF, null))
+    private val peerKeys = java.util.concurrent.ConcurrentHashMap<String, ByteArray>().apply {
+        for ((peer, pin) in keyPins) pin.publicKey?.let { put(peer, it) }
+    }
 
     init {
         keyPair = loadOrCreateKeys()
@@ -709,11 +716,96 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     fun sendMessage(text: String) {
         val peer = _selectedChat.value ?: return
         val username = _me.value ?: return
-        val peerPub = peerKeys[peer]
-        val body = if (peerPub != null) encryptForPeer(text, peerPub, keyPair.secretKey) else text
-        val msgId = "${username}-${System.nanoTime()}"
-        nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = body, msgId = msgId))
-        appendChat(ChatLine(id = msgId, from = username, text = text, me = true, ts = System.currentTimeMillis()))
+        withEncryptionConsent(peer) {
+            val msgId = "${username}-${System.nanoTime()}"
+            nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = sealFor(peer, text), msgId = msgId))
+            appendChat(ChatLine(id = msgId, from = username, text = text, me = true, ts = System.currentTimeMillis()))
+        }
+    }
+
+    /** Encrypts [text] for [peer] when their key is known; plaintext otherwise. */
+    private fun sealFor(peer: String, text: String): String {
+        val peerPub = peerKeys[peer] ?: return text
+        return encryptForPeer(text, peerPub, keyPair.secretKey)
+    }
+
+    /**
+     * Runs [send] now if a message to [peer] can be end-to-end encrypted, or
+     * the user already agreed to send to them unencrypted this session.
+     * Otherwise asks the contact for their key and asks the user (once per
+     * contact per session) before anything goes out in plaintext, like the
+     * web client. [onCancel] runs if the user declines.
+     */
+    private fun withEncryptionConsent(peer: String, onCancel: () -> Unit = {}, send: () -> Unit) {
+        if (peerKeys.containsKey(peer) || peer in plaintextOk) { send(); return }
+        requestPeerKey(peer, force = true)
+        _plaintextPrompt.value?.cancel?.invoke()
+        _plaintextPrompt.value = PlaintextPrompt(peer, send, onCancel)
+    }
+
+    /** The user answered [plaintextPrompt]. */
+    fun answerPlaintextPrompt(sendUnencrypted: Boolean) {
+        val p = _plaintextPrompt.value ?: return
+        _plaintextPrompt.value = null
+        // The key may have arrived while the dialog was up: then it goes
+        // out encrypted either way, and no consent is recorded.
+        if (peerKeys.containsKey(p.peer)) { p.send(); return }
+        if (sendUnencrypted) {
+            plaintextOk.add(p.peer)
+            p.send()
+        } else {
+            p.cancel()
+        }
+    }
+
+    private fun requestPeerKey(peer: String, force: Boolean = false) {
+        val me = _me.value ?: return
+        if (!force && !keyRequested.add(peer)) return
+        keyRequested.add(peer)
+        nexus.send(NexusMessage(type = "key_request", sender = me, recipient = peer))
+    }
+
+    /**
+     * Takes a public key a contact presented. The first key seen is pinned;
+     * a different one later is refused and the user is warned, as on the web.
+     */
+    private fun acceptPeerKey(peer: String, publicKeyB64: String, fingerprintHint: String?) {
+        if (peer == _me.value) return
+        when (val d = decidePeerKey(keyPins[peer], publicKeyB64, fingerprintHint)) {
+            is PinDecision.Accept -> {
+                if (d.newPin) savePin(peer, d.pin)
+                val pk = d.pin.publicKey ?: return
+                val hadKey = peerKeys.containsKey(peer)
+                peerKeys[peer] = pk
+                // Just learned it: re-pull the open chat so rows that came in
+                // before the key can be decrypted.
+                if (!hadKey && peer == _selectedChat.value) {
+                    _me.value?.let { nexus.send(NexusMessage(type = "dm_history", sender = it, recipient = peer)) }
+                }
+            }
+            is PinDecision.Changed -> {
+                Log.w(TAG, "key for $peer changed: pinned ${d.pinned}, offered ${d.offered}")
+                if (_keyChangeWarning.value?.peer != peer) {
+                    _keyChangeWarning.value = KeyChangeWarning(peer, d.pinned, d.offered, publicKeyB64)
+                }
+            }
+            PinDecision.Invalid -> Log.w(TAG, "ignoring malformed key or fingerprint for $peer")
+        }
+    }
+
+    private fun savePin(peer: String, pin: KeyPin) {
+        keyPins = keyPins + (peer to pin)
+        prefs.edit().putString(KEY_PINS_PREF, encodePins(keyPins)).apply()
+    }
+
+    /** The user dismissed the key-change warning; [trustNewKey] re-pins the contact's new key. */
+    fun answerKeyChange(trustNewKey: Boolean) {
+        val w = _keyChangeWarning.value ?: return
+        _keyChangeWarning.value = null
+        if (!trustNewKey) return
+        keyPins = keyPins - w.peer
+        peerKeys.remove(w.peer)
+        acceptPeerKey(w.peer, w.publicKeyB64, w.offered)
     }
 
     // ── User search ──────────────────────────────────────────────
@@ -746,10 +838,10 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     // ── Message edit / delete / react (DMs) ──────────────────────
     fun editMessage(msgId: String, newText: String) {
         val peer = _selectedChat.value ?: return
-        val peerPub = peerKeys[peer]
-        val body = if (peerPub != null) encryptForPeer(newText, peerPub, keyPair.secretKey) else newText
-        nexus.send(NexusMessage(type = "msg_edit", recipient = peer, msgId = msgId, body = body))
-        _chatLog.value = _chatLog.value.map { if (it.id == msgId) it.copy(text = newText, edited = true) else it }
+        withEncryptionConsent(peer) {
+            nexus.send(NexusMessage(type = "msg_edit", recipient = peer, msgId = msgId, body = sealFor(peer, newText)))
+            _chatLog.value = _chatLog.value.map { if (it.id == msgId) it.copy(text = newText, edited = true) else it }
+        }
     }
     fun deleteMessage(msgId: String) {
         val peer = _selectedChat.value ?: return
@@ -782,6 +874,10 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun sendFile(uri: android.net.Uri) {
         val peer = _selectedChat.value ?: return
+        withEncryptionConsent(peer) { uploadAndSendFile(peer, uri) }
+    }
+
+    private fun uploadAndSendFile(peer: String, uri: android.net.Uri) {
         val username = _me.value ?: return
         val token = _sessionToken.value ?: return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -820,12 +916,11 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                     val size = j.optLong("size", bytes.size.toLong())
                     if (fileUrl.isNotEmpty()) {
                         val msgId = "${username}-${System.nanoTime()}"
-                        val peerPub = peerKeys[peer]
                         val fileJson = JSONObject().apply {
                             put("url", fileUrl); put("name", fileName); put("mime", mime); put("size", size)
                         }
                         val plaintext = "phaze-file${fileJson}"
-                        val encBody = if (peerPub != null) encryptForPeer(plaintext, peerPub, keyPair.secretKey) else plaintext
+                        val encBody = sealFor(peer, plaintext)
                         nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = encBody, msgId = msgId))
                         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                             appendChat(ChatLine(id = msgId, from = username, text = plaintext, me = true, kind = "file", fileUrl = fileUrl, fileName = fileName, ts = System.currentTimeMillis()))
@@ -845,7 +940,13 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun sendVoiceMessage(filePath: String) {
-        val peer = _selectedChat.value ?: return
+        val peer = _selectedChat.value ?: run { java.io.File(filePath).delete(); return }
+        withEncryptionConsent(peer, onCancel = { java.io.File(filePath).delete() }) {
+            uploadAndSendVoice(peer, filePath)
+        }
+    }
+
+    private fun uploadAndSendVoice(peer: String, filePath: String) {
         val username = _me.value ?: return
         val token = _sessionToken.value ?: return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -869,12 +970,11 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                     val size = j.optLong("size", bytes.size.toLong())
                     if (fileUrl.isNotEmpty()) {
                         val msgId = "${username}-${System.nanoTime()}"
-                        val peerPub = peerKeys[peer]
                         val fileJson = JSONObject().apply {
                             put("url", fileUrl); put("name", voiceFileName); put("mime", mime); put("size", size)
                         }
                         val plaintext = "phaze-file${fileJson}"
-                        val body = if (peerPub != null) encryptForPeer(plaintext, peerPub, keyPair.secretKey) else plaintext
+                        val body = sealFor(peer, plaintext)
                         nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = body, msgId = msgId))
                         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                             appendChat(ChatLine(id = msgId, from = username, text = plaintext, me = true, kind = "voice", fileUrl = fileUrl, fileName = voiceFileName, ts = System.currentTimeMillis()))
@@ -1146,10 +1246,15 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         _chatLog.value = _chatLog.value + line
     }
 
-    private fun decrypt(body: String?, sender: String?): String {
-        if (body == null) return ""
-        val pk = sender?.let { peerKeys[it] } ?: return body
-        return try { decryptFromPeer(body, pk, keyPair.secretKey) } catch (_: Exception) { "[Encrypted]" }
+    /**
+     * Opens a DM body from/with [peer]. Plaintext passes through; ciphertext
+     * we can't open yet shows a placeholder, never raw hex, and asks the
+     * contact for their key so a later history re-pull can decrypt it.
+     */
+    private fun decrypt(body: String?, peer: String?): String {
+        val pk = peer?.let { peerKeys[it] }
+        if (pk == null && peer != null && peer != _me.value && isEncryptedBody(body)) requestPeerKey(peer)
+        return displayDmBody(body, pk?.let { k -> { b: String -> decryptFromPeer(b, k, keyPair.secretKey) } })
     }
 
     private fun observeMessages() {
@@ -1340,7 +1445,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                             msg.ts ?: existing?.lastTs ?: 0L,
                         ))
                     }
-                    msg.publicKey?.let { pk -> decodePublicKeyB64(pk)?.let { peerKeys[sender] = it } }
+                    msg.publicKey?.let { pk -> acceptPeerKey(sender, pk, msg.keyFingerprint) }
                     if (msg.status == "Offline" && _callState.value?.peer == sender) {
                         clearCall()
                     }
@@ -1400,7 +1505,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 val text = decrypt(msg.body, sender)
                 val line = ChatLine(
                     id = msg.msgId ?: "${sender}-${System.nanoTime()}",
-                    from = sender, text = text.ifEmpty { "[Encrypted]" }, me = false,
+                    from = sender, text = text.ifEmpty { ENCRYPTED_PLACEHOLDER }, me = false,
                     kind = msg.kind, fileUrl = msg.fileUrl, fileName = msg.fileName,
                 )
                 if (_selectedChat.value == sender) appendChat(line)
@@ -1552,7 +1657,9 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             "msg_edit" -> {
                 val id = msg.msgId ?: return
                 val sender = msg.sender ?: return
-                val text = decrypt(msg.body, sender)
+                // Our own edit relayed from another of our devices is keyed to the recipient.
+                val peer = if (sender == _me.value) msg.recipient else sender
+                val text = decrypt(msg.body, peer)
                 _chatLog.value = _chatLog.value.map { if (it.id == id) it.copy(text = text, edited = true) else it }
             }
             "msg_delete" -> {
@@ -1778,11 +1885,8 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 val isMe = sender == me
                 val isDeleted = r.optBoolean("deleted", false)
                 val isEdited = r.optBoolean("edited", false)
-                var text = if (isDeleted) "" else r.optString("body", "")
-                val pk = peerKeys[if (isMe) peer else sender]
-                if (pk != null && text.isNotEmpty()) {
-                    text = try { decryptFromPeer(text, pk, keyPair.secretKey) } catch (_: Exception) { "[Encrypted]" }
-                }
+                // Both directions open with the contact's key (NaCl box).
+                val text = if (isDeleted) "" else decrypt(r.optString("body", ""), peer)
                 lines.add(ChatLine(
                     id = r.optString("msg_id", "$i"),
                     from = sender, text = text, me = isMe,

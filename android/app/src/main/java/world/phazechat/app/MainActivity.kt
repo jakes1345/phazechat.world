@@ -110,6 +110,8 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     val connState by vm.connState.collectAsState()
     val deviceVerify by vm.deviceVerify.collectAsState()
     val deviceChallenge by vm.deviceChallenge.collectAsState()
+    val plaintextPrompt by vm.plaintextPrompt.collectAsState()
+    val keyChangeWarning by vm.keyChangeWarning.collectAsState()
 
     val pendingOpenChat by vm.pendingOpenChat.collectAsState()
     // Only collected while the activity is started, so the conference is
@@ -168,6 +170,41 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
             },
             confirmButton = { Button(onClick = { vm.answerDeviceChallenge(true) }) { Text("Approve") } },
             dismissButton = { TextButton(onClick = { vm.answerDeviceChallenge(false) }) { Text("Deny") } },
+        )
+    }
+
+    // Sending to a contact whose key this device doesn't have yet.
+    plaintextPrompt?.let { p ->
+        AlertDialog(
+            onDismissRequest = { vm.answerPlaintextPrompt(false) },
+            title = { Text("Send without encryption?") },
+            text = {
+                Text(
+                    "${p.peer} hasn't shared an encryption key with this device yet (they may be offline).\n\n" +
+                        "Send without end-to-end encryption? The server will be able to read this message.\n\n" +
+                        "Choose Cancel to wait until they come online."
+                )
+            },
+            confirmButton = { TextButton(onClick = { vm.answerPlaintextPrompt(true) }) { Text("Send unencrypted") } },
+            dismissButton = { Button(onClick = { vm.answerPlaintextPrompt(false) }) { Text("Cancel") } },
+        )
+    }
+
+    // A contact's key differs from the one pinned on this device.
+    keyChangeWarning?.let { w ->
+        AlertDialog(
+            onDismissRequest = { vm.answerKeyChange(false) },
+            title = { Text("⚠ ${w.peer}'s security key changed") },
+            text = {
+                Text(
+                    "The encryption key ${w.peer} is using now (${w.offered}) isn't the one this device " +
+                        "trusted for them (${w.pinned}). This happens when they reinstall or switch devices, " +
+                        "but it can also mean someone is intercepting your messages.\n\n" +
+                        "The new key is not being used. Check with ${w.peer} another way before trusting it."
+                )
+            },
+            confirmButton = { Button(onClick = { vm.answerKeyChange(false) }) { Text("Keep old key") } },
+            dismissButton = { TextButton(onClick = { vm.answerKeyChange(true) }) { Text("Trust new key") } },
         )
     }
 

@@ -6,9 +6,8 @@ import com.goterl.lazysodium.SodiumAndroid
 import com.goterl.lazysodium.interfaces.Box
 import com.goterl.lazysodium.utils.Key
 import com.goterl.lazysodium.utils.KeyPair
-import java.security.MessageDigest
 
-private const val E2EE_PREFIX = "E2EE:"
+private const val E2EE_PREFIX = E2EE_BODY_PREFIX
 private val sodium = LazySodiumAndroid(SodiumAndroid())
 
 data class NaClKeyPair(val publicKey: ByteArray, val secretKey: ByteArray)
@@ -18,10 +17,7 @@ fun generateKeyPair(): NaClKeyPair {
     return NaClKeyPair(kp.publicKey.asBytes, kp.secretKey.asBytes)
 }
 
-fun fingerprint(pub: ByteArray): String {
-    val digest = MessageDigest.getInstance("SHA-256").digest(pub)
-    return digest.take(8).joinToString("") { "%02x".format(it) }
-}
+fun fingerprint(pub: ByteArray): String = keyFingerprint(pub)
 
 fun encryptForPeer(plain: String, peerPub: ByteArray, mySecret: ByteArray): String {
     val msg = plain.toByteArray(Charsets.UTF_8)
