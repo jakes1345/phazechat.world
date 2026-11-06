@@ -1824,46 +1824,72 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			client.PendingCallRoom = roomID
 			client.PendingCallID = callID
 			client.PendingCallStarted = startedAt
+			client.PendingCallAnswered = false
+			// Remember who was called, so only they can answer or reject.
+			setPendingCallee(client, msg.Recipient)
 			s.Mu.Unlock()
-			msg.RoomID = roomID
+			// Forward only the fields a callee needs, never whatever else
+			// the caller put on the wire.
+			ringMsg := NexusMessage{
+				Type:      "call_offer",
+				Sender:    username,
+				Recipient: msg.Recipient,
+				Body:      msg.Body,
+				SDP:       msg.SDP,
+				RoomID:    roomID,
+			}
 			// Ring every session they have open — laptop and phone at once,
 			// whichever picks up takes the call.
 			for _, c := range ring {
-				c.Send(msg)
+				c.Send(ringMsg)
 			}
 
 		case "call_answer":
 			if username == "" {
 				continue
 			}
-			msg.Sender = username
 			s.Mu.Lock()
 			var roomID string
-			caller := s.pendingCallerLocked(msg.Recipient)
+			var stillRinging []*Client
+			// Only the person this call was placed to can answer it, and only
+			// while it's still ringing. Without the callee check anyone could
+			// "answer" someone else's outgoing call and be handed its room.
+			caller := s.outgoingCallLocked(msg.Recipient, username)
+			if caller != nil && caller.PendingCallRoom == "" {
+				caller = nil // already answered on another device
+			}
 			if caller != nil {
 				roomID = caller.PendingCallRoom
 				caller.PendingCallRoom = ""
 				caller.PendingCallAnswered = true
 				caller.InCall = true
 				caller.CallPartner = username
-			}
-			// This connection takes the call; the caller talks to this one.
-			client.InCall = true
-			client.CallPartner = msg.Recipient
-			// Our other sessions are still ringing for a call that's now
-			// answered — collect them so we can call them off.
-			var stillRinging []*Client
-			for _, c := range s.Clients[username] {
-				if c != client {
-					stillRinging = append(stillRinging, c)
+				// This connection takes the call; the caller talks to this one.
+				client.InCall = true
+				client.CallPartner = msg.Recipient
+				// Our other sessions are still ringing for a call that's now
+				// answered — collect them so we can call them off.
+				for _, c := range s.Clients[username] {
+					if c != client {
+						stillRinging = append(stillRinging, c)
+					}
 				}
 			}
 			s.Mu.Unlock()
 
-			jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: msg.Body}
-			if caller != nil {
-				caller.Send(jitsiMsg)
+			if caller == nil {
+				// Nothing to answer: the caller hung up, it was answered
+				// elsewhere, or it was never ours. Both clients clear their
+				// call UI on call_end.
+				client.Send(NexusMessage{Type: "call_end", Sender: msg.Recipient})
+				continue
 			}
+			kind := msg.Body
+			if kind != "audio" && kind != "video" {
+				kind = ""
+			}
+			jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: kind}
+			caller.Send(jitsiMsg)
 			client.Send(jitsiMsg)
 			for _, c := range stillRinging {
 				c.Send(NexusMessage{Type: "call_end", Sender: msg.Recipient, Body: "answered_elsewhere"})
@@ -1876,54 +1902,99 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
+			peer := msg.Recipient
+			if peer == "" {
+				continue
+			}
 			s.Mu.Lock()
-			// The peer's side of this call lives on one specific connection.
-			// If they haven't answered yet it's still only pending, so fall
-			// back to whichever of their connections holds the pending call.
-			peerClient := s.callPeerLocked(msg.Recipient, username)
-			if peerClient == nil {
-				peerClient = s.pendingCallerLocked(msg.Recipient)
-			}
-
-			// The call row lives on whichever side placed the call — find
-			// it before either client's state gets cleared below.
-			var pendingClient *Client
-			var logCaller, logCallee string
-			if client.PendingCallID != 0 {
-				pendingClient, logCaller, logCallee = client, username, msg.Recipient
-			} else if peerClient != nil && peerClient.PendingCallID != 0 {
-				pendingClient, logCaller, logCallee = peerClient, msg.Recipient, username
-			}
-			var logMsg *NexusMessage
-			if pendingClient != nil {
-				kind, answered, duration := s.finalizeCall(pendingClient.PendingCallID, pendingClient.PendingCallAnswered, pendingClient.PendingCallStarted)
-				started := pendingClient.PendingCallStarted
-				pendingClient.PendingCallID = 0
-				pendingClient.PendingCallAnswered = false
-				status := "missed"
-				if answered {
-					status = "answered"
+			var (
+				participant bool
+				notify      []*Client // peer connections to relay the hang-up to
+				dialler     *Client   // connection holding the call row
+				ownOther    *Client   // another of our devices that had answered
+				logCaller   string
+				logCallee   string
+			)
+			switch {
+			case client.InCall && client.CallPartner == peer:
+				// An answered call on this very connection.
+				participant = true
+				if pc := s.callPeerLocked(peer, username); pc != nil {
+					notify = []*Client{pc}
 				}
-				m := NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration}
-				logMsg = &m
+				if pendingCalleeOf(client) == peer {
+					dialler, logCaller, logCallee = client, username, peer
+				} else if pc := s.outgoingCallLocked(peer, username); pc != nil {
+					dialler, logCaller, logCallee = pc, peer, username
+				}
+			case pendingCalleeOf(client) == peer && (client.PendingCallRoom != "" || client.PendingCallID != 0):
+				// The caller hanging up. Still ringing: every one of the
+				// callee's devices is ringing, so tell them all.
+				participant = true
+				dialler, logCaller, logCallee = client, username, peer
+				if client.PendingCallRoom != "" {
+					notify = append(notify, s.Clients[peer]...)
+				} else if pc := s.callPeerLocked(peer, username); pc != nil {
+					notify = []*Client{pc}
+				}
+			default:
+				// The callee rejecting (or ending from another of their
+				// devices). Only valid if `peer` really is calling us.
+				if pc := s.outgoingCallLocked(peer, username); pc != nil {
+					participant = true
+					dialler, logCaller, logCallee = pc, peer, username
+					notify = []*Client{pc}
+					// If another of our devices had answered, it's in the
+					// call too and needs releasing.
+					if mine := s.callPeerLocked(username, peer); mine != nil && mine != client {
+						mine.InCall = false
+						mine.CallPartner = ""
+						ownOther = mine
+					}
+				}
 			}
-
+			if !participant {
+				// Not a party to any call with `peer`: refuse rather than
+				// let anyone tear down someone else's call.
+				s.Mu.Unlock()
+				continue
+			}
+			var callID int64
+			var answered bool
+			var started time.Time
+			if dialler != nil {
+				callID, answered, started = clearOutgoingCallLocked(dialler)
+			}
 			client.InCall = false
 			client.CallPartner = ""
-			if peerClient != nil {
-				peerClient.InCall = false
-				peerClient.CallPartner = ""
+			for _, c := range notify {
+				if c.CallPartner == username {
+					c.InCall = false
+					c.CallPartner = ""
+				}
 			}
 			s.Mu.Unlock()
 
-			if peerClient != nil {
-				peerClient.Send(msg)
+			// Relay with the authenticated sender, never the client's claim.
+			relay := NexusMessage{Type: msg.Type, Sender: username, Recipient: peer}
+			for _, c := range notify {
+				c.Send(relay)
+			}
+			if ownOther != nil {
+				ownOther.Send(NexusMessage{Type: "call_end", Sender: peer})
 			}
 			// The call log is history, not signalling — every session on both
-			// sides should see it so their call lists agree.
-			if logMsg != nil {
-				s.sendTo(username, *logMsg)
-				s.sendTo(msg.Recipient, *logMsg)
+			// sides should see it so their call lists agree. The DB write
+			// happens here, after s.Mu is released.
+			if callID != 0 {
+				kind, ans, duration := s.finalizeCall(callID, answered, started)
+				status := "missed"
+				if ans {
+					status = "answered"
+				}
+				logMsg := NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration}
+				s.sendTo(username, logMsg)
+				s.sendTo(peer, logMsg)
 			}
 
 		case "call_invite":
@@ -1934,8 +2005,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "call_error", Error: "You can only invite friends"})
 				continue
 			}
-			msg.Sender = username
-			s.sendTo(msg.Recipient, msg)
+			s.sendTo(msg.Recipient, NexusMessage{
+				Type:      "call_invite",
+				Sender:    username,
+				Recipient: msg.Recipient,
+				ChannelID: msg.ChannelID,
+			})
 
 		case "remote_register":
 			if username == "" {

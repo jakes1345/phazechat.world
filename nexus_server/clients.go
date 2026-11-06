@@ -206,20 +206,6 @@ func (s *NexusServer) ringingClients(username string) []*Client {
 	return s.clientsOf(username)
 }
 
-// pendingCallerLocked finds the connection of `caller` that has an outgoing
-// call waiting to be answered. Caller must hold s.Mu.
-//
-// The pending room is recorded on the exact connection that dialled, so a
-// second tab belonging to the same person doesn't get mistaken for the caller.
-func (s *NexusServer) pendingCallerLocked(caller string) *Client {
-	for _, c := range s.Clients[caller] {
-		if c.PendingCallRoom != "" || c.PendingCallID != 0 {
-			return c
-		}
-	}
-	return nil
-}
-
 // detachClient unregisters one connection and cleans up everything that hung
 // off it: an in-progress call (the partner is told and the call row closed),
 // and — when it was the user's last connection — presence, voice rooms and
@@ -239,7 +225,7 @@ func (s *NexusServer) detachClient(username string, client *Client) int {
 	remaining := s.removeClientLocked(username, client)
 
 	var (
-		partner   *Client
+		notify    []*Client // the other side's connections to tell
 		logRow    int64
 		answered  bool
 		started   time.Time
@@ -249,39 +235,44 @@ func (s *NexusServer) detachClient(username string, client *Client) int {
 	if callPartner := client.CallPartner; callPartner != "" {
 		// The peer's call lives on one specific connection of theirs, not
 		// on all of them — find that one.
-		if partner = s.callPeerLocked(callPartner, username); partner != nil {
+		if partner := s.callPeerLocked(callPartner, username); partner != nil {
 			partner.InCall = false
 			partner.CallPartner = ""
+			notify = []*Client{partner}
 			// The call row lives on whichever side placed the call.
-			var pendingClient *Client
 			if client.PendingCallID != 0 {
-				pendingClient, logCaller, logCallee = client, username, callPartner
+				logCaller, logCallee = username, callPartner
+				logRow, answered, started = clearOutgoingCallLocked(client)
 			} else if partner.PendingCallID != 0 {
-				pendingClient, logCaller, logCallee = partner, callPartner, username
-			}
-			if pendingClient != nil {
-				logRow = pendingClient.PendingCallID
-				answered = pendingClient.PendingCallAnswered
-				started = pendingClient.PendingCallStarted
-				pendingClient.PendingCallID = 0
-				pendingClient.PendingCallAnswered = false
+				logCaller, logCallee = callPartner, username
+				logRow, answered, started = clearOutgoingCallLocked(partner)
 			}
 		}
+	} else if callee := pendingCalleeOf(client); callee != "" && client.PendingCallRoom != "" {
+		// Hung up by disconnecting while still ringing: stop the callee's
+		// devices ringing for a call nobody can answer any more.
+		notify = append(notify, s.Clients[callee]...)
+		logCaller, logCallee = username, callee
+		logRow, answered, started = clearOutgoingCallLocked(client)
 	}
 	client.InCall = false
 	client.CallPartner = ""
+	clearPendingCallee(client)
 	s.Mu.Unlock()
 
-	if partner != nil {
-		partner.Send(NexusMessage{Type: "call_end", Sender: username})
-		if logRow != 0 {
-			kind, ans, duration := s.finalizeCall(logRow, answered, started)
-			status := "missed"
-			if ans {
-				status = "answered"
-			}
-			// Only the surviving partner is still connected to receive this live.
-			partner.Send(NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration})
+	for _, c := range notify {
+		c.Send(NexusMessage{Type: "call_end", Sender: username})
+	}
+	if logRow != 0 {
+		kind, ans, duration := s.finalizeCall(logRow, answered, started)
+		status := "missed"
+		if ans {
+			status = "answered"
+		}
+		// Only the surviving side is still connected to receive this live.
+		m := NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration}
+		for _, c := range notify {
+			c.Send(m)
 		}
 	}
 

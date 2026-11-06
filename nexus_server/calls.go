@@ -1,6 +1,65 @@
 package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
+
+// pendingCallees records who an outgoing call was placed to, keyed by the
+// exact connection that dialled. It sits beside the PendingCall* fields on
+// Client: call_answer and call_reject need it to check that the person
+// answering or rejecting is really the one being called, rather than anyone
+// who names the caller in Recipient.
+//
+// It has its own mutex (not s.Mu) because it's package-level and test
+// servers run side by side. Callers update it while holding s.Mu so it moves
+// in step with the rest of the call state.
+var pendingCallees = struct {
+	sync.Mutex
+	m map[*Client]string
+}{m: map[*Client]string{}}
+
+func setPendingCallee(c *Client, callee string) {
+	pendingCallees.Lock()
+	pendingCallees.m[c] = callee
+	pendingCallees.Unlock()
+}
+
+func pendingCalleeOf(c *Client) string {
+	pendingCallees.Lock()
+	defer pendingCallees.Unlock()
+	return pendingCallees.m[c]
+}
+
+func clearPendingCallee(c *Client) {
+	pendingCallees.Lock()
+	delete(pendingCallees.m, c)
+	pendingCallees.Unlock()
+}
+
+// outgoingCallLocked finds the connection of `caller` that placed a call to
+// `callee` which is still in flight (ringing, or answered and not yet ended).
+// Caller must hold s.Mu.
+func (s *NexusServer) outgoingCallLocked(caller, callee string) *Client {
+	for _, c := range s.Clients[caller] {
+		if (c.PendingCallRoom != "" || c.PendingCallID != 0) && pendingCalleeOf(c) == callee {
+			return c
+		}
+	}
+	return nil
+}
+
+// clearOutgoingCallLocked resets a dialling connection's pending-call state
+// and returns what's needed to finalize the call row after s.Mu is released.
+// Caller must hold s.Mu.
+func clearOutgoingCallLocked(c *Client) (callID int64, answered bool, started time.Time) {
+	callID, answered, started = c.PendingCallID, c.PendingCallAnswered, c.PendingCallStarted
+	c.PendingCallID = 0
+	c.PendingCallAnswered = false
+	c.PendingCallRoom = ""
+	clearPendingCallee(c)
+	return
+}
 
 // callOutcome finalizes a call row's answered/duration fields. A call that
 // was never answered is a miss regardless of how long it rang.
