@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import world.phazechat.app.data.ChatLine
+import world.phazechat.app.data.resolveAttachmentUrl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -268,6 +270,7 @@ fun MessageBubble(
     val bubbleColor = if (line.me) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val textColor = if (line.me) Color.White else MaterialTheme.colorScheme.onSurface
     val uriHandler = LocalUriHandler.current
+    val ctx = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
 
     Row(
@@ -309,7 +312,15 @@ fun MessageBubble(
                             size >= 1024 -> "${size / 1024} KB"
                             else -> "$size B"
                         }
-                        val openModifier = if (url.isNotEmpty()) Modifier.clickable { uriHandler.openUri(url) } else Modifier
+                        val openUrl = remember(url) { resolveAttachmentUrl(url) }
+                        val openModifier = if (openUrl != null) Modifier.clickable {
+                            try {
+                                uriHandler.openUri(openUrl)
+                            } catch (_: Exception) {
+                                // No app to open it (ActivityNotFoundException) or a bad URI.
+                                android.widget.Toast.makeText(ctx, "No app can open this file", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        } else Modifier
                         if (isVoice) {
                             Row(modifier = openModifier, verticalAlignment = Alignment.CenterVertically) {
                                 Text("🎙", fontSize = 20.sp)
