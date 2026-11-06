@@ -28,7 +28,7 @@ if (dsn) {
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/web/sw.js', { scope: '/web/' })
+      .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
       .catch((e) => console.warn('[sw] registration failed', e))
   })
 }

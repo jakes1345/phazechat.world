@@ -178,12 +178,15 @@ function saveUnread(me: string, u: Record<string, number>) {
   try { localStorage.setItem(unreadKey(me), JSON.stringify(u)) } catch { /* quota */ }
 }
 
+const canNotify = () => typeof Notification !== 'undefined' && Notification.permission === 'granted'
+
+// Re-sends this browser's push subscription after sign-in. Only runs once the
+// user has granted notification permission (Settings → Notifications asks,
+// from a click); it never prompts on its own.
 async function registerPush(send: (m: NexusMessage) => void) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !canNotify()) return
   try {
-    const reg = await navigator.serviceWorker.register('/web/sw.js', { scope: '/web/' })
-    const perm = await Notification.requestPermission()
-    if (perm !== 'granted') return
+    const reg = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
     const resp = await fetch('/api/v1/vapid-key')
     if (!resp.ok) return
     const { publicKey } = await resp.json() as { publicKey: string }
@@ -1178,7 +1181,7 @@ export default function App() {
         case 'friend_accepted':
           if (msg.sender) {
             setFriends((f) => ({ ...f, [msg.sender!]: msg.status || 'Online' }))
-            appendLog('system', `${msg.sender} accepted your friend request`, false)
+            appendLog('system', `${msg.sender} accepted your friend request`, false, { peer: msg.sender })
           }
           break
 
@@ -1295,7 +1298,7 @@ export default function App() {
                   ? '📎 Attachment' : (msg.body || '').slice(0, 60)
                 if (wails) {
                   wails.Notify(msg.sender, preview)
-                } else if (Notification.permission === 'granted') {
+                } else if (canNotify()) {
                   new Notification(msg.sender!, { body: preview, icon: '/web/favicon.svg', tag: `dm-${msg.sender}` })
                 }
               }
@@ -1515,7 +1518,7 @@ export default function App() {
           if (msg.sender) {
             setCallState({ peer: msg.sender, type: (msg.body as 'audio' | 'video') || 'audio', status: 'ringing', direction: 'incoming' })
             startRinger('CallIncoming.wav')
-            if (Notification.permission === 'granted') {
+            if (canNotify()) {
               new Notification(`Incoming call from ${msg.sender}`, {
                 body: 'Open Phaze to answer',
                 icon: '/web/favicon.svg',
@@ -1959,8 +1962,11 @@ export default function App() {
       // Pull durable history from the server so messages survive a localStorage
       // wipe, a new browser, or a fresh device. Server stores E2EE ciphertext.
       send({ type: 'dm_history', sender: me, recipient: name })
-      // Notify peer we've read their messages
-      send({ type: 'read_receipt', sender: me, recipient: name, body: name })
+      // Read receipts are a Phaze 6+ feature; earlier themes don't tell
+      // contacts what you've seen.
+      if (hasFeature(theme, 'read_receipts')) {
+        send({ type: 'read_receipt', sender: me, recipient: name, body: name })
+      }
     } else {
       setLog([])
       setPinnedIds([])
@@ -2015,7 +2021,7 @@ export default function App() {
           return
         } else if (out.local === 'help') {
           const helpLines = SLASH_COMMANDS.map((c) => `${c.cmd} — ${c.desc}`).join('\n')
-          appendLog('system', `Available commands:\n${helpLines}`, false, { id: newMsgId() })
+          appendLog('system', `Available commands:\n${helpLines}`, false, { id: newMsgId(), peer: selected })
           return
         }
       }

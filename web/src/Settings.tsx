@@ -783,7 +783,7 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
                     try {
                       const perm = await Notification.requestPermission()
                       if (perm !== 'granted') { setPushMsg('Notification permission denied.'); return }
-                      const reg = await navigator.serviceWorker.register('/web/sw.js', { scope: '/web/' })
+                      const reg = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
                       const resp = await fetch('/api/v1/vapid-key')
                       if (!resp.ok) { setPushMsg('Server does not support push yet.'); return }
                       const { publicKey } = await resp.json() as { publicKey: string }
