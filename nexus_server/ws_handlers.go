@@ -608,8 +608,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "delete_account_result", Error: "Not authenticated"})
 				continue
 			}
-			if msg.Body == "" || !s.authenticateUser(username, msg.Body) {
-				client.Send(NexusMessage{Type: "delete_account_result", Error: "Password confirmation required"})
+			if ok, throttled := s.confirmPassword(username, msg.Body); !ok {
+				errText := "Password confirmation required"
+				if throttled {
+					errText = reauthThrottledMsg
+				}
+				client.Send(NexusMessage{Type: "delete_account_result", Error: errText})
 				continue
 			}
 			if err := s.deleteAccount(username); err != nil {
@@ -687,9 +691,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			// Current clients don't send a password here; newer ones may,
 			// and if they do it has to be right.
-			if msg.Body != "" && !s.authenticateUser(username, msg.Body) {
-				client.Send(NexusMessage{Type: "totp_result", Error: "Password incorrect"})
-				continue
+			if msg.Body != "" {
+				if ok, throttled := s.confirmPassword(username, msg.Body); !ok {
+					errText := "Password incorrect"
+					if throttled {
+						errText = reauthThrottledMsg
+					}
+					client.Send(NexusMessage{Type: "totp_result", Error: errText})
+					continue
+				}
 			}
 			uri, secret, err := s.generateTOTPURI(username)
 			if err != nil {
@@ -727,8 +737,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			if !s.authenticateUser(username, msg.Body) {
-				client.Send(NexusMessage{Type: "totp_result", Error: "Password required"})
+			if ok, throttled := s.confirmPassword(username, msg.Body); !ok {
+				errText := "Password required"
+				if throttled {
+					errText = reauthThrottledMsg
+				}
+				client.Send(NexusMessage{Type: "totp_result", Error: errText})
 				continue
 			}
 			s.disableTOTP(username)
@@ -772,8 +786,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			oldPw, newPw := msg.Body[:idx], msg.Body[idx+1:]
-			if !s.authenticateUser(username, oldPw) {
-				client.Send(NexusMessage{Type: "change_password_result", Error: "Current password incorrect"})
+			if ok, throttled := s.confirmPassword(username, oldPw); !ok {
+				errText := "Current password incorrect"
+				if throttled {
+					errText = reauthThrottledMsg
+				}
+				client.Send(NexusMessage{Type: "change_password_result", Error: errText})
 				continue
 			}
 			if len(newPw) < 8 {
