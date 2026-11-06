@@ -1,6 +1,7 @@
 // Pure configuration helpers for the Phaze container Worker. Kept free of
 // `cloudflare:*` imports so they can be unit tested under plain Node.
 
+import { MAIL_ENDPOINT, hasMailBinding } from "./mail";
 import { S3_ENDPOINT } from "./s3";
 
 /** Header the Worker sets to the visitor's real IP before proxying. */
@@ -60,7 +61,13 @@ export function containerEnv(env: Record<string, unknown>): Record<string, strin
       out[key] = value;
     }
   }
-  return { ...out, ...FIXED_CONTAINER_ENV };
+  const fixed: Record<string, string> = { ...FIXED_CONTAINER_ENV };
+  // Mail goes through the Worker's EMAIL binding (see mail.ts) when it has
+  // one; the server then needs no mail provider key.
+  if (hasMailBinding(env)) {
+    fixed.PHAZE_MAIL_RELAY = MAIL_ENDPOINT;
+  }
+  return { ...out, ...fixed };
 }
 
 /** True when the Worker has its R2 bucket binding. */

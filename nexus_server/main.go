@@ -2419,6 +2419,7 @@ func (s *NexusServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 		"turn_configured":       turnOK,
 		"turn_public_fallback":  turnFallback, // openrelay.metered.ca in use
 		"turn_provider":         turnProvider,
+		"mail_relay_configured": mailRelayURL() != "",
 		"smtp_configured":       smtpOK,
 		"brevo_configured":      brevoOK,
 		"resend_configured":     resendOK,
@@ -3975,11 +3976,10 @@ func (s *NexusServer) vapidKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *NexusServer) exportHandler(w http.ResponseWriter, r *http.Request) {
-	// H5: prefer Authorization header; fall back to query param for backwards compat.
-	tok := ""
-	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
-		tok = strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
-	}
+	// The web app signs in with the HttpOnly session cookie and never sees
+	// its token, so the cookie (or a Bearer header from the apps) comes
+	// first; the query param stays for older clients.
+	tok := strings.TrimSpace(tokenFromRequest(r))
 	if tok == "" {
 		tok = r.URL.Query().Get("token")
 	}

@@ -15,13 +15,12 @@ interface Story {
 
 interface Props {
   me: string
-  sessionToken: string
 }
 
 // Stories: thin horizontal ring above the friends/chat panel showing every
 // user with active (last-24h) media. Click a ring to open the viewer.
 // Authored posts get an upload-attached "+" tile up front.
-export default function Stories({ me, sessionToken }: Props) {
+export default function Stories({ me }: Props) {
   const [stories, setStories] = useState<Story[]>([])
   const [viewing, setViewing] = useState<string | null>(null) // username
   const [openIndex, setOpenIndex] = useState(0)
@@ -31,13 +30,11 @@ export default function Stories({ me, sessionToken }: Props) {
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   const refresh = useMemo(() => async () => {
-    if (!sessionToken) return
     const r = await fetch('/api/v1/stories', { credentials: 'include' })
     if (!r.ok) return
     const data = await r.json()
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStories(data)
-  }, [sessionToken])
+  }, [])
 
   useEffect(() => {
     void refresh()
@@ -58,7 +55,6 @@ export default function Stories({ me, sessionToken }: Props) {
   const authors = Array.from(byAuthor.keys())
 
   const handleAdd = async (file: File) => {
-    if (!sessionToken) return
     setUploading(true)
     try {
       const fd = new FormData()

@@ -22,6 +22,9 @@
   // The container's database and uploads. It reaches this bucket through the
   // Worker (src/s3.ts), so no R2 API token is needed.
   "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "phazechat-data" }],
+  // Sign-up codes and other account mail, sent with Cloudflare Email Service
+  // from noreply@phazechat.world (src/mail.ts). No mail provider key needed.
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@phazechat.world"] }],
   "durable_objects": {
     "bindings": [{ "name": "NEXUS", "class_name": "PhazeNexus" }]
   },

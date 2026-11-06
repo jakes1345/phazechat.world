@@ -218,8 +218,9 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
   }
 
   const exportData = () => {
-    if (!sessionToken) return
-    const url = `/api/v1/export?token=${encodeURIComponent(sessionToken)}`
+    // The session cookie goes with this same-origin download; the token is
+    // only in JS memory for older sign-ins.
+    const url = sessionToken ? `/api/v1/export?token=${encodeURIComponent(sessionToken)}` : '/api/v1/export'
     const a = document.createElement('a')
     a.href = url
     a.download = 'phaze-data-export.json'

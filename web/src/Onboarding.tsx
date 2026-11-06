@@ -3,7 +3,6 @@ import './onboarding.css'
 
 interface Props {
   me: string
-  sessionToken: string
   /** Sends a WS message (used for the friend-request step). */
   onAddFriend: (username: string) => void
   /** Switches to Live tab if user wants to start broadcasting. */
@@ -14,7 +13,7 @@ interface Props {
 // Onboarding: a 3-step modal shown once per user on their first sign-in.
 // localStorage key 'phaze_onboarded' marks completion so the modal never
 // reappears. Each step is skippable; the user can always finish later.
-export default function Onboarding({ me, sessionToken, onAddFriend, onJump, onClose }: Props) {
+export default function Onboarding({ me, onAddFriend, onJump, onClose }: Props) {
   const [step, setStep] = useState(1)
   const [friendName, setFriendName] = useState('')
   const [done, setDone] = useState<Record<number, boolean>>({})
@@ -32,7 +31,6 @@ export default function Onboarding({ me, sessionToken, onAddFriend, onJump, onCl
   const skip = finish
 
   const handleAvatarUpload = async (file: File) => {
-    if (!sessionToken) return
     const fd = new FormData()
     fd.append('file', file)
     const r = await fetch('/api/v1/upload', {
