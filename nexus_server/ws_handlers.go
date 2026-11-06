@@ -1051,7 +1051,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if msg.Body == "" {
 				continue
 			}
-			s.DB.Exec("UPDATE users SET fcm_token = ? WHERE username = ?", msg.Body, username)
+			if err := s.registerFCMToken(username, msg.Body); err != nil {
+				log.Printf("[FCM] register token for %s: %v", username, err)
+				continue
+			}
 			log.Printf("[FCM] registered token for %s", username)
 
 		case "subscribe_push":
@@ -1430,10 +1433,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			client.Send(NexusMessage{Type: "friend_request_sent", Recipient: msg.Recipient})
 			log.Printf("Friend request: %s -> %s", username, msg.Recipient)
-			s.sendTo(msg.Recipient, NexusMessage{
+			if !s.sendTo(msg.Recipient, NexusMessage{
 				Type:   "friend_request",
 				Sender: username,
-			})
+			}) {
+				s.notify(msg.Recipient, pushNote{
+					Title: "Friend request", Body: username + " wants to connect",
+					Kind: pushKindFriendRequest, Sender: username,
+				})
+			}
 
 		case "friend_accept":
 			if username == "" {
@@ -1836,6 +1844,11 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			ring := s.clientsOf(msg.Recipient)
 			if len(ring) == 0 {
+				// Nobody to ring: tell them they missed it, so they can call back.
+				s.notify(msg.Recipient, pushNote{
+					Title: "Missed call", Body: username + " tried to call you",
+					Kind: pushKindMissedCall, Sender: username,
+				})
 				client.Send(NexusMessage{Type: "call_error", Error: msg.Recipient + " is not available"})
 				continue
 			}

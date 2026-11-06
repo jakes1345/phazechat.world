@@ -153,6 +153,18 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         return peer
     }
 
+    // Deep-link: open a Space's channel (a push for a channel message or mention)
+    private val _pendingOpenSpace = MutableStateFlow<Pair<String, String>?>(null)
+    val pendingOpenSpace = _pendingOpenSpace.asStateFlow()
+    fun openSpace(serverId: String, channelId: String) {
+        _pendingOpenSpace.value = serverId to channelId
+    }
+    fun consumePendingOpenSpace(): Pair<String, String>? {
+        val v = _pendingOpenSpace.value
+        _pendingOpenSpace.value = null
+        return v
+    }
+
     // Chat
     private val _selectedChat = MutableStateFlow<String?>(null)
     val selectedChat = _selectedChat.asStateFlow()
