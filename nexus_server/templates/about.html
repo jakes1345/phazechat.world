@@ -69,7 +69,7 @@
             <p>The classic desktop messenger we grew up on was retired, and its replacement is a conference-call app for work meetings. We wanted DMs, voice calls, a real contact list — the stuff a proper messenger actually has. So we built it.</p>
 
             <h2>How it works</h2>
-            <p>Messages are encrypted on your device before they're sent. The server stores ciphertext and cannot read them. Calls run on WebRTC; right now that means a Jitsi Meet room per call rather than Phaze's own relay, which we're moving away from — see the Privacy Policy for exactly what that means for who can see a call.</p>
+            <p>Messages are encrypted on your device before they're sent. The server stores ciphertext and cannot read them. Calls and voice rooms run on WebRTC directly between the people in them, encrypted with DTLS-SRTP. When a direct path is blocked, the encrypted media goes through a relay that can't decrypt it. See the Privacy Policy for the details.</p>
             <p>No tracking, no ads, nothing sold. The code is open source. If you don't want to use our server, run your own with one Docker command.</p>
 
             <h2>Contributing</h2>
