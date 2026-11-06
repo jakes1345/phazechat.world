@@ -1859,6 +1859,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			client.PendingCallRoom = roomID
 			client.PendingCallID = callID
 			client.PendingCallStarted = startedAt
+			client.PendingCallRTC = msg.Status == callRTC
 			s.Mu.Unlock()
 			msg.RoomID = roomID
 			// Ring every session they have open — laptop and phone at once,
@@ -1874,9 +1875,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			msg.Sender = username
 			s.Mu.Lock()
 			var roomID string
+			var callerRTC bool
 			caller := s.pendingCallerLocked(msg.Recipient)
 			if caller != nil {
 				roomID = caller.PendingCallRoom
+				callerRTC = caller.PendingCallRTC
+				caller.PendingCallRTC = false
 				caller.PendingCallRoom = ""
 				caller.PendingCallAnswered = true
 				caller.InCall = true
@@ -1895,17 +1899,51 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			s.Mu.Unlock()
 
-			jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: msg.Body}
-			if caller != nil {
-				caller.Send(jitsiMsg)
+			if caller != nil && callerRTC && msg.Status == callRTC {
+				// Both ends run WebRTC themselves: tell each its role. The
+				// caller makes the offer; call_signal carries SDP and ICE
+				// between exactly these two connections.
+				caller.Send(NexusMessage{Type: "call_accepted", Sender: username, RoomID: roomID, Body: msg.Body, Status: "caller"})
+				client.Send(NexusMessage{Type: "call_accepted", Sender: msg.Recipient, RoomID: roomID, Body: msg.Body, Status: "callee"})
+			} else {
+				// An older client on either end still joins a Jitsi room.
+				jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: msg.Body}
+				if caller != nil {
+					caller.Send(jitsiMsg)
+				}
+				client.Send(jitsiMsg)
 			}
-			client.Send(jitsiMsg)
 			for _, c := range stillRinging {
 				c.Send(NexusMessage{Type: "call_end", Sender: msg.Recipient, Body: "answered_elsewhere"})
 			}
 
 		case "ice_candidate":
-			// No-op: WebRTC ICE negotiation replaced by Jitsi.
+			// No-op: the old pre-Jitsi signalling. Calls now use call_signal.
+
+		case "call_signal":
+			// WebRTC offer/answer/ICE for a 1:1 call, relayed only between
+			// the two connections that are in the call with each other.
+			if username == "" || msg.Recipient == "" {
+				continue
+			}
+			if !validCallSignal(msg) {
+				continue
+			}
+			s.Mu.RLock()
+			mine := client.InCall && client.CallPartner == msg.Recipient
+			peer := s.callPeerLocked(msg.Recipient, username)
+			s.Mu.RUnlock()
+			if !mine || peer == nil {
+				continue
+			}
+			peer.Send(NexusMessage{
+				Type:      "call_signal",
+				Sender:    username,
+				Recipient: msg.Recipient,
+				Body:      msg.Body,
+				SDP:       msg.SDP,
+				Candidate: msg.Candidate,
+			})
 
 		case "call_reject", "call_end":
 			if username == "" {

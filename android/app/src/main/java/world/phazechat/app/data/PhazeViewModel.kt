@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import world.phazechat.app.call.CallAudio
+import world.phazechat.app.call.CallService
+import world.phazechat.app.call.PeerCall
+import world.phazechat.app.call.ProxyVideoSink
 import world.phazechat.app.crypto.*
 
 data class CallLogInfo(
@@ -401,28 +405,42 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private val _channelDraft = MutableStateFlow("")
     val channelDraft = _channelDraft.asStateFlow()
 
-    // Calls. Like the web client, a call rings over the socket and then runs
-    // in a Jitsi Meet room the server picks when it's answered (call_jitsi).
+    // Calls. Like the web client, a call rings over the socket; once it's
+    // answered the server pairs the two connections (call_accepted) and relays
+    // WebRTC signalling (call_signal) while media goes directly between the
+    // phones, or through the TURN relay. See world.phazechat.app.call.PeerCall.
     data class CallState(
         val peer: String,
         // ringing: offer sent or received; connecting: answered here, waiting
-        // for the room; active: in the Jitsi conference.
+        // for the server to pair the call; active: media is being set up or flowing.
         val status: String = "ringing",
         val isIncoming: Boolean = false,
         val isVideo: Boolean = false,
-        val roomId: String? = null,
     )
     private val _callState = MutableStateFlow<CallState?>(null)
     val callState = _callState.asStateFlow()
 
-    /** A conference the UI should open (it needs an Activity to launch from). */
-    data class ConferenceLaunch(val room: String, val video: Boolean, val displayName: String?)
-    private val _pendingConference = MutableStateFlow<ConferenceLaunch?>(null)
-    val pendingConference = _pendingConference.asStateFlow()
-    fun consumePendingConference() { _pendingConference.value = null }
+    /** The live part of an active call, for the call screen. */
+    data class CallMedia(
+        val localSink: ProxyVideoSink,
+        val remoteSink: ProxyVideoSink,
+        val phase: CallPhase = CallPhase.STARTING,
+        val hasLocalVideo: Boolean = false,
+        val frontCamera: Boolean = true,
+        val hasRemoteVideo: Boolean = false,
+        val muted: Boolean = false,
+        val cameraOff: Boolean = false,
+        val speakerOn: Boolean = false,
+    )
+    private val _callMedia = MutableStateFlow<CallMedia?>(null)
+    val callMedia = _callMedia.asStateFlow()
 
-    // Told by the Jitsi SDK when a conference ends, however it ended.
-    private val conferenceEndReceiver = JitsiCalls.registerEndListener(app) { url -> onConferenceEnded(url) }
+    private var peerCall: PeerCall? = null
+    // Bumped per call, so a finished call's late callbacks can't touch the next one.
+    @Volatile private var callGen = 0
+    private val callAudio = CallAudio(app)
+    // TURN relay credentials from the last auth_result.
+    private var turnConfig: TurnConfig? = null
 
     // Stories
     private val _stories = MutableStateFlow<List<world.phazechat.app.ui.Story>>(emptyList())
@@ -1020,8 +1038,10 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         val me = _me.value ?: return
         if (_callState.value != null) return
         _callState.value = CallState(peer = peer, status = "ringing", isVideo = withVideo)
-        // No SDP: the server only needs the kind, and answers with a Jitsi room.
-        nexus.send(NexusMessage(type = "call_offer", sender = me, recipient = peer, body = callKind(withVideo)))
+        // Started here, while Phaze is on screen: Android won't let it start later from the background.
+        CallService.start(getApplication(), peer, withVideo && canUseCamera())
+        // status "rtc": this client does WebRTC calls (older ones were handed a Jitsi room).
+        nexus.send(NexusMessage(type = "call_offer", sender = me, recipient = peer, body = callKind(withVideo), status = CALL_RTC))
     }
 
     fun answerCall() {
@@ -1029,8 +1049,79 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         val me = _me.value ?: return
         if (!cs.isIncoming || cs.status != "ringing") return
         _callState.value = cs.copy(status = "connecting")
-        // The server then sends call_jitsi with the room to both sides.
-        nexus.send(NexusMessage(type = "call_answer", sender = me, recipient = cs.peer, body = callKind(cs.isVideo)))
+        CallService.start(getApplication(), cs.peer, cs.isVideo && canUseCamera())
+        // The server then sends call_accepted to both sides.
+        nexus.send(NexusMessage(type = "call_answer", sender = me, recipient = cs.peer, body = callKind(cs.isVideo), status = CALL_RTC))
+    }
+
+    private fun canUseCamera() = androidx.core.content.ContextCompat.checkSelfPermission(
+        getApplication(), android.Manifest.permission.CAMERA
+    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    fun toggleMute() {
+        val m = _callMedia.value ?: return
+        val muted = !m.muted
+        peerCall?.setMuted(muted)
+        _callMedia.value = m.copy(muted = muted)
+    }
+
+    fun toggleCamera() {
+        val m = _callMedia.value ?: return
+        if (!m.hasLocalVideo) return
+        val off = !m.cameraOff
+        peerCall?.setCameraOff(off)
+        _callMedia.value = m.copy(cameraOff = off)
+    }
+
+    fun switchCamera() {
+        val m = _callMedia.value ?: return
+        if (!m.hasLocalVideo || m.cameraOff) return
+        peerCall?.switchCamera()
+    }
+
+    fun toggleSpeaker() {
+        val m = _callMedia.value ?: return
+        val on = !m.speakerOn
+        callAudio.setSpeaker(on)
+        _callMedia.value = m.copy(speakerOn = on)
+    }
+
+    /** The server paired this call: set up the media connection with [peer]. */
+    private fun beginPeerCall(peer: String, video: Boolean, isCaller: Boolean) {
+        val me = _me.value ?: return
+        peerCall?.close()
+        val gen = ++callGen
+        val events = object : PeerCall.Events {
+            override fun signal(body: String, sdp: String?, candidate: String?) {
+                if (gen != callGen) return
+                nexus.send(NexusMessage(type = "call_signal", sender = me, recipient = peer, body = body, sdp = sdp, candidate = candidate))
+            }
+            override fun onPhase(phase: CallPhase) {
+                if (phase != CallPhase.CLOSED) updateMedia(gen) { it.copy(phase = phase) }
+            }
+            override fun onLocalVideo(present: Boolean, frontFacing: Boolean) =
+                updateMedia(gen) { it.copy(hasLocalVideo = present, frontCamera = frontFacing) }
+            override fun onRemoteVideo(present: Boolean) = updateMedia(gen) { it.copy(hasRemoteVideo = present) }
+            override fun onMediaError(message: String) {
+                viewModelScope.launch(Dispatchers.Main) {
+                    if (gen != callGen || _callState.value == null) return@launch
+                    endCall()
+                    _actionStatus.value = message
+                }
+            }
+        }
+        val call = PeerCall(getApplication(), video, isCaller, iceServersFor(turnConfig), events)
+        peerCall = call
+        _callMedia.value = CallMedia(localSink = call.localSink, remoteSink = call.remoteSink, speakerOn = video)
+        // Video calls start on the loudspeaker, voice calls on the earpiece.
+        callAudio.start(speaker = video)
+        CallService.onHangUp = { viewModelScope.launch(Dispatchers.Main) { endCall() } }
+        call.start()
+    }
+
+    private fun updateMedia(gen: Int, change: (CallMedia) -> CallMedia) {
+        if (gen != callGen) return
+        _callMedia.update { m -> m?.let(change) }
     }
 
     fun rejectCall() {
@@ -1047,25 +1138,20 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun callKind(video: Boolean) = if (video) "video" else "audio"
 
-    /** Drops the call state, hanging up the Jitsi conference if one was opened. */
+    /** Drops the call state and frees the camera, microphone and connection. */
     private fun clearCall() {
-        val cs = _callState.value
+        callGen++
         _callState.value = null
-        _pendingConference.value = null
-        if (cs?.status == "active") JitsiCalls.hangUp(getApplication())
-    }
-
-    /** The conference ended in Jitsi (hung up there, or it failed): tell the peer. */
-    private fun onConferenceEnded(url: String?) {
-        val cs = _callState.value ?: return
-        if (cs.status != "active" || !conferenceUrlMatchesRoom(url, cs.roomId)) return
-        nexus.send(NexusMessage(type = "call_end", sender = _me.value, recipient = cs.peer))
-        _callState.value = null
-        _pendingConference.value = null
+        _callMedia.value = null
+        peerCall?.close()
+        peerCall = null
+        callAudio.stop()
+        CallService.onHangUp = null
+        CallService.stop(getApplication())
     }
 
     override fun onCleared() {
-        JitsiCalls.unregister(getApplication(), conferenceEndReceiver)
+        clearCall()
         super.onCleared()
     }
 
@@ -1142,6 +1228,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             "auth_result" -> {
+                msg.turnConfig?.let { turnConfig = it }
                 if (msg.status == "totp_required") {
                     _totpRequired.value = true
                     _authError.value = null
@@ -1510,8 +1597,8 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
-            // Call signalling (server side: call_offer / call_answer in
-            // nexus_server/ws_handlers.go). Media goes through Jitsi.
+            // Call signalling (server side: call_offer / call_answer /
+            // call_signal in nexus_server/ws_handlers.go). Media goes over WebRTC.
             "call_offer" -> {
                 val from = msg.sender ?: return
                 // The server reports busy before ringing us during a call
@@ -1521,22 +1608,33 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 _callState.value = CallState(
                     peer = from, status = "ringing", isIncoming = true,
                     isVideo = isVideoOffer(msg.body, msg.sdp),
-                    roomId = msg.roomId,
                 )
             }
-            "call_jitsi" -> {
+            "call_accepted" -> {
+                // Both sides speak WebRTC: the server tells each one its role.
                 val cs = _callState.value ?: return
-                val room = msg.roomId
-                if (room.isNullOrBlank()) {
-                    // The caller went away before the answer reached them.
-                    clearCall()
-                    _actionStatus.value = "Call ended."
-                    return
-                }
-                if (cs.status == "active" && cs.roomId == room) return
+                val peer = msg.sender ?: return
+                if (peer != cs.peer || cs.status == "active") return
                 val video = when (msg.body) { "video" -> true; "audio" -> false; else -> cs.isVideo }
-                _callState.value = cs.copy(status = "active", roomId = room, isVideo = video)
-                _pendingConference.value = ConferenceLaunch(room = room, video = video, displayName = _me.value)
+                _callState.value = cs.copy(status = "active", isVideo = video)
+                beginPeerCall(peer, video, isCaller = msg.status == "caller")
+            }
+            "call_signal" -> {
+                val cs = _callState.value ?: return
+                if (msg.sender != cs.peer) return
+                peerCall?.handle(msg.body, msg.sdp, msg.candidate)
+            }
+            "call_jitsi" -> {
+                // The other side runs an older Phaze that still hands calls to Jitsi.
+                val cs = _callState.value ?: return
+                if (!msg.roomId.isNullOrBlank()) {
+                    nexus.send(NexusMessage(type = "call_end", sender = _me.value, recipient = cs.peer))
+                    _actionStatus.value = "${cs.peer} needs to update Phaze before you can call each other."
+                } else {
+                    // The caller went away before the answer reached them.
+                    _actionStatus.value = "Call ended."
+                }
+                clearCall()
             }
             "call_reject", "call_end" -> {
                 val cs = _callState.value

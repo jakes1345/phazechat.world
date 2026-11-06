@@ -25,7 +25,8 @@ import { SenderItemsContext, rewardById } from './referralRewards'
 const NO_ITEMS: ReadonlySet<string> = new Set()
 import { effectIn } from './emoticons'
 import ScreenEffect, { type EffectId } from './ScreenEffects'
-import { CallScreen } from './CallScreen'
+import { CallScreen, CallMedia, CallControls, type CallMediaState } from './CallScreen'
+import { PeerCall, iceServersFor, callPhaseText, type CallKind, type CallRole, type SignalKind } from './peerCall'
 import { SELECTABLE_THEMES, type ThemeId, isThemeId, resolveTheme, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype, isSkypeEra } from './themes'
 import OSChrome from './OSChrome'
 const Spaces = lazy(() => import('./Spaces'))
@@ -484,7 +485,9 @@ export default function App() {
   const [typingPeers, setTypingPeers] = useState<Set<string>>(new Set())
   const [callState, setCallState] = useState<CallState | null>(null)
   const [callSeconds, setCallSeconds] = useState(0)
-  const [jitsiRoom, setJitsiRoom] = useState<string | null>(null)
+  // The live media of the call in progress (WebRTC — see peerCall.ts).
+  const [callMedia, setCallMedia] = useState<CallMediaState | null>(null)
+  const peerCallRef = useRef<PeerCall | null>(null)
   const callTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Auth + registration UI state hoisted above WS handler (ESLint no-use-before-define)
@@ -755,6 +758,8 @@ export default function App() {
   const [convos, setConvos] = useState<Convo[]>([])
   const [selectedConvo, setSelectedConvo] = useState<string | null>(null)
   const [turn, setTurn] = useState<TurnConfig | null>(null)
+  const turnRef = useRef<TurnConfig | null>(null)
+  useEffect(() => { turnRef.current = turn }, [turn])
   const [convoLogs, setConvoLogs] = useState<Record<string, ConvoLine[]>>({})
   const [newGroupOpen, setNewGroupOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
@@ -985,10 +990,13 @@ export default function App() {
     if (ringTimerRef.current) { clearTimeout(ringTimerRef.current); ringTimerRef.current = null }
     if (callTimerRef.current) { clearInterval(callTimerRef.current); callTimerRef.current = null }
     setCallSeconds(0)
-    setJitsiRoom(null)
+    peerCallRef.current?.close()
+    peerCallRef.current = null
+    setCallMedia(null)
     setCallState(null)
   }, [stopRinger])
 
+  const hangUpRef = useRef<() => void>(() => {})
   const hangUp = useCallback(() => {
     const cs = callStateRef.current
     if (cs) {
@@ -997,12 +1005,13 @@ export default function App() {
     }
     tearDownCall()
   }, [tearDownCall])
+  useEffect(() => { hangUpRef.current = hangUp }, [hangUp])
 
 
   const startCall = useCallback((type: 'audio' | 'video') => {
     const recipient = selectedRef.current
     if (!recipient || !meRef.current) return
-    sendRef.current({ type: 'call_offer', recipient, body: type })
+    sendRef.current({ type: 'call_offer', recipient, body: type, status: 'rtc' })
     setCallState({ peer: recipient, type, status: 'ringing', direction: 'outgoing' })
     startRinger('CallOutgoing.wav')
     ringTimerRef.current = setTimeout(() => {
@@ -1017,8 +1026,49 @@ export default function App() {
     const cs = callStateRef.current
     if (!cs) return
     stopRinger()
-    sendRef.current({ type: 'call_answer', recipient: cs.peer, body: cs.type })
+    sendRef.current({ type: 'call_answer', recipient: cs.peer, body: cs.type, status: 'rtc' })
   }, [stopRinger])
+
+  // Both sides said they run WebRTC; the server paired them and gave each a
+  // role. Open the mic/camera and connect directly to the other person.
+  const beginPeerCall = useCallback((peer: string, kind: CallKind, role: CallRole) => {
+    peerCallRef.current?.close()
+    setCallMedia({ local: null, remote: null, phase: 'starting', muted: false, cameraOff: false })
+    const pc = new PeerCall(kind, role, iceServersFor(turnRef.current), {
+      signal: (sig) => sendRef.current({ type: 'call_signal', recipient: peer, body: sig.body, sdp: sig.sdp, candidate: sig.candidate }),
+      onLocalStream: (local) => setCallMedia((m) => m ? { ...m, local } : m),
+      onRemoteStream: (remote) => setCallMedia((m) => m ? { ...m, remote } : m),
+      onPhase: (phase) => {
+        if (phase === 'closed') return
+        setCallMedia((m) => m ? { ...m, phase } : m)
+        if (phase === 'failed') {
+          setErr(`Lost the connection to ${peer}.`)
+          hangUpRef.current()
+        }
+      },
+      onMediaError: (message) => {
+        setErr(message)
+        hangUpRef.current()
+      },
+    })
+    peerCallRef.current = pc
+    void pc.start()
+  }, [])
+
+  const toggleMute = useCallback(() => {
+    setCallMedia((m) => {
+      if (!m) return m
+      peerCallRef.current?.setMuted(!m.muted)
+      return { ...m, muted: !m.muted }
+    })
+  }, [])
+  const toggleCamera = useCallback(() => {
+    setCallMedia((m) => {
+      if (!m) return m
+      peerCallRef.current?.setCameraOff(!m.cameraOff)
+      return { ...m, cameraOff: !m.cameraOff }
+    })
+  }, [])
 
   const onMessageRef = useRef<(raw: NexusMessage) => void>(() => {})
 
@@ -1502,17 +1552,36 @@ export default function App() {
           }
           break
 
-        case 'call_jitsi':
-          if (msg.room_id) {
-            stopRinger()
-            if (ringTimerRef.current) { clearTimeout(ringTimerRef.current); ringTimerRef.current = null }
-            setJitsiRoom(msg.room_id)
-            setCallState((prev) => prev ? { ...prev, status: 'active' } : null)
-            setCallSeconds(0)
-            if (callTimerRef.current) clearInterval(callTimerRef.current)
-            callTimerRef.current = setInterval(() => setCallSeconds((s) => s + 1), 1000)
+        case 'call_accepted': {
+          const cs = callStateRef.current
+          if (!cs || !msg.sender || msg.sender !== cs.peer) break
+          stopRinger()
+          if (ringTimerRef.current) { clearTimeout(ringTimerRef.current); ringTimerRef.current = null }
+          setCallState((prev) => prev ? { ...prev, status: 'active' } : null)
+          setCallSeconds(0)
+          if (callTimerRef.current) clearInterval(callTimerRef.current)
+          callTimerRef.current = setInterval(() => setCallSeconds((s) => s + 1), 1000)
+          const kind: CallKind = msg.body === 'video' || msg.body === 'audio' ? msg.body : cs.type
+          beginPeerCall(cs.peer, kind, msg.status === 'callee' ? 'callee' : 'caller')
+          break
+        }
+
+        case 'call_signal':
+          if (msg.sender && msg.sender === callStateRef.current?.peer && peerCallRef.current &&
+              (msg.body === 'offer' || msg.body === 'answer' || msg.body === 'ice')) {
+            void peerCallRef.current.handle({ body: msg.body as SignalKind, sdp: msg.sdp, candidate: msg.candidate })
           }
           break
+
+        case 'call_jitsi': {
+          // The other person is on an older Phaze that still hands calls to
+          // an outside meeting site. End it cleanly instead of a dead screen.
+          const peer = callStateRef.current?.peer
+          if (peer) sendRef.current({ type: 'call_end', recipient: peer })
+          tearDownCall()
+          setErr(`${peer ?? 'They'} need${peer ? 's' : ''} to update Phaze before you can call each other.`)
+          break
+        }
 
         case 'call_reject':
         case 'call_end':
@@ -2581,10 +2650,13 @@ export default function App() {
       {callState && isClassicSkype(theme) && (
         <CallScreen
           state={callState}
-          jitsiUrl={callState.status === 'active' && jitsiRoom ? `https://meet.jit.si/${jitsiRoom}` : null}
+          media={callMedia}
+          seconds={callSeconds}
           avatarBg={avatarColor(callState.peer)}
           onAnswer={acceptCall}
           onHangUp={hangUp}
+          onToggleMute={toggleMute}
+          onToggleCamera={toggleCamera}
         />
       )}
       {/* !isClassicSkype, not `theme !== 'skype7'`.
@@ -2594,13 +2666,8 @@ export default function App() {
           on top of each other for the whole duration of a call. */}
       {callState && !isClassicSkype(theme) && (
         <div className="call-overlay">
-          {callState.status === 'active' && jitsiRoom && (
-            <iframe
-              src={`https://meet.jit.si/${jitsiRoom}`}
-              allow="camera; microphone; display-capture; fullscreen"
-              style={{ width: '100%', flex: 1, border: 'none', minHeight: 0 }}
-              title="Call"
-            />
+          {callState.status === 'active' && callMedia && (
+            <CallMedia kind={callState.type} media={callMedia} />
           )}
           <div className="call-card">
             <div className="call-avatar">{callState.peer[0].toUpperCase()}</div>
@@ -2608,7 +2675,7 @@ export default function App() {
             <div className="call-status-text">
               {callState.status === 'ringing' && callState.direction === 'outgoing' && 'Calling…'}
               {callState.status === 'ringing' && callState.direction === 'incoming' && `${callState.type === 'video' ? '📹' : '☎'} Incoming ${callState.type} call`}
-              {callState.status === 'active' && `${String(Math.floor(callSeconds / 60)).padStart(2, '0')}:${String(callSeconds % 60).padStart(2, '0')}`}
+              {callState.status === 'active' && (callPhaseText(callMedia?.phase) ?? `${String(Math.floor(callSeconds / 60)).padStart(2, '0')}:${String(callSeconds % 60).padStart(2, '0')}`)}
             </div>
             <div className="call-controls">
               {callState.direction === 'incoming' && callState.status === 'ringing' ? (
@@ -2617,7 +2684,10 @@ export default function App() {
                   <button className="call-btn-decline" onClick={hangUp}>Decline</button>
                 </>
               ) : (
-                <button className="call-btn-end" onClick={hangUp}>End call</button>
+                <>
+                  <CallControls kind={callState.type} media={callMedia} onToggleMute={toggleMute} onToggleCamera={toggleCamera} buttonClass="call-btn-toggle" />
+                  <button className="call-btn-end" onClick={hangUp}>End call</button>
+                </>
               )}
             </div>
           </div>

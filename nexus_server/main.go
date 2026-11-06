@@ -267,6 +267,11 @@ type Client struct {
 	// PendingCallStarted is when the call row was inserted, so call_log can
 	// report a real start time without a second DB round-trip.
 	PendingCallStarted time.Time
+	// PendingCallRTC is true when the dialling client can run the call
+	// itself over WebRTC (it sent call_offer with status "rtc"). When the
+	// answering client can too, the call is set up peer to peer with
+	// call_accepted + call_signal; otherwise both fall back to call_jitsi.
+	PendingCallRTC bool
 	// PendingCallAnswered flips true on call_answer; read on end/reject to
 	// tell a completed call apart from one that was never picked up.
 	PendingCallAnswered bool

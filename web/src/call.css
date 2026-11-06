@@ -51,12 +51,47 @@
 .call7-dots i:nth-child(2) { animation-delay: 0.2s; }
 .call7-dots i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes call7-blink { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
-.call7-jitsi {
+.call7-media {
   position: absolute;
-  inset: 0 0 76px 0;
+  inset: 0;
+  z-index: 0;
+}
+.call7-media .call-remote {
   width: 100%;
-  height: calc(100% - 76px);
-  border: 0;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+.call7-media .call-local {
+  position: absolute;
+  bottom: 92px;
+  right: 16px;
+  width: 168px;
+  height: 126px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  transform: scaleX(-1);
+}
+.call7-center, .call7-mark, .call7-bar { z-index: 1; }
+.call7-overlay-state {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(10, 24, 32, 0.7);
+  font-size: 14px;
+}
+.call7-toggle { background: rgba(255, 255, 255, 0.18); }
+.call7-toggle:hover { background: rgba(255, 255, 255, 0.3); }
+.call7-toggle[data-on="off"] { background: #fff; }
+.call7-toggle[data-on="off"] svg { fill: #1b1b1b; }
+@media (max-width: 600px) {
+  .call7-media .call-local { width: 96px; height: 128px; }
 }
 .call7-bar {
   position: absolute;

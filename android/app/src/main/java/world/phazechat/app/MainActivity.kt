@@ -2,7 +2,6 @@ package world.phazechat.app
 
 import android.Manifest
 import world.phazechat.app.data.ConnState
-import world.phazechat.app.data.JitsiCalls
 import android.content.Intent
 import android.media.MediaRecorder
 import android.os.Build
@@ -38,7 +37,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import world.phazechat.app.data.PhazeViewModel
 import world.phazechat.app.ui.*
@@ -109,10 +107,8 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     val globalNotice by vm.globalNotice.collectAsState()
     val connState by vm.connState.collectAsState()
 
+    val callMedia by vm.callMedia.collectAsState()
     val pendingOpenChat by vm.pendingOpenChat.collectAsState()
-    // Only collected while the activity is started, so the conference is
-    // opened from the foreground (background activity starts are blocked).
-    val pendingConference by vm.pendingConference.collectAsStateWithLifecycle()
 
     // Consume deep-link navigation (e.g. from push notification tap)
     LaunchedEffect(pendingOpenChat, me) {
@@ -121,14 +117,6 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
             vm.consumePendingOpenChat()
             vm.selectChat(peer)
         }
-    }
-
-    // The server answered the call with a Jitsi room: open the conference.
-    val conferenceCtx = LocalContext.current
-    LaunchedEffect(pendingConference) {
-        val conf = pendingConference ?: return@LaunchedEffect
-        vm.consumePendingConference()
-        JitsiCalls.launch(conferenceCtx, conf.room, conf.displayName, conf.video)
     }
 
     val toastCtx = LocalContext.current
@@ -245,10 +233,10 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
     var voicePath by remember { mutableStateOf<String?>(null) }
 
-    // Calls need the microphone, and video calls the camera, before the Jitsi
-    // conference opens. Ask up front, when the call is placed or answered, so
-    // the conference never starts without them. Without the microphone there
-    // is no call; without the camera a video call still goes ahead.
+    // Calls need the microphone, and video calls the camera, before the call
+    // connects. Ask up front, when the call is placed or answered, so it never
+    // starts without them. Without the microphone there is no call; without
+    // the camera a video call still goes ahead, with video one way only.
     var pendingCallPeer by remember { mutableStateOf<String?>(null) }
     var pendingCallVideo by remember { mutableStateOf(false) }
     var pendingAnswer by remember { mutableStateOf(false) }
@@ -356,16 +344,19 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         }
     }
 
-    // Call overlay: ringing and connecting. The conference itself is the
-    // Jitsi SDK's activity, opened above once the server sends the room.
+    // Call overlay: ringing, then the call itself (video and controls).
     if (callState != null) {
         val cs = callState!!
         CallScreen(
             peer = cs.peer, isIncoming = cs.isIncoming, callStatus = cs.status,
             isVideo = cs.isVideo,
+            media = callMedia,
             onAnswer = { answerWithPermission(cs.isVideo) }, onReject = { vm.rejectCall() },
             onHangUp = { vm.endCall() },
-            onReturnToCall = { JitsiCalls.bringToFront(context) },
+            onToggleMute = { vm.toggleMute() },
+            onToggleCamera = { vm.toggleCamera() },
+            onSwitchCamera = { vm.switchCamera() },
+            onToggleSpeaker = { vm.toggleSpeaker() },
         )
         return
     }

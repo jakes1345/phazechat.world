@@ -60,3 +60,35 @@ jobs:
           name: playwright-report
           path: web/playwright-report/
           retention-days: 7
+
+  # Compiles the Android app (release, with R8 shrinking, which is where a
+  # missing keep rule shows up) and runs its unit tests. No signing: only the
+  # APK packaging step needs the keystore, and this stops before it.
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Android SDK
+        # platform-tools only; Gradle's Android plugin fetches the platform
+        # and build tools itself (see release.yml for why).
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Write google-services.json from secret
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Write local.properties (SDK path)
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+
+      - name: Compile, shrink and unit-test the release build
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew :app:testReleaseUnitTest :app:minifyReleaseWithR8 --no-daemon
