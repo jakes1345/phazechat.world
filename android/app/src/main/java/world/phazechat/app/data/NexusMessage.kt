@@ -10,9 +10,13 @@ data class NexusMessage(
     val status: String? = null,
     val error: String? = null,
     val results: List<String>? = null,
-    // Only from old clients' call_offer, which carried an SDP offer.
+    // SDP offer/answer on call_signal (old clients also put one on call_offer).
     val sdp: String? = null,
-    // Jitsi room for a call: on call_offer and call_jitsi.
+    // ICE candidate on call_signal, as JSON (see CallSignals.kt).
+    val candidate: String? = null,
+    // TURN relay credentials, on auth_result.
+    val turnConfig: TurnConfig? = null,
+    // Jitsi room an older client's server hands out on call_jitsi.
     val roomId: String? = null,
     val qrToken: String? = null,
     val email: String? = null,
@@ -56,6 +60,8 @@ data class NexusMessage(
         recipient?.let { put("recipient", it) }
         body?.let { put("body", it) }
         status?.let { put("status", it) }
+        sdp?.let { put("sdp", it) }
+        candidate?.let { put("candidate", it) }
         qrToken?.let { put("qr_token", it) }
         email?.let { put("email", it) }
         mood?.let { put("mood", it) }
@@ -124,6 +130,8 @@ data class NexusMessage(
                 error = j.str("error"),
                 results = results,
                 sdp = j.str("sdp"),
+                candidate = j.str("candidate"),
+                turnConfig = parseTurnConfig(j.optJSONObject("turn_config")),
                 roomId = j.str("room_id"),
                 qrToken = j.str("qr_token"),
                 email = j.str("email"),

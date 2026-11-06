@@ -18,12 +18,17 @@
     <!-- Push notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Calls run in the Jitsi Meet SDK, whose manifest adds what it needs:
-         network state, audio settings, Bluetooth, MANAGE_OWN_CALLS, and the
-         foreground-service permissions (microphone, media playback, media
-         projection) for its ongoing-call service and screen sharing. Don't
-         strip those: on Android 14+ the call service can't start without
-         FOREGROUND_SERVICE_MICROPHONE. -->
+    <!-- Calls (WebRTC): route call audio, follow network changes, and keep
+         a call going in the background with an ongoing-call service. On
+         Android 14+ that service can't start without the typed
+         FOREGROUND_SERVICE_* permissions. WAKE_LOCK turns the screen off
+         when the phone is held to the ear. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
 
     <!-- Strip permissions that libraries merge in but we don't use directly -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -35,10 +40,7 @@
 
 
 
-    <!-- tools:replace: the Jitsi Meet SDK's manifest sets its own allowBackup
-         and label on <application>; ours win. -->
     <application
-        tools:replace="android:allowBackup,android:label"
         android:name=".PhazeApp"
         android:allowBackup="false"
         android:extractNativeLibs="false"
@@ -70,6 +72,13 @@
             android:name=".QRScannerActivity"
             android:exported="false"
             android:theme="@style/Theme.Phaze" />
+
+        <!-- Ongoing call: keeps the microphone (and camera) working while
+             Phaze is in the background. -->
+        <service
+            android:name=".call.CallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera" />
 
         <!-- Firebase Cloud Messaging — handles push notification delivery only. -->
         <service

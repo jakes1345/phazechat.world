@@ -72,6 +72,11 @@ android {
         jniLibs { useLegacyPackaging = false }
     }
 
+    // AGP 9 only makes unit-test tasks for the tested build type. Test the
+    // release variant, the one that ships (and the one CI can build: the
+    // Firebase config has no client for the .debug application id).
+    testBuildType = "release"
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -79,6 +84,16 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+// The Firebase config (app/google-services.json, gitignored) is required for
+// real builds. The PR compile check in CI has no copy, so it passes
+// -Pphaze.noFirebaseConfig to build without the push-notification resources.
+if (providers.gradleProperty("phaze.noFirebaseConfig").isPresent) {
+    googleServices {
+        missingGoogleServicesStrategy =
+            com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy.WARN
     }
 }
 
@@ -117,15 +132,13 @@ dependencies {
     implementation("com.goterl:lazysodium-android:5.2.0@aar")
     implementation("net.java.dev.jna:jna:5.19.1@aar")
 
-    // Core (NotificationCompat for the screen-share foreground service)
+    // Core (NotificationCompat and ServiceCompat for the ongoing-call service)
     implementation("androidx.core:core-ktx:1.13.1")
 
-    // Voice/video calls: the server hands every call off to a Jitsi Meet room
-    // (see call_jitsi in nexus_server/ws_handlers.go), and the SDK runs it in
-    // its own activity. It brings its own WebRTC build (org.jitsi:webrtc), so
-    // no other WebRTC library may be added next to it: the classes and native
-    // libraries would clash. Its React Native modules are transitive deps.
-    implementation("org.jitsi.react:jitsi-meet-sdk:13.3.0") { isTransitive = true }
+    // Voice/video calls run over WebRTC directly between the two devices
+    // (app/call/PeerCall.kt; signalling relayed by the server as call_signal).
+    // A prebuilt, maintained Google WebRTC (org.webrtc API) for Android.
+    implementation("io.getstream:stream-webrtc-android:1.3.10")
 
     // Firebase Cloud Messaging
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))

@@ -1060,6 +1060,20 @@ button.link-btn:hover,
   cursor: pointer;
   box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
 }
+.call-btn-toggle {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.call-btn-toggle:hover { background: rgba(255, 255, 255, 0.24); }
+.call-btn-toggle[data-on="off"] { background: #fff; }
+.call-btn-toggle[data-on="off"] svg { fill: #1b1b1b; }
 .call-btn-share {
   padding: 0.6rem 1.4rem;
   border-radius: 999px;
