@@ -26,7 +26,7 @@ dbs:
         region: ${AWS_REGION}
         access-key-id: ${AWS_ACCESS_KEY_ID}
         secret-access-key: ${AWS_SECRET_ACCESS_KEY}
-        # Keep 24h of WAL + a snapshot every 6h. Tunable.
+        # Keep 7 days (168h) of snapshots + WAL, snapshot every 6h. Tunable.
         retention: 168h
         retention-check-interval: 1h
         snapshot-interval: 6h
