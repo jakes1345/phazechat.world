@@ -3287,14 +3287,29 @@ func (s *NexusServer) adminLoginHandler(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		TOTP     string `json:"totp"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&body); err != nil {
 		http.Error(w, "bad json", http.StatusBadRequest)
 		return
 	}
 	if !s.authenticateUser(body.Username, body.Password) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
+	}
+	// Staff accounts with 2FA must pass it here too. The admin token is an
+	// ordinary session token, so skipping this check let a password alone
+	// open both the portal and the user's whole account.
+	if _, enabled := s.totpStatus(body.Username); enabled {
+		code := strings.TrimSpace(body.TOTP)
+		if code == "" {
+			http.Error(w, "two-factor code required", http.StatusUnauthorized)
+			return
+		}
+		if !s.verifyTOTP(body.Username, code) && !s.consumeBackupCode(body.Username, code) {
+			http.Error(w, "invalid two-factor code", http.StatusUnauthorized)
+			return
+		}
 	}
 	role := s.userRole(body.Username)
 	// is_admin=1 accounts created via seed-admin count as super_admin
