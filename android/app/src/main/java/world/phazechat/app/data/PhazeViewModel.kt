@@ -507,6 +507,13 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private fun observeConnection() {
         viewModelScope.launch {
             nexus.state.collect { st ->
+                if (st == ConnState.DISCONNECTED && _deviceVerify.value != null) {
+                    // The server only finishes a held sign-in on the socket
+                    // that started it, so the emailed code is useless now.
+                    // Say so instead of letting the next code entry fail.
+                    _deviceVerify.value = null
+                    _authError.value = "The connection dropped while waiting for your code. Sign in again to get a new one."
+                }
                 if (st == ConnState.CONNECTED) {
                     val tok = _sessionToken.value ?: return@collect
                     sendSessionAuth(tok)
@@ -1897,6 +1904,21 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         val fcmToken = prefs.getString("fcm_token", null)
         if (!fcmToken.isNullOrEmpty()) {
             nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
+        } else {
+            // No stored token (first run, or a refresh after sign-out that
+            // failed offline): ask Firebase directly instead of waiting for
+            // onNewToken, which may never fire again.
+            try {
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                    .addOnSuccessListener { t ->
+                        if (!t.isNullOrEmpty()) {
+                            prefs.edit().putString("fcm_token", t).apply()
+                            nexus.send(NexusMessage(type = "register_fcm_token", body = t))
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.w(TAG, "FCM token fetch: ${e.message}")
+            }
         }
         loadSpaces()
     }
