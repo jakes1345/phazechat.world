@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -993,6 +994,32 @@ func randDigits(n int) (string, error) {
 // user are retained (the subject column is just text, so the username string
 // remains in the safety log — this is the legitimate-interests carve-out).
 func (s *NexusServer) deleteAccount(username string) error {
+	// Files go once the rows are gone: the avatar (or whoever registers the
+	// name next inherits the picture) and story media.
+	var storyMedia []string
+	if rows, err := s.DB.Query(`SELECT media_url FROM stories WHERE author = ?`, username); err == nil {
+		for rows.Next() {
+			var u string
+			if rows.Scan(&u) == nil {
+				storyMedia = append(storyMedia, u)
+			}
+		}
+		rows.Close()
+	}
+	if err := s.deleteAccountRows(username); err != nil {
+		return err
+	}
+	ctx := context.Background()
+	if err := blobs().Delete(ctx, "avatars/"+username+".png"); err != nil && !errors.Is(err, errBlobNotFound) {
+		log.Printf("[delete] avatar for %s: %v", username, err)
+	}
+	for _, u := range storyMedia {
+		s.deleteStoryMedia(ctx, u)
+	}
+	return nil
+}
+
+func (s *NexusServer) deleteAccountRows(username string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
