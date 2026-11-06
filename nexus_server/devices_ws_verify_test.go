@@ -2,6 +2,7 @@ package main
 
 import (
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -91,6 +92,97 @@ func TestDeviceVerifyWS_CorrectCodeSignsIn(t *testing.T) {
 	// The code is spent.
 	if r := deviceVerify(t, held, NexusMessage{Body: "424242"}); r.Status == "ok" {
 		t.Fatalf("code was accepted twice: %+v", r)
+	}
+}
+
+// The bot signs in unattended: it must never be held for a code it can't
+// enter. Other accounts still are.
+func TestDeviceVerificationWS_BotAccountExempt(t *testing.T) {
+	t.Setenv("PHAZE_DEVICE_VERIFICATION", "1")
+	t.Setenv("NOVA_USERNAME", "novabot")
+	noMailTransport(t)
+	srv, _, wsBase := newTestServer(t)
+	registerAndVerify(t, srv, "novabot", "password123")
+	registerAndVerify(t, srv, "alice", "password123")
+
+	// An open session makes a challenge deliverable, so without the
+	// exemption the second sign-in would be held.
+	first := dial(t, wsBase)
+	if r := wsAuthAs(t, first, "novabot", "password123", "", "nova-bot-novabot-0000"); r.Status != "ok" {
+		t.Fatalf("first bot sign-in: %+v", r)
+	}
+	second := dial(t, wsBase)
+	if r := wsAuthAs(t, second, "novabot", "password123", "", "some-other-install-id"); r.Status != "ok" || r.QRToken == "" {
+		t.Fatalf("bot sign-in from a new device was held: %+v", r)
+	}
+	var challenges int
+	srv.DB.QueryRow(`SELECT COUNT(*) FROM device_challenges WHERE username = ?`, "novabot").Scan(&challenges)
+	if challenges != 0 {
+		t.Fatalf("bot sign-in created %d device challenges", challenges)
+	}
+
+	phone := dial(t, wsBase)
+	wsAuthAs(t, phone, "alice", "password123", "android/Pixel", "")
+	other := dial(t, wsBase)
+	if r := wsAuthAs(t, other, "alice", "password123", "android/Evil", ""); r.Status != "device_verification_required" {
+		t.Fatalf("exemption leaked to another account: %+v", r)
+	}
+}
+
+// The session minted for a held sign-in is never sent anywhere. If the
+// waiting socket goes away, it must not become a live session when the
+// challenge is approved from another device.
+func TestDeviceVerifyWS_OrphanHeldTokenRevoked(t *testing.T) {
+	t.Setenv("PHAZE_DEVICE_VERIFICATION", "1")
+	noMailTransport(t)
+	srv, _, wsBase := newTestServer(t)
+	registerAndVerify(t, srv, "alice", "password123")
+	phone, held, chID := heldWSSignIn(t, wsBase, srv, "alice", "424242")
+
+	var tok string
+	srv.DB.QueryRow(`SELECT session_token FROM device_challenges WHERE id = ?`, chID).Scan(&tok)
+	if tok == "" {
+		t.Fatal("no held session token recorded")
+	}
+	held.Close()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if u, _ := srv.sessionState(tok); u == "" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("held session token not revoked after its socket closed")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	phone.WriteJSON(NexusMessage{Type: "device_approve", ChallengeID: chID})
+	readUntil(t, phone, func(m NexusMessage) bool { return m.Type == "device_result" && m.Status == "approved" })
+	if u := srv.sessionUsername(tok); u != "" {
+		t.Fatalf("approving the challenge revived the orphaned token for %q", u)
+	}
+	// The approval still trusts the device, so signing in again from it works.
+	again := dial(t, wsBase)
+	if r := wsAuthAs(t, again, "alice", "password123", "android/NewPhone", "install-alice-0123456789"); r.Status != "ok" {
+		t.Fatalf("approved device should sign in, got %+v", r)
+	}
+}
+
+// A retry on the same socket replaces the held sign-in; the first one's
+// token goes with it.
+func TestDeviceVerifyWS_RetryRevokesPreviousHeldToken(t *testing.T) {
+	t.Setenv("PHAZE_DEVICE_VERIFICATION", "1")
+	noMailTransport(t)
+	srv, _, wsBase := newTestServer(t)
+	registerAndVerify(t, srv, "alice", "password123")
+	_, held, chID := heldWSSignIn(t, wsBase, srv, "alice", "424242")
+	var first string
+	srv.DB.QueryRow(`SELECT session_token FROM device_challenges WHERE id = ?`, chID).Scan(&first)
+
+	if r := wsAuthAs(t, held, "alice", "password123", "android/NewPhone", "install-alice-0123456789"); r.Status != "device_verification_required" {
+		t.Fatalf("retry: %+v", r)
+	}
+	if u, _ := srv.sessionState(first); u != "" {
+		t.Fatal("first held token still valid after the retry replaced it")
 	}
 }
 

@@ -169,6 +169,15 @@ func deviceLabel(userAgent, fallback string) string {
 	return browser + " on " + os
 }
 
+// isBotAccount reports whether username is the house bot (Nova), which signs
+// in unattended over the WebSocket. Nobody is there to enter a code, so a
+// held sign-in would only retry forever, minting a session, a challenge and
+// an email each time. The bot account is exempt from the new-device hold.
+func isBotAccount(username string) bool {
+	bot := strings.TrimSpace(os.Getenv("NOVA_USERNAME"))
+	return bot != "" && username == bot
+}
+
 // isKnownDevice reports whether this account has approved this device before.
 func (s *NexusServer) isKnownDevice(username, deviceID string) bool {
 	if deviceID == "" {

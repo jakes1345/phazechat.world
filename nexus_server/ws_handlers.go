@@ -89,10 +89,26 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 	// messages, friends, requests, conversations). Shared by "auth" and
 	// "device_verify". sessTok is an already-issued session to hand out, or
 	// "" to issue a new one.
+	// dropHeld forgets this socket's held sign-in and revokes its session
+	// token. That token was never sent anywhere, so once the socket stops
+	// waiting on it (signed in another way, started a new attempt or
+	// closed) nothing could ever use it — but an approval from another
+	// device would otherwise turn it into a live session nobody holds.
+	dropHeld := func() {
+		if held.token != "" {
+			s.revokeSession(held.token)
+		}
+		held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+	}
+
 	completePasswordSignIn := func(user, sessTok, deviceInfo string) {
 		metrics.authSuccess.Add(1)
 		authTracker.recordSuccess(client.IP, user) // clear fail counters
-		held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+		if held.token == sessTok {
+			// Handing out the held session itself: it's no longer orphaned.
+			held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+		}
+		dropHeld()
 		if s.reauthConnection(client, username, user) {
 			// Already signed in as this user on this socket.
 			client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username, QRToken: sessTok})
@@ -229,6 +245,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 		err := ws.ReadJSON(&msg)
 		if err != nil {
 			log.Printf("Read error: %v", err)
+			dropHeld()
 			if username != "" {
 				// Drop just this connection. The user may still have others
 				// open — another tab, the desktop app, their phone — and only
@@ -483,7 +500,8 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			// approval: password (+TOTP) alone got a full session.
 			deviceID := wsDeviceID(wsDeviceCookie, msg.DeviceID, msg.Sender, msg.DeviceInfo, client.IP)
 			deviceKnown := s.isKnownDevice(msg.Sender, deviceID)
-			if deviceVerificationEnabled() && !deviceKnown && s.canDeliverChallenge(msg.Sender) {
+			botAccount := isBotAccount(msg.Sender)
+			if deviceVerificationEnabled() && !deviceKnown && !botAccount && s.canDeliverChallenge(msg.Sender) {
 				label := wsDeviceLabel(wsUserAgent, msg.DeviceInfo)
 				pendingTok, err := s.issueSessionToken(msg.Sender, msg.DeviceInfo)
 				if err == nil {
@@ -501,7 +519,8 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				log.Printf("[device] %s: WS sign-in from new device %q held for approval", msg.Sender, label)
 				// Remember it on this socket so device_verify can finish
 				// the sign-in with the emailed code. A newer held sign-in
-				// replaces an older one.
+				// replaces an older one, whose session nobody will receive.
+				dropHeld()
 				held.username, held.token, held.deviceInfo, held.challengeID = msg.Sender, pendingTok, msg.DeviceInfo, challengeID
 				// Both clients show Error for any auth_result that isn't
 				// ok/totp_required. Failure counters are deliberately left
@@ -516,7 +535,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			if !deviceKnown {
-				if deviceVerificationEnabled() {
+				if deviceVerificationEnabled() && !botAccount {
 					log.Printf("[device] %s: no session open and no mail transport — allowing WS sign-in from %q unverified",
 						msg.Sender, wsDeviceLabel(wsUserAgent, msg.DeviceInfo))
 				}
