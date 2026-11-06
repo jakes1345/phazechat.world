@@ -6,12 +6,18 @@ function toHex(u8: Uint8Array): string {
   return Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-function fromHex(hex: string): Uint8Array {
+function fromHex(hex: string): Uint8Array | null {
+  if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) return null
   const out = new Uint8Array(hex.length / 2)
   for (let i = 0; i < out.length; i++) {
     out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
   }
   return out
+}
+
+/** True when a message body is NaCl-box ciphertext in the E2EE: wire format. */
+export function isEncryptedBody(field: string | undefined | null): boolean {
+  return !!field && field.startsWith(E2EE_PREFIX)
 }
 
 /** First 16 hex chars of SHA-256(pub), matching Go crypto.Fingerprint */
@@ -39,14 +45,19 @@ export function encryptForPeer(
   return E2EE_PREFIX + toHex(combined)
 }
 
-export function decryptFromPeer(field: string, senderPub: Uint8Array, mySecret: Uint8Array): string {
-  if (!field.startsWith(E2EE_PREFIX)) return field
+/**
+ * Opens an E2EE: body. Plaintext bodies are returned unchanged; ciphertext
+ * that is malformed or doesn't authenticate with this key pair returns null
+ * so callers can show a placeholder instead of an empty message.
+ */
+export function decryptFromPeer(field: string, senderPub: Uint8Array, mySecret: Uint8Array): string | null {
+  if (!isEncryptedBody(field)) return field
   const raw = fromHex(field.slice(E2EE_PREFIX.length))
-  if (raw.length < 24) return ''
+  if (!raw || raw.length < 24 + nacl.box.overheadLength) return null
   const nonce = raw.slice(0, 24)
   const boxed = raw.slice(24)
   const opened = nacl.box.open(boxed, nonce, senderPub, mySecret)
-  if (!opened) return ''
+  if (!opened) return null
   return new TextDecoder().decode(opened)
 }
 

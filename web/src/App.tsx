@@ -4,13 +4,14 @@ import jsQR from 'jsqr'
 import type { NexusMessage, TurnConfig } from './nexusTypes'
 import {
   decryptFromPeer,
+  isEncryptedBody,
   decodePublicKeyField,
   encryptForPeer,
   encodePublicKeyB64,
   fingerprint,
   generateKeyPair,
 } from './e2ee'
-import { loadPins, savePins } from './keyPins'
+import { loadPins, pinnedPublicKeys, savePins } from './keyPins'
 import { encryptKeypair as encryptKeyBackup } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
@@ -834,8 +835,15 @@ export default function App() {
 
   const wsRef = useRef<WebSocket | null>(null)
   const keysRef = useRef(loadOrCreateKeys())
-  const peerKeysRef = useRef<Record<string, Uint8Array>>({})
-  const pinsRef = useRef(loadPins())
+  const [initialPins] = useState(loadPins)
+  const [initialPeerKeys] = useState(() => pinnedPublicKeys(initialPins))
+  const pinsRef = useRef(initialPins)
+  const peerKeysRef = useRef<Record<string, Uint8Array>>(initialPeerKeys)
+  // Contacts we've already asked for a key this session after receiving
+  // ciphertext we couldn't open, so one burst of messages sends one request.
+  const keyAskedRef = useRef<Set<string>>(new Set())
+  // Contacts the user agreed to message without encryption this session.
+  const plaintextOkRef = useRef<Set<string>>(new Set())
   const meRef = useRef<string | null>(null)
   const selectedRef = useRef<string | null>(null)
   const sendRef = useRef<(m: NexusMessage) => void>(() => {})
@@ -940,24 +948,39 @@ export default function App() {
     })()
   }, [])
 
+  // Opens a DM body. Plaintext passes through; ciphertext we can't open
+  // (no key for this contact yet, or it doesn't authenticate) returns null.
+  const openBody = useCallback((body: string, peer: string): string | null => {
+    if (!isEncryptedBody(body)) return body
+    const pk = peerKeysRef.current[peer]
+    if (!pk) {
+      // Ask for the key once so later messages and a history re-pull can
+      // be decrypted.
+      const my = meRef.current
+      if (my && !keyAskedRef.current.has(peer)) {
+        keyAskedRef.current.add(peer)
+        sendRef.current({ type: 'key_request', sender: my, recipient: peer })
+      }
+      return null
+    }
+    try {
+      return decryptFromPeer(body, pk, keysRef.current.secretKey)
+    } catch {
+      return null
+    }
+  }, [])
+
   const unwrap = useCallback((msg: NexusMessage): NexusMessage => {
     const sender = msg.sender ?? ''
     if (!sender) return msg
-    const pk = peerKeysRef.current[sender]
-    const sk = keysRef.current.secretKey
     const out = { ...msg }
-    // Only decrypt body for chat messages — call signaling is not encrypted.
-    // Never let raw ciphertext reach the UI: no peer key yet, or a bad
-    // decrypt, both fall back to a placeholder instead of the E2EE: blob.
-    if (out.body && msg.type === 'msg') {
-      if (pk) {
-        try { out.body = decryptFromPeer(out.body, pk, sk) } catch { out.body = '[Encrypted]' }
-      } else {
-        out.body = '[Encrypted]'
-      }
+    // Chat messages and their edits carry E2EE bodies; call signaling is not
+    // encrypted. Never let raw ciphertext reach the UI.
+    if (out.body && (msg.type === 'msg' || msg.type === 'msg_edit')) {
+      out.body = openBody(out.body, sender) ?? '[Encrypted]'
     }
     return out
-  }, [])
+  }, [openBody])
 
   const stopRinger = useCallback(() => {
     if (ringingAudioRef.current) {
@@ -1565,7 +1588,9 @@ export default function App() {
 
         case 'kicked':
           localStorage.removeItem(SESSION_KEY)
-          peerKeysRef.current = {}
+          peerKeysRef.current = pinnedPublicKeys(pinsRef.current)
+          keyAskedRef.current.clear()
+          plaintextOkRef.current.clear()
           setFriends({})
           setPending([])
           setSelected(null)
@@ -1836,27 +1861,29 @@ export default function App() {
   const ingestDMHistory = useCallback((peer: string, rows: import('./nexusTypes').DMMessage[]) => {
     const my = meRef.current
     if (!my || !peer || !rows?.length) return
-    const peerKey = peerKeysRef.current[peer]
-    const mySec = keysRef.current.secretKey
     const local = loadHistory(my, peer)
     const byId = new Map<string, ChatLine>(local.map((l) => [l.id, l]))
     for (const r of rows) {
       const isMe = r.sender === my
+      const existing = byId.get(r.msg_id)
+      // Both sides' rows are boxed with the same shared key, so the
+      // contact's key opens ours too. When it can't be opened yet, keep the
+      // readable copy this device already has (your own sent text, or a
+      // message decrypted earlier) instead of overwriting it; a later
+      // history pull after the key arrives fills in the rest.
       let text = r.body || ''
-      // For E2EE bodies we only know how to decrypt if we have the peer key.
-      // Same invariant as unwrap() above: never let raw ciphertext reach the
-      // UI or the local history cache. If the peer key isn't loaded yet, a
-      // later re-open of this chat re-requests dm_history and resolves it.
       if (text) {
-        if (peerKey) {
-          try { text = decryptFromPeer(text, peerKey, mySec) } catch { text = '[Encrypted]' }
+        const opened = openBody(text, peer)
+        if (opened !== null) {
+          text = opened
+        } else if (existing && (existing.file || (existing.text && existing.text !== '[Encrypted]'))) {
+          text = existing.file ? '' : existing.text
         } else {
           text = '[Encrypted]'
         }
       }
       const file = decodeFileBody(text) || undefined
       const ts = Date.parse(r.created_at + 'Z') || Date.now()
-      const existing = byId.get(r.msg_id)
       const line: ChatLine = {
         id: r.msg_id,
         from: r.sender,
@@ -1875,8 +1902,25 @@ export default function App() {
     if (selectedRef.current === peer) {
       setLog(merged)
     }
-  }, [])
+  }, [openBody])
   useEffect(() => { ingestDMHistoryRef.current = ingestDMHistory }, [ingestDMHistory])
+
+  // Returns true when a message to `peer` can be end-to-end encrypted, or
+  // the user agreed to send it in plaintext. Without the contact's key
+  // (first contact while they're offline) the message would be stored on
+  // the server in plaintext, so ask once per contact per session.
+  const confirmCanSend = useCallback((peer: string): boolean => {
+    if (peerKeysRef.current[peer] || plaintextOkRef.current.has(peer)) return true
+    const my = meRef.current
+    if (my) sendRef.current({ type: 'key_request', sender: my, recipient: peer })
+    const ok = window.confirm(
+      `${peer} hasn't shared an encryption key with this device yet (they may be offline).\n\n` +
+      'Send without end-to-end encryption? The server will be able to read this message.\n\n' +
+      'Choose Cancel to wait until they come online.',
+    )
+    if (ok) plaintextOkRef.current.add(peer)
+    return ok
+  }, [])
 
   // Unlock browser audio on first user interaction so ringtones work without gesture.
   useEffect(() => {
@@ -1977,6 +2021,7 @@ export default function App() {
       }
     }
 
+    if (!confirmCanSend(selected)) return
     const peer = peerKeysRef.current[selected]
     const body = peer ? encryptForPeer(plaintext, peer, keysRef.current.secretKey) : plaintext
     const msgId = newMsgId()
@@ -2026,6 +2071,7 @@ export default function App() {
       setErr('File exceeds 25 MB')
       return
     }
+    if (!confirmCanSend(selected)) return
     try {
       const fd = new FormData()
       fd.append('file', file)
@@ -2049,7 +2095,7 @@ export default function App() {
     } catch (e) {
       setErr(`Upload error: ${(e as Error).message}`)
     }
-  }, [selected, me, sessionToken, send, appendLog])
+  }, [selected, me, sessionToken, send, appendLog, confirmCanSend])
 
   const stopRecording = useCallback((cancel = false) => {
     const r = recorderRef.current
@@ -2134,6 +2180,7 @@ export default function App() {
     if (!selected || !me || !editingId) return
     const text = draft.trim()
     if (!text) return
+    if (!confirmCanSend(selected)) return
     const peer = peerKeysRef.current[selected]
     const body = peer ? encryptForPeer(text, peer, keysRef.current.secretKey) : text
     send({ type: 'msg_edit', sender: me, recipient: selected, msg_id: editingId, body })
