@@ -1574,42 +1574,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			_, _ = s.DB.Exec(`INSERT INTO convo_messages (convo_id, sender, body) VALUES (?, ?, ?)`,
 				msg.ConvoID, username, msg.Body)
-			var convoName string
-			_ = s.DB.QueryRow(`SELECT name FROM conversations WHERE id = ?`, msg.ConvoID).Scan(&convoName)
-			pushTitle := username
-			if convoName != "" {
-				pushTitle = username + " in " + convoName
-			}
-			pushBody := "Sent a message"
-
-			s.Mu.RLock()
-			for _, m := range members {
-				if m == username {
-					continue
-				}
-				// Prefer per-member envelope so the server never sees plaintext.
-				// Fall back to msg.Body for older clients still using the legacy
-				// plaintext fan-out path.
-				body := msg.Body
-				if msg.Envelopes != nil {
-					if env, ok := msg.Envelopes[m]; ok {
-						body = env
-					}
-				}
-				fanout := NexusMessage{
-					Type:    "convo_msg",
-					Sender:  username,
-					Body:    body,
-					ConvoID: msg.ConvoID,
-				}
-				if !s.sendTo(m, fanout) {
-					s.DB.Exec(`INSERT INTO offline_messages (sender, recipient, body, msg_type, convo)
-						VALUES (?, ?, ?, 'convo_msg', ?)`, username, m, body, msg.ConvoID)
-					go s.sendWebPush(m, pushTitle, pushBody)
-					go s.sendFCMPush(m, pushTitle, pushBody)
-				}
-			}
-			s.Mu.RUnlock()
+			s.fanoutConvoMsg(msg.ConvoID, username, msg.Body, msg.Envelopes, members)
 
 		case "convo_leave":
 			if username == "" || msg.ConvoID == "" {
