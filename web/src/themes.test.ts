@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   THEMES, SELECTABLE_THEMES, DEFAULT_THEME, resolveTheme, nextTheme,
   hasFeature, featuresOf, isSkypeEra, isClassicSkype, type ThemeId, type Feature,
+  FEATURE_LABELS, newInEra, advertisedFeatures,
 } from './themes'
 
 /**
@@ -116,10 +117,52 @@ describe('era feature gating', () => {
     }
   })
 
-  it('gives Skype 6 the same features as Skype 5', () => {
-    // Not an oversight: Skype 6's changes were Microsoft account sign-in and
-    // the Messenger merge — account plumbing, not conversation features.
-    expect([...featuresOf('skype6')].sort()).toEqual([...featuresOf('skype5')].sort())
+  it('gives Skype 6 exactly one feature over Skype 5: video messages', () => {
+    // Its other headline changes were account plumbing (Microsoft account
+    // sign-in, the Messenger merge). Video messaging launched Feb 2013.
+    const five = new Set(featuresOf('skype5'))
+    expect(featuresOf('skype6').filter((f) => !five.has(f))).toEqual(['video_messages'])
+  })
+
+  it('puts the call and contact features in the right eras', () => {
+    for (const era of ERAS) {
+      expect(hasFeature(era, 'send_contacts')).toBe(true)
+      expect(hasFeature(era, 'voicemail')).toBe(true)
+      expect(hasFeature(era, 'group_call')).toBe(true)
+    }
+    expect(hasFeature('skype3', 'screen_share')).toBe(false)
+    expect(hasFeature('skype4', 'screen_share')).toBe(true)
+    expect(hasFeature('skype4', 'group_video')).toBe(false)
+    expect(hasFeature('skype5', 'group_video')).toBe(true)
+    expect(hasFeature('skype5', 'video_messages')).toBe(false)
+    for (const f of ['quotes', 'drafts', 'bookmarks', 'media_gallery', 'call_recording'] as const) {
+      expect(hasFeature('skype7', f)).toBe(false)
+      expect(hasFeature('skype8', f)).toBe(true)
+    }
+  })
+})
+
+describe('era picker text', () => {
+  it('labels every feature', () => {
+    for (const era of ERAS) {
+      for (const f of featuresOf(era)) expect(FEATURE_LABELS[f]).toBeTruthy()
+    }
+  })
+
+  it('lists what each era adds over the one before it', () => {
+    expect(newInEra('skype3')).toContain('voicemail')
+    expect(newInEra('skype4')).toEqual(['screen_share'])
+    expect(newInEra('skype5')).toEqual(['group_video'])
+    expect(newInEra('skype6')).toEqual(['video_messages'])
+    expect(newInEra('skype8')).toContain('quotes')
+    expect(newInEra('skype8')).not.toContain('voicemail')
+  })
+
+  it('never advertises the features that have no implementation', () => {
+    for (const era of ERAS) {
+      expect(advertisedFeatures(era)).not.toContain('mojis')
+      expect(advertisedFeatures(era)).not.toContain('dark_mode')
+    }
   })
 })
 

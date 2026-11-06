@@ -26,7 +26,14 @@ const NO_ITEMS: ReadonlySet<string> = new Set()
 import { effectIn } from './emoticons'
 import ScreenEffect, { type EffectId } from './ScreenEffects'
 import { CallScreen } from './CallScreen'
-import { SELECTABLE_THEMES, type ThemeId, isThemeId, resolveTheme, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype, isSkypeEra } from './themes'
+import { SELECTABLE_THEMES, type ThemeId, isThemeId, resolveTheme, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype, isSkypeEra, newInEra, FEATURE_LABELS } from './themes'
+import { encodeContactCard, decodeContactCard, encodeQuote, decodeQuote, previewText, quotableText, type QuoteRef } from './messageKinds'
+import { jitsiCallUrl } from './jitsi'
+import { parseBookmarks, serializeBookmarks, toggleBookmark, bookmarkIdsFor, BOOKMARKS_SETTING, type Bookmark } from './bookmarks'
+import { startCallRecording, type CallRecording } from './callRecorder'
+import MediaMessageRecorder from './MediaMessageRecorder'
+import { ContactCardView, ContactPicker } from './ContactCard'
+import ConversationGallery from './ConversationGallery'
 import OSChrome from './OSChrome'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
@@ -205,7 +212,51 @@ async function registerPush(send: (m: NexusMessage) => void) {
   }
 }
 
-type FileAttachment = { url: string; name: string; mime: string; size: number }
+type FileAttachment = {
+  url: string
+  name: string
+  mime: string
+  size: number
+  /** Set on recordings that are more than a plain attachment. */
+  kind?: 'voicemail' | 'video_message' | 'call_recording'
+  /** Length of a recording, in seconds. */
+  duration?: number
+}
+
+const FILE_KIND_LABEL: Record<NonNullable<FileAttachment['kind']>, string> = {
+  voicemail: 'Voicemail',
+  video_message: 'Video message',
+  call_recording: 'Call recording',
+}
+
+function fileKindLabel(f: FileAttachment): string | null {
+  if (!f.kind || !(f.kind in FILE_KIND_LABEL)) return null
+  const d = typeof f.duration === 'number' && f.duration > 0
+    ? ` · ${Math.floor(f.duration / 60)}:${String(f.duration % 60).padStart(2, '0')}`
+    : ''
+  return FILE_KIND_LABEL[f.kind] + d
+}
+
+/** Unsent text per conversation (Skype 8 drafts). Kept on this device only:
+ *  a draft of an end-to-end encrypted chat must not sit on the server. */
+const draftsKey = (me: string) => `phaze_drafts_${me}_v1`
+
+function loadDrafts(me: string): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(draftsKey(me))
+    const v = raw ? JSON.parse(raw) as unknown : null
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+    const out: Record<string, string> = {}
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (typeof val === 'string' && val) out[k] = val
+    }
+    return out
+  } catch { return {} }
+}
+
+function saveDrafts(me: string, d: Record<string, string>) {
+  try { localStorage.setItem(draftsKey(me), JSON.stringify(d)) } catch { /* quota */ }
+}
 type ChatLine = {
   id: string
   from: string
@@ -312,13 +363,17 @@ function lastLineFor(me: string | null, peer: string): { text: string; ts: numbe
   try {
     const raw = localStorage.getItem(`phaze_chat_${me}_${peer}_v1`)
     if (!raw) return null
-    const arr = JSON.parse(raw) as { text: string; ts: number; file?: { name?: string }; deleted?: boolean; me?: boolean }[]
+    const arr = JSON.parse(raw) as { text: string; ts: number; file?: { name?: string; kind?: FileAttachment['kind'] }; deleted?: boolean; me?: boolean }[]
     if (!arr.length) return null
     const last = arr[arr.length - 1]
     let text = last.text || ''
     if (last.deleted) text = '[deleted]'
+    else if (last.file?.kind === 'voicemail') text = '📼 Voicemail'
+    else if (last.file?.kind === 'video_message') text = '🎥 Video message'
+    else if (last.file?.kind === 'call_recording') text = '⏺ Call recording'
     else if (last.file?.name) text = `📎 ${last.file.name}`
     else if (text.startsWith('phaze-file{')) text = '📎 File'
+    else text = previewText(text)
     if (last.me) text = `You: ${text}`
     return { text, ts: last.ts }
   } catch { return null }
@@ -653,7 +708,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [remoteOpen, setRemoteOpen] = useState(false)
   const [groupCallRoom, setGroupCallRoom] = useState<string | null>(null)
-  const [groupCallInvite, setGroupCallInvite] = useState<{ from: string; room: string } | null>(null)
+  const [groupCallInvite, setGroupCallInvite] = useState<{ from: string; room: string; group?: string; kind: 'audio' | 'video' } | null>(null)
   // Referral tiers the server reported, keyed by username (self included);
   // decides who can send reward emoticons — see referralRewards.ts.
   const [perks, setPerks] = useState<Record<string, string[]>>({})
@@ -749,6 +804,20 @@ export default function App() {
   const [mentionIdx, setMentionIdx] = useState(0)
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
+  // Era features: quote replies, drafts, bookmarks, the chat gallery,
+  // contact cards, voicemail, video messages and call recording.
+  const [quoting, setQuoting] = useState<QuoteRef | null>(null)
+  const [editQuote, setEditQuote] = useState<QuoteRef | null>(null)
+  const [savedDrafts, setSavedDrafts] = useState<Record<string, string>>({})
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [contactPickFor, setContactPickFor] = useState<{ kind: 'dm'; peer: string } | { kind: 'group'; convo: string } | null>(null)
+  const [mediaRec, setMediaRec] = useState<{ mode: 'voicemail' | 'video_message'; peer: string } | null>(null)
+  const [voicemailOffer, setVoicemailOffer] = useState<string | null>(null)
+  const voicemailOnRef = useRef(false)
+  const [callRec, setCallRec] = useState<CallRecording | null>(null)
+  const callRecPeerRef = useRef<string | null>(null)
+  const [groupCallMeta, setGroupCallMeta] = useState<{ name: string; kind: 'audio' | 'video' }>({ name: 'Group call', kind: 'audio' })
   const [skypeHistory, setSkypeHistory] = useState<{ sender: string; body: string; sent_at: string }[]>([])
   const skypeHistoryCache = useRef<Record<string, { sender: string; body: string; sent_at: string }[]>>({})
 
@@ -870,6 +939,8 @@ export default function App() {
     }).catch(() => setSkypeHistory([]))
   }, [selected, me])
   useEffect(() => { callStateRef.current = callState }, [callState])
+  useEffect(() => { voicemailOnRef.current = hasFeature(theme, 'voicemail') }, [theme])
+  useEffect(() => { setSavedDrafts(me ? loadDrafts(me) : {}) }, [me])
 
   const appendLog = useCallback((from: string, text: string, isMe: boolean, opts?: { id?: string; file?: FileAttachment; peer?: string; ts?: number; callInfo?: ChatLine['callInfo'] }) => {
     const id = opts?.id || newMsgId()
@@ -1008,7 +1079,8 @@ export default function App() {
     ringTimerRef.current = setTimeout(() => {
       if (callStateRef.current?.status === 'ringing') {
         hangUp()
-        setErr('No answer')
+        if (voicemailOnRef.current) setVoicemailOffer(recipient)
+        else setErr('No answer')
       }
     }, 60000)
   }, [hangUp, startRinger])
@@ -1515,23 +1587,48 @@ export default function App() {
           break
 
         case 'call_reject':
-        case 'call_end':
+        case 'call_end': {
+          // Declined before it was answered: offer a voicemail, as the
+          // classic messenger did for an unanswered call.
+          const cs = callStateRef.current
+          if (msg.type === 'call_reject' && cs && cs.direction === 'outgoing' && cs.status === 'ringing' && voicemailOnRef.current) {
+            setVoicemailOffer(cs.peer)
+          }
           tearDownCall()
           break
+        }
 
         case 'call_busy':
           tearDownCall()
           setErr(`${msg.sender || 'User'} is already in a call.`)
           break
 
-        case 'call_error':
+        case 'call_error': {
+          const cs = callStateRef.current
+          const unanswered = !!cs && cs.direction === 'outgoing' && cs.status === 'ringing'
           tearDownCall()
-          setErr(msg.error || msg.body || 'Call failed — user may be offline.')
+          // Usually "they're offline" — the case voicemail exists for.
+          if (unanswered && voicemailOnRef.current) setVoicemailOffer(cs.peer)
+          else setErr(msg.error || msg.body || 'Call failed — user may be offline.')
           break
+        }
 
         case 'call_invite':
           if (msg.sender && msg.channel_id) {
-            setGroupCallInvite({ from: msg.sender, room: msg.channel_id })
+            setGroupCallInvite({
+              from: msg.sender,
+              room: msg.channel_id,
+              group: msg.convo_name || undefined,
+              kind: msg.body === 'audio' ? 'audio' : 'video',
+            })
+          }
+          break
+
+        case 'convo_call_started':
+          // Our own group call is set up; the other members are ringing.
+          if (msg.channel_id) {
+            setGroupCallMeta({ name: msg.convo_name || 'Group call', kind: msg.body === 'video' ? 'video' : 'audio' })
+            setGroupCallRoom(msg.channel_id)
           }
           break
 
@@ -1620,6 +1717,7 @@ export default function App() {
             // shelving, so resolve it the same way a stored one is.
             const t = msg.envelopes['theme']
             if (isThemeId(t)) setTheme(resolveTheme(t))
+            setBookmarks(parseBookmarks(msg.envelopes[BOOKMARKS_SETTING]))
           }
           break
 
@@ -1898,7 +1996,12 @@ export default function App() {
   const openChat = (name: string) => {
     setSelected(name)
     setEditingId(null)
-    setDraft('')
+    setEditQuote(null)
+    setQuoting(null)
+    setGalleryOpen(false)
+    // Drafts (Skype 8): each chat keeps its own unsent text. Earlier eras
+    // start every chat empty.
+    setDraft(me && hasFeature(theme, 'drafts') ? (loadDrafts(me)[name] ?? '') : '')
     setSearch('')
     setSearchOpen(false)
     setMentionQuery(null)
@@ -1945,6 +2048,38 @@ export default function App() {
     }
   }, [])
 
+  /** Message text as people see it: contact cards and quote replies get
+   *  their own look in every era (the data is there whichever era is on),
+   *  everything else goes through RichText. */
+  const renderMessageText = (text: string, sender: string): React.ReactNode => {
+    const card = decodeContactCard(text)
+    if (card) {
+      return (
+        <ContactCardView
+          card={card}
+          me={me}
+          friends={friends}
+          color={avatarColor(card.username)}
+          onAdd={sendFriendRequest}
+          onMessage={(u) => { setSelectedConvo(null); setView('dms'); openChat(u) }}
+          onProfile={setProfileUser}
+        />
+      )
+    }
+    const q = decodeQuote(text)
+    return (
+      <SenderItemsContext.Provider value={itemsOf(sender)}>
+        {q && (
+          <button type="button" className="quote-block" onClick={() => scrollToMessage(q.quote.id)} title="Go to the quoted message">
+            <span className="quote-block-from">{q.quote.from}</span>
+            <span className="quote-block-text">{q.quote.text}</span>
+          </button>
+        )}
+        <RichText text={q ? q.reply : text} me={me} />
+      </SenderItemsContext.Provider>
+    )
+  }
+
   const sendChat = () => {
     if (!selected || !me || !draft.trim()) return
     if (editingId) {
@@ -1977,16 +2112,67 @@ export default function App() {
       }
     }
 
-    const peer = peerKeysRef.current[selected]
-    const body = peer ? encryptForPeer(plaintext, peer, keysRef.current.secretKey) : plaintext
-    const msgId = newMsgId()
-    send({ type: 'msg', sender: me, recipient: selected, body, msg_id: msgId })
-    appendLog(me, plaintext, true, { id: msgId })
-    fireEffect(me, plaintext)
-    playPhazeSound('MessageOutgoing.wav')
+    const typed = plaintext
+    if (quoting) {
+      plaintext = encodeQuote(quoting, plaintext)
+      setQuoting(null)
+    }
+    sendDMBody(plaintext, selected)
+    fireEffect(me, typed)
     setDraft('')
     setEmojiOpen(false)
+    if (savedDrafts[selected]) {
+      const next = { ...savedDrafts }
+      delete next[selected]
+      setSavedDrafts(next)
+      saveDrafts(me, next)
+    }
   }
+
+  /** Send one DM body (already-built plaintext), encrypted when the peer's
+   *  key is known, exactly like a typed message. */
+  const sendDMBody = (plaintext: string, to: string) => {
+    if (!me) return
+    const peer = peerKeysRef.current[to]
+    const body = peer ? encryptForPeer(plaintext, peer, keysRef.current.secretKey) : plaintext
+    const msgId = newMsgId()
+    send({ type: 'msg', sender: me, recipient: to, body, msg_id: msgId })
+    appendLog(me, plaintext, true, { id: msgId, peer: to })
+    playPhazeSound('MessageOutgoing.wav')
+  }
+
+
+  const toggleMessageBookmark = (conversation: string, id: string) => {
+    if (!me) return
+    const next = toggleBookmark(bookmarks, conversation, id)
+    setBookmarks(next)
+    send({ type: 'settings_set', sender: me, body: JSON.stringify({ key: BOOKMARKS_SETTING, value: serializeBookmarks(next) }) })
+  }
+
+  const sendConvoText = (cid: string, text: string) => {
+    send({ type: 'convo_msg', convo_id: cid, sender: me ?? undefined, body: text })
+    // Server fans out to the other members only — echo locally.
+    setConvoLogs((prev) => ({
+      ...prev,
+      [cid]: [...(prev[cid] ?? []), {
+        id: `${cid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        sender: me ?? '', body: text, ts: Date.now(), me: true,
+      }],
+    }))
+  }
+
+  const shareContact = (username: string) => {
+    const target = contactPickFor
+    setContactPickFor(null)
+    if (!target || !me) return
+    const body = encodeContactCard({ username, mood: moods[username] || undefined })
+    if (target.kind === 'dm') {
+      sendDMBody(body, target.peer)
+    } else {
+      sendConvoText(target.convo, body)
+    }
+  }
+
 
   const slashMatches = useMemo(() => {
     if (!draft.startsWith('/')) return [] as SlashCmd[]
@@ -2017,8 +2203,9 @@ export default function App() {
     }
   }, [paletteQuery, send])
 
-  const sendFile = useCallback(async (file: File) => {
-    if (!selected || !me || !sessionToken) {
+  const sendFile = useCallback(async (file: File, opts?: { recipient?: string; kind?: FileAttachment['kind']; duration?: number }) => {
+    const to = opts?.recipient ?? selected
+    if (!to || !me || !sessionToken) {
       setErr('Sign in to send files')
       return
     }
@@ -2038,13 +2225,16 @@ export default function App() {
         setErr(`Upload failed: ${resp.status}`)
         return
       }
-      const att = await resp.json() as FileAttachment
-      const peerKey = peerKeysRef.current[selected]
+      const uploaded = await resp.json() as FileAttachment
+      const att: FileAttachment = { ...uploaded }
+      if (opts?.kind) att.kind = opts.kind
+      if (opts?.duration) att.duration = opts.duration
+      const peerKey = peerKeysRef.current[to]
       const plaintext = encodeFileBody(att)
       const body = peerKey ? encryptForPeer(plaintext, peerKey, keysRef.current.secretKey) : plaintext
       const msgId = newMsgId()
-      send({ type: 'msg', sender: me, recipient: selected, body, msg_id: msgId })
-      appendLog(me, '', true, { id: msgId, file: att })
+      send({ type: 'msg', sender: me, recipient: to, body, msg_id: msgId })
+      appendLog(me, '', true, { id: msgId, file: att, peer: to })
       playPhazeSound('MessageOutgoing.wav')
     } catch (e) {
       setErr(`Upload error: ${(e as Error).message}`)
@@ -2110,6 +2300,48 @@ export default function App() {
     setTimeout(() => { if (recorderRef.current === rec) stopRecording(false) }, 2 * 60 * 1000)
   }, [selected, sessionToken, recording, stopRecording, sendFile])
 
+  const MAX_ATTACHMENT = 25 * 1024 * 1024
+
+  const beginCallRecording = async (peer: string) => {
+    try {
+      const r = await startCallRecording(peer)
+      callRecPeerRef.current = peer
+      setCallRec(r)
+      // Everyone on the call is told, as the original did.
+      sendDMBody(`⏺ ${me} started recording this call`, peer)
+    } catch {
+      setErr('Recording was cancelled, or this browser cannot record the screen.')
+    }
+  }
+
+  const finishCallRecording = async () => {
+    const r = callRec
+    const peer = callRecPeerRef.current
+    setCallRec(null)
+    callRecPeerRef.current = null
+    if (!r || !peer) return
+    const { file, duration } = await r.stop()
+    if (file.size > MAX_ATTACHMENT) {
+      // Too big to post: keep it rather than lose it.
+      const url = URL.createObjectURL(file)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.name
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      setErr('The recording is over 25 MB, so it was saved to this device instead of posted to the chat.')
+      return
+    }
+    await sendFile(file, { recipient: peer, kind: 'call_recording', duration })
+  }
+
+  // A recording still running when the call ends is finished and posted.
+  useEffect(() => {
+    if (callState || !callRec) return
+    void finishCallRecording()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callState, callRec])
+
   const reactTo = useCallback((line: ChatLine, emoji: string) => {
     if (!selected || !me) return
     send({ type: 'msg_react', sender: me, recipient: selected, msg_id: line.id, reaction: emoji })
@@ -2127,13 +2359,18 @@ export default function App() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const beginEdit = (line: ChatLine) => {
     setEditingId(line.id)
-    setDraft(line.text)
+    const q = decodeQuote(line.text)
+    setEditQuote(q ? q.quote : null)
+    setDraft(q ? q.reply : line.text)
   }
-  const cancelEdit = () => { setEditingId(null); setDraft('') }
+  const cancelEdit = () => { setEditingId(null); setEditQuote(null); setDraft('') }
   const submitEdit = () => {
     if (!selected || !me || !editingId) return
-    const text = draft.trim()
-    if (!text) return
+    const typed = draft.trim()
+    if (!typed) return
+    // An edited quote reply keeps its quote.
+    const text = editQuote ? encodeQuote(editQuote, typed) : typed
+    setEditQuote(null)
     const peer = peerKeysRef.current[selected]
     const body = peer ? encryptForPeer(text, peer, keysRef.current.secretKey) : text
     send({ type: 'msg_edit', sender: me, recipient: selected, msg_id: editingId, body })
@@ -2151,6 +2388,13 @@ export default function App() {
   const handleDraftChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value
     setDraft(v)
+    if (me && selected && !editingId && hasFeature(theme, 'drafts')) {
+      const next = { ...savedDrafts }
+      if (v.trim()) next[selected] = v
+      else delete next[selected]
+      setSavedDrafts(next)
+      saveDrafts(me, next)
+    }
     const caret = e.target.selectionStart ?? v.length
     const upto = v.slice(0, caret)
     const m = /(?:^|\s)@([A-Za-z0-9_]{0,32})$/.exec(upto)
@@ -2314,7 +2558,7 @@ export default function App() {
                           type="button"
                           className={t.id === theme ? 'skype-menu-item on' : 'skype-menu-item'}
                           onClick={() => { setTheme(t.id); setMenuOpen(null) }}
-                          title={t.hint}
+                          title={`${t.hint ? t.hint + ' · ' : ''}${t.id === SELECTABLE_THEMES[0].id ? 'Has' : 'Adds'}: ${newInEra(t.id).map((f) => FEATURE_LABELS[f]).join(', ')}`}
                         >
                           <span className="skype-menu-item-icon">{t.icon}</span>
                           <span className="skype-menu-item-label">{t.label}</span>
@@ -2580,7 +2824,7 @@ export default function App() {
       {callState && isClassicSkype(theme) && (
         <CallScreen
           state={callState}
-          jitsiUrl={callState.status === 'active' && jitsiRoom ? `https://meet.jit.si/${jitsiRoom}` : null}
+          jitsiUrl={callState.status === 'active' && jitsiRoom ? jitsiCallUrl(jitsiRoom, { theme, kind: callState.type, group: false }) : null}
           avatarBg={avatarColor(callState.peer)}
           onAnswer={acceptCall}
           onHangUp={hangUp}
@@ -2595,7 +2839,7 @@ export default function App() {
         <div className="call-overlay">
           {callState.status === 'active' && jitsiRoom && (
             <iframe
-              src={`https://meet.jit.si/${jitsiRoom}`}
+              src={jitsiCallUrl(jitsiRoom, { theme, kind: callState.type, group: false })}
               allow="camera; microphone; display-capture; fullscreen"
               style={{ width: '100%', flex: 1, border: 'none', minHeight: 0 }}
               title="Call"
@@ -2616,7 +2860,17 @@ export default function App() {
                   <button className="call-btn-decline" onClick={hangUp}>Decline</button>
                 </>
               ) : (
-                <button className="call-btn-end" onClick={hangUp}>End call</button>
+                <>
+                  {callState.status === 'active' && hasFeature(theme, 'call_recording') && (
+                    <button
+                      type="button"
+                      className={`call-btn-end call-record-btn ${callRec ? 'on' : ''}`}
+                      onClick={() => void (callRec ? finishCallRecording() : beginCallRecording(callState.peer))}
+                      title={callRec ? 'Stop recording and post it to the chat' : 'Record this call'}
+                    >{callRec ? '■ Stop recording' : '⏺ Record'}</button>
+                  )}
+                  <button className="call-btn-end" onClick={hangUp}>End call</button>
+                </>
               )}
             </div>
           </div>
@@ -2702,11 +2956,39 @@ export default function App() {
       )}
 
       {/* ── Group call invite banner ─────────────────────────── */}
+      {voicemailOffer && (
+        <div className="voicemail-offer" role="dialog" aria-label="Leave a voicemail">
+          <span><strong>{voicemailOffer}</strong> didn't answer. Leave a voicemail?</span>
+          <button type="button" className="era-btn primary" onClick={() => { setMediaRec({ mode: 'voicemail', peer: voicemailOffer }); setVoicemailOffer(null) }}>Record voicemail</button>
+          <button type="button" className="era-btn" onClick={() => setVoicemailOffer(null)}>No thanks</button>
+        </div>
+      )}
+      {mediaRec && (
+        <MediaMessageRecorder
+          mode={mediaRec.mode}
+          peer={mediaRec.peer}
+          onClose={() => setMediaRec(null)}
+          onSend={(file, duration) => {
+            const target = mediaRec
+            setMediaRec(null)
+            void sendFile(file, { recipient: target.peer, kind: target.mode, duration })
+          }}
+        />
+      )}
+      {contactPickFor && (
+        <ContactPicker
+          friends={Object.keys(friends)}
+          exclude={new Set(contactPickFor.kind === 'dm' ? [contactPickFor.peer] : (convos.find((c) => c.id === contactPickFor.convo)?.members ?? []))}
+          moods={moods}
+          onPick={shareContact}
+          onClose={() => setContactPickFor(null)}
+        />
+      )}
       {groupCallInvite && (
         <div className="banner" style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-          <span>👥 <strong>{groupCallInvite.from}</strong> invited you to a group call</span>
+          <span>👥 <strong>{groupCallInvite.from}</strong> {groupCallInvite.group ? <>started a group call in <strong>{groupCallInvite.group}</strong></> : 'invited you to a group call'}</span>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button type="button" style={{ padding: '4px 12px', borderRadius: 6, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }} onClick={() => { setGroupCallRoom(groupCallInvite.room); setGroupCallInvite(null) }}>Join</button>
+            <button type="button" style={{ padding: '4px 12px', borderRadius: 6, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }} onClick={() => { setGroupCallMeta({ name: groupCallInvite.group || 'Group call', kind: groupCallInvite.kind }); setGroupCallRoom(groupCallInvite.room); setGroupCallInvite(null) }}>Join</button>
             <button type="button" style={{ padding: '4px 12px', borderRadius: 6, background: 'transparent', color: 'var(--muted)', border: '1px solid var(--input-border)', cursor: 'pointer' }} onClick={() => setGroupCallInvite(null)}>Decline</button>
           </div>
         </div>
@@ -2719,7 +3001,8 @@ export default function App() {
           <VoiceRoom
             me={me}
             channelId={groupCallRoom}
-            channelName="Group Call"
+            channelName={groupCallMeta.name}
+            src={jitsiCallUrl(groupCallRoom, { theme, kind: groupCallMeta.kind, group: true })}
             send={send}
             subscribe={subscribe}
             turn={null}
@@ -3119,7 +3402,11 @@ export default function App() {
                               {last && <span className="friend-time">{relTime(last.ts)}</span>}
                             </span>
                             <span className="friend-line">
-                              <span className="friend-preview">{last?.text || st}</span>
+                              <span className="friend-preview">
+                                {hasFeature(theme, 'drafts') && savedDrafts[u] && selected !== u
+                                  ? <><span className="draft-tag">Draft:</span> {savedDrafts[u]}</>
+                                  : (last?.text || st)}
+                              </span>
                               {unread[u] > 0 && selected !== u && (
                                 <span className="unread-badge">{unread[u] > 99 ? '99+' : unread[u]}</span>
                               )}
@@ -3194,24 +3481,13 @@ export default function App() {
                     me={me ?? ''}
                     friends={Object.keys(friends)}
                     lines={convoLogs[selectedConvo] ?? []}
-                    renderBody={(t, sender) => (
-                      <SenderItemsContext.Provider value={itemsOf(sender)}>
-                        <RichText text={t} me={me} />
-                      </SenderItemsContext.Provider>
-                    )}
+                    renderBody={(t, sender) => renderMessageText(t, sender)}
                     senderColor={avatarColor}
-                    onSend={(text) => {
-                      send({ type: 'convo_msg', convo_id: selectedConvo, sender: me ?? undefined, body: text })
-                      // Server fans out to the other members only — echo locally.
-                      const cid = selectedConvo
-                      setConvoLogs((prev) => ({
-                        ...prev,
-                        [cid]: [...(prev[cid] ?? []), {
-                          id: `${cid}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                          sender: me ?? '', body: text, ts: Date.now(), me: true,
-                        }],
-                      }))
-                    }}
+                    onSend={(text) => sendConvoText(selectedConvo, text)}
+                    onCall={hasFeature(theme, 'group_call') ? (kind) => send({ type: 'convo_call', convo_id: selectedConvo, body: kind }) : undefined}
+                    groupVideo={hasFeature(theme, 'group_video')}
+                    quotesOn={hasFeature(theme, 'quotes')}
+                    onShareContact={hasFeature(theme, 'send_contacts') ? () => setContactPickFor({ kind: 'group', convo: selectedConvo }) : undefined}
                     onLeave={() => {
                       send({ type: 'convo_leave', convo_id: selectedConvo, sender: me ?? undefined })
                       setConvos((prev) => prev.filter((c) => c.id !== selectedConvo))
@@ -3269,6 +3545,14 @@ export default function App() {
                             title={pinnedIds.length > 0 ? `${pinnedIds.length} pinned` : 'No pinned messages'}
                             onClick={() => setPinsOpen((v) => !v)}
                           >📌{pinnedIds.length > 0 ? <span className="header-count">{pinnedIds.length}</span> : null}</button>
+                          {hasFeature(theme, 'media_gallery') && (
+                            <button
+                              type="button"
+                              className="chat-call-btn"
+                              title="Gallery: media, files, links and bookmarks"
+                              onClick={() => setGalleryOpen((v) => !v)}
+                            >🖼</button>
+                          )}
                           <button
                             type="button"
                             className="chat-call-btn"
@@ -3301,6 +3585,7 @@ export default function App() {
                             title="Group call"
                             onClick={() => {
                               const room = `call_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+                              setGroupCallMeta({ name: 'Group call', kind: 'video' })
                               setGroupCallRoom(room)
                               if (selected) {
                                 send({ type: 'call_invite', recipient: selected, channel_id: room })
@@ -3341,7 +3626,7 @@ export default function App() {
                         onKeyDown={(e) => { if (e.key === 'Escape') { setSearchOpen(false); setSearch('') } }}
                       />
                       {search && (
-                        <span className="muted small">{log.filter((l) => !l.deleted && l.text.toLowerCase().includes(search.toLowerCase())).length} matches</span>
+                        <span className="muted small">{log.filter((l) => !l.deleted && previewText(l.text).toLowerCase().includes(search.toLowerCase())).length} matches</span>
                       )}
                       <button type="button" className="link-btn" onClick={() => { setSearch(''); setSearchOpen(false) }}>Close</button>
                     </div>
@@ -3363,6 +3648,16 @@ export default function App() {
                         </button>
                       ))}
                     </div>
+                  )}
+
+                  {selected && galleryOpen && hasFeature(theme, 'media_gallery') && (
+                    <ConversationGallery
+                      lines={log}
+                      bookmarkIds={bookmarkIdsFor(bookmarks, selected)}
+                      bookmarksOn={hasFeature(theme, 'bookmarks')}
+                      onJump={scrollToMessage}
+                      onClose={() => setGalleryOpen(false)}
+                    />
                   )}
 
                   <div className="chat" ref={chatScrollRef}>
@@ -3408,7 +3703,7 @@ export default function App() {
                     )}
                     {(() => {
                       const q = search.trim().toLowerCase()
-                      const view = q ? log.filter((l) => !l.deleted && (l.text.toLowerCase().includes(q) || l.from.toLowerCase().includes(q))) : log
+                      const view = q ? log.filter((l) => !l.deleted && (previewText(l.text).toLowerCase().includes(q) || l.from.toLowerCase().includes(q))) : log
                       return view.map((line, i) => {
                       const prev = view[i - 1]
                       const showGap = !prev || (line.ts - prev.ts) > 5 * 60 * 1000 || prev.me !== line.me
@@ -3446,8 +3741,9 @@ export default function App() {
                             {showGap && !line.me && <span className="who clickable" onClick={() => setProfileUser(line.from)}>{line.from}</span>}
                             {line.deleted ? (
                               <span className="bubble-text deleted-text">message deleted</span>
-                            ) : line.file ? (
-                              isImage(line.file.mime, line.file.name) ? (
+                            ) : line.file ? (<>
+                              {fileKindLabel(line.file) && <span className="media-msg-label">{fileKindLabel(line.file)}</span>}
+                              {isImage(line.file.mime, line.file.name) ? (
                                 <a href={line.file.url} target="_blank" rel="noopener noreferrer" className="bubble-image-link">
                                   <img src={line.file.url} alt={line.file.name} className="bubble-image" loading="lazy" />
                                 </a>
@@ -3466,9 +3762,9 @@ export default function App() {
                                     <span className="bubble-file-size">{fmtBytes(line.file.size)}</span>
                                   </span>
                                 </a>
-                              )
+                              )}</>
                             ) : (
-                              <span className="bubble-text"><SenderItemsContext.Provider value={itemsOf(line.from)}><RichText text={line.text} me={me} /></SenderItemsContext.Provider>{line.edited && <span className="edited-tag"> (edited)</span>}</span>
+                              <span className="bubble-text">{renderMessageText(line.text, line.from)}{line.edited && <span className="edited-tag"> (edited)</span>}</span>
                             )}
                             <span className="bubble-ts">{formatTime(line.ts)}{hasFeature(theme, 'read_receipts') && line.me && <span className="receipt-tick" title={line.seen ? 'Seen' : 'Delivered'}>{line.seen ? ' ✓✓' : ' ✓'}</span>}</span>
                             {/* Reactions arrived with Skype 8. A 2007 chat log
@@ -3495,13 +3791,32 @@ export default function App() {
                                 {hasFeature(theme, 'reactions') && REACTION_EMOJIS.map((e) => (
                                   <button key={e} type="button" className="action-btn react" onClick={() => reactTo(line, e)} title={`React ${e}`}>{e}</button>
                                 ))}
+                                {hasFeature(theme, 'quotes') && (
+                                  <button
+                                    type="button"
+                                    className="action-btn"
+                                    title="Quote"
+                                    onClick={() => {
+                                      setQuoting({ id: line.id, from: line.me ? (me ?? line.from) : line.from, text: line.file ? `📎 ${line.file.name}` : quotableText(line.text), ts: line.ts })
+                                      draftInputRef.current?.focus()
+                                    }}
+                                  >❝</button>
+                                )}
+                                {hasFeature(theme, 'bookmarks') && selected && (
+                                  <button
+                                    type="button"
+                                    className="action-btn"
+                                    title={bookmarkIdsFor(bookmarks, selected).has(line.id) ? 'Remove bookmark' : 'Bookmark'}
+                                    onClick={() => toggleMessageBookmark(selected, line.id)}
+                                  >{bookmarkIdsFor(bookmarks, selected).has(line.id) ? '★' : '☆'}</button>
+                                )}
                                 {hasFeature(theme, 'pinned_messages') && (
                                   <button type="button" className="action-btn" onClick={() => togglePin(line)} title={isPinned ? 'Unpin' : 'Pin'}>{isPinned ? '📍' : '📌'}</button>
                                 )}
                                 {/* Message editing shipped in Skype 3.2
                                     (2007), not Skype 8 — see
                                     docs/skype-eras/skype3.md. */}
-                                {hasFeature(theme, 'edit_message') && line.me && !line.file && (
+                                {hasFeature(theme, 'edit_message') && line.me && !line.file && !decodeContactCard(line.text) && (
                                   <button type="button" className="action-btn" onClick={() => beginEdit(line)} title="Edit">✏️</button>
                                 )}
                                 {hasFeature(theme, 'delete_message') && line.me && (
@@ -3529,6 +3844,13 @@ export default function App() {
                     <div className="edit-banner">
                       <span>Editing message</span>
                       <button type="button" className="link-btn" onClick={cancelEdit}>Cancel</button>
+                    </div>
+                  )}
+
+                  {selected && quoting && !editingId && (
+                    <div className="quote-banner">
+                      <span className="quote-banner-text">Quoting <strong>{quoting.from}</strong>: {quoting.text}</span>
+                      <button type="button" className="link-btn" onClick={() => setQuoting(null)}>Cancel</button>
                     </div>
                   )}
 
@@ -3571,6 +3893,24 @@ export default function App() {
                           title="Cancel"
                           onClick={() => stopRecording(true)}
                         >✕</button>
+                      )}
+                      {hasFeature(theme, 'video_messages') && !recording && (
+                        <button
+                          type="button"
+                          className="emoji-btn"
+                          title="Record a video message"
+                          onClick={() => setMediaRec({ mode: 'video_message', peer: selected })}
+                          disabled={!!editingId}
+                        >🎥</button>
+                      )}
+                      {hasFeature(theme, 'send_contacts') && !recording && (
+                        <button
+                          type="button"
+                          className="emoji-btn"
+                          title="Send a contact"
+                          onClick={() => setContactPickFor({ kind: 'dm', peer: selected })}
+                          disabled={!!editingId}
+                        >👤</button>
                       )}
                       <div className="emoji-wrap">
                         <button type="button" className="emoji-btn" title="Emoji" onClick={() => setEmojiOpen((v) => !v)}>😊</button>

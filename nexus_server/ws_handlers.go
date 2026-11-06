@@ -1758,6 +1758,55 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				s.sendTo(m, notice)
 			}
 
+		case "convo_call":
+			// Start a group call from a group chat. Real Skype could ring a
+			// whole group chat into a conference call from the 3.x days
+			// (group video came later, at 5.0 — the client decides whether
+			// cameras are offered). The server's part is the same rule as
+			// every other group action: only a member can do it, and it
+			// rings the other members only, never anyone outside the group.
+			if username == "" || msg.ConvoID == "" {
+				continue
+			}
+			members := s.conversationMembers(msg.ConvoID)
+			isMember := false
+			for _, m := range members {
+				if m == username {
+					isMember = true
+					break
+				}
+			}
+			if !isMember {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "you are not in this group"})
+				continue
+			}
+			suffix, err := randHex(6)
+			if err != nil {
+				client.Send(NexusMessage{Type: "convo_error", ConvoID: msg.ConvoID, Error: "server error"})
+				continue
+			}
+			var convoName string
+			s.DB.QueryRow(`SELECT name FROM conversations WHERE id = ?`, msg.ConvoID).Scan(&convoName)
+			room := "phaze_g_" + suffix
+			kind := "audio"
+			if msg.Body == "video" {
+				kind = "video"
+			}
+			invite := NexusMessage{
+				Type: "call_invite", Sender: username, ChannelID: room,
+				ConvoID: msg.ConvoID, ConvoName: convoName, Body: kind,
+			}
+			for _, m := range members {
+				if m == username || s.isBlocked(m, username) {
+					continue
+				}
+				s.sendTo(m, invite)
+			}
+			client.Send(NexusMessage{
+				Type: "convo_call_started", ChannelID: room,
+				ConvoID: msg.ConvoID, ConvoName: convoName, Body: kind,
+			})
+
 		case "convo_history":
 			if username == "" || msg.ConvoID == "" {
 				continue
