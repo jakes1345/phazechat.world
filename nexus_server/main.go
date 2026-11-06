@@ -423,6 +423,29 @@ var (
 	TurnShortTerm = os.Getenv("PHAZE_TURN_SHORT_TERM") == "true"
 )
 
+// turnProvider names the TURN source calls will get right now: "cloudflare"
+// when Cloudflare hands out credentials, "static" or "coturn" for the
+// self-configured modes, or "" when none works and clients fall back to the
+// public relay. The Cloudflare check reuses the cached credential set, so it
+// calls Cloudflare at most once per refresh, or once a minute while failing.
+func (s *NexusServer) turnProvider(ctx context.Context) string {
+	if cloudflareTURN != nil {
+		cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		cfg := cloudflareTURN.Config(cctx)
+		cancel()
+		if cfg != nil {
+			return "cloudflare"
+		}
+	}
+	if TurnURL != "" && TurnUsername != "" && TurnPassword != "" {
+		return "static"
+	}
+	if TurnSecret != "" && TurnURL != "" {
+		return "coturn"
+	}
+	return ""
+}
+
 func (s *NexusServer) generateMediaToken(username string) *TurnConfig {
 	// Cloudflare Realtime TURN — set PHAZE_CF_TURN_KEY_ID + PHAZE_CF_TURN_API_TOKEN.
 	// Falls through to the modes below if Cloudflare can't be reached.
@@ -2366,7 +2389,8 @@ func (s *NexusServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 		v = "1.0.0-Phaze"
 	}
 
-	turnOK := TurnSecret != "" && TurnURL != ""
+	turnProvider := s.turnProvider(r.Context())
+	turnOK := turnProvider != ""
 	turnFallback := !turnOK // we still serve openrelay public TURN as fallback
 	resendOK := os.Getenv("RESEND_API_KEY") != ""
 	brevoOK := os.Getenv("BREVO_API_KEY") != ""
@@ -2394,6 +2418,7 @@ func (s *NexusServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 		"database_ok":           dbOK,
 		"turn_configured":       turnOK,
 		"turn_public_fallback":  turnFallback, // openrelay.metered.ca in use
+		"turn_provider":         turnProvider,
 		"smtp_configured":       smtpOK,
 		"brevo_configured":      brevoOK,
 		"resend_configured":     resendOK,
