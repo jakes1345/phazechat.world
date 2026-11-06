@@ -4032,7 +4032,7 @@ func initSentry(component string) {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              dsn,
 		Environment:      env,
-		Release:          os.Getenv("FLY_MACHINE_VERSION"),
+		Release:          Version,
 		TracesSampleRate: 0.05,
 		ServerName:       component,
 	})
@@ -4063,6 +4063,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Pick the upload/avatar store now so a misconfigured bucket stops the
+	// boot instead of failing the first upload.
+	blobs()
+
 	// Enable WAL mode for better concurrent access
 	db.Exec("PRAGMA journal_mode=WAL")
 	db.Exec("PRAGMA busy_timeout=5000")
@@ -4170,9 +4174,9 @@ func main() {
 	})
 
 	// Search engine verification endpoints.
-	// Google: flyctl secrets set PHAZE_GSC_VERIFICATION=google123abc.html
-	// Bing:   flyctl secrets set PHAZE_BING_VERIFICATION=<xml-code>
-	// Yandex: flyctl secrets set PHAZE_YANDEX_VERIFICATION=<code>
+	// Google: npx wrangler secret put PHAZE_GSC_VERIFICATION   (e.g. google123abc.html)
+	// Bing:   npx wrangler secret put PHAZE_BING_VERIFICATION  (the XML code)
+	// Yandex: npx wrangler secret put PHAZE_YANDEX_VERIFICATION
 	http.HandleFunc("/google", func(w http.ResponseWriter, r *http.Request) {
 		v := os.Getenv("PHAZE_GSC_VERIFICATION")
 		if v == "" {
@@ -4276,9 +4280,9 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 	// and a PHAZE_ADMIN_IPS allowlist would compare against the edge IP and
 	// lock EVERYONE out of the admin portal with a 404.
 	if trustedProxyHeader == "" {
-		log.Printf("[WARN] PHAZE_TRUST_PROXY_HEADER is unset — all stored IPs will be the edge proxy IP, not real clients. On Fly.io set PHAZE_TRUST_PROXY_HEADER=Fly-Client-IP.")
+		log.Printf("[WARN] PHAZE_TRUST_PROXY_HEADER is unset — all stored IPs will be the edge proxy IP, not real clients. Behind Cloudflare the Worker sets it to X-Phaze-Client-IP; on Fly.io use Fly-Client-IP.")
 		if strings.TrimSpace(os.Getenv("PHAZE_ADMIN_IPS")) != "" {
-			log.Printf("[WARN] PHAZE_ADMIN_IPS is set but PHAZE_TRUST_PROXY_HEADER is not — the admin IP allowlist compares against the edge IP and will 404 EVERYONE, including you. Set PHAZE_TRUST_PROXY_HEADER=Fly-Client-IP.")
+			log.Printf("[WARN] PHAZE_ADMIN_IPS is set but PHAZE_TRUST_PROXY_HEADER is not — the admin IP allowlist compares against the edge IP and will 404 EVERYONE, including you. Set PHAZE_TRUST_PROXY_HEADER to your edge proxy's client-IP header.")
 		}
 	}
 	// Admin portal — hidden path, not /admin. Set PHAZE_ADMIN_PATH env var
@@ -4457,12 +4461,7 @@ func (s *NexusServer) avatarHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// 404 when no picture is set: clients render their own letter-circle
 	// fallback, which beats shipping one generic silhouette to everybody.
-	path := "avatars/" + username + ".png"
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		http.NotFound(w, r)
-		return
-	}
-	http.ServeFile(w, r, path)
+	serveBlob(w, r, "avatars/"+username+".png")
 }
 
 // uploadHandler accepts authenticated multipart uploads for in-chat
@@ -4473,10 +4472,11 @@ func (s *NexusServer) avatarHandler(w http.ResponseWriter, r *http.Request) {
 // learns which conversation references which upload.
 const maxUploadBytes = 25 * 1024 * 1024 // 25 MB
 
-// uploadDir returns the directory where chat attachments are stored. In
-// production (Fly) set PHAZE_UPLOAD_DIR=/data/uploads so files persist on
-// the mounted volume; otherwise we fall back to public/uploads relative to
-// the working directory for local dev.
+// uploadDir returns the directory where chat attachments are stored when
+// the blob store is local disk (see blobstore.go). Set
+// PHAZE_UPLOAD_DIR=/data/uploads on a host with a mounted volume so files
+// persist; otherwise we fall back to public/uploads relative to the working
+// directory for local dev.
 func uploadDir() string {
 	if d := os.Getenv("PHAZE_UPLOAD_DIR"); d != "" {
 		return d
@@ -4559,25 +4559,14 @@ func (s *NexusServer) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := os.MkdirAll(uploadDir(), 0o755); err != nil {
-		http.Error(w, "storage error", http.StatusInternalServerError)
-		return
-	}
 	rnd, err := randHex(16)
 	if err != nil {
 		http.Error(w, "rng error", http.StatusInternalServerError)
 		return
 	}
 	storedName := rnd + ext
-	outPath := filepath.Join(uploadDir(), storedName)
-	out, err := os.Create(outPath)
-	if err != nil {
-		http.Error(w, "storage error", http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, io.LimitReader(file, maxUploadBytes)); err != nil {
-		os.Remove(outPath)
+	if err := blobs().Put(r.Context(), "uploads/"+storedName, file, hdr.Size, detected); err != nil {
+		log.Printf("[upload] store %s: %v", storedName, err)
 		http.Error(w, "write error", http.StatusInternalServerError)
 		return
 	}
@@ -4600,11 +4589,6 @@ func (s *NexusServer) uploadsServeHandler(w http.ResponseWriter, r *http.Request
 		http.NotFound(w, r)
 		return
 	}
-	full := filepath.Join(uploadDir(), name)
-	if _, err := os.Stat(full); err != nil {
-		http.NotFound(w, r)
-		return
-	}
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	// Force download for non-image files — prevents a browser from executing
@@ -4616,7 +4600,7 @@ func (s *NexusServer) uploadsServeHandler(w http.ResponseWriter, r *http.Request
 	default:
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
 	}
-	http.ServeFile(w, r, full)
+	serveBlob(w, r, "uploads/"+name)
 }
 
 func (s *NexusServer) handleBotMessage(client *Client, msg NexusMessage) {

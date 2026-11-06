@@ -1,20 +1,20 @@
-# Litestream config — streams SQLite WAL frames to S3-compatible storage
-# every second, so the on-disk DB on the Fly volume is not the only copy.
+# Litestream config: streams SQLite WAL frames to S3-compatible storage
+# every second. On Cloudflare Containers the disk is wiped on every restart,
+# so this replica (in R2) is the database's only durable copy.
 #
-# Required env vars at runtime:
-#   LITESTREAM_BUCKET       e.g. phaze-nexus-backups
-#   LITESTREAM_ENDPOINT     e.g. https://s3.us-east-005.backblazeb2.com
-#                           (or omit for AWS S3 defaults)
-#   LITESTREAM_REGION       e.g. us-east-005
-#   LITESTREAM_ACCESS_KEY_ID
-#   LITESTREAM_SECRET_ACCESS_KEY
+# Required env vars at runtime (the Cloudflare Worker passes them through):
+#   BUCKET_NAME             bucket name (LITESTREAM_BUCKET also accepted)
+#   AWS_ENDPOINT_URL_S3     e.g. https://<account>.r2.cloudflarestorage.com
+#   AWS_REGION              "auto" for R2
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
 #
-# Restore on a fresh volume:
+# Restore by hand:
 #   litestream restore -if-replica-exists -config /app/litestream.yml /data/nexus.db
 #
-# The entrypoint script (Dockerfile CMD) does this automatically when
-# LITESTREAM_BUCKET is set. If unset, the server runs without replication
-# (useful for local dev / self-hosters who don't want S3).
+# The entrypoint script (Dockerfile CMD) does this automatically when a
+# bucket is set. If unset, the server runs without replication (useful for
+# local dev / self-hosters who don't want S3).
 
 dbs:
   - path: /data/nexus.db
