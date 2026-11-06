@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { runGroupCommand } from './groupCommands'
+import { encodeQuote, quotableText, type QuoteRef } from './messageKinds'
 
 export type GroupLine = {
   id: string
@@ -37,6 +38,14 @@ type Props = {
   /** False once /alertsoff muted this group's message sounds. */
   alertsOn: boolean
   onSetAlerts: (on: boolean) => void
+  /** Ring the other members into a call. Video is offered only from the
+   *  group-video era; before that a group call is voice only. */
+  onCall?: (kind: 'audio' | 'video') => void
+  groupVideo?: boolean
+  /** Quote replies (Skype 8). */
+  quotesOn?: boolean
+  /** Opens the contact picker for "Send contacts". */
+  onShareContact?: () => void
 }
 
 /** A line only this user sees — command output and errors. */
@@ -56,12 +65,14 @@ export default function GroupChat({
   name, members, creator, me, friends, lines, renderBody, senderColor,
   onSend, onLeave, onClose, onAddMembers, onRemoveMember, onRename,
   classicCommands, alertsOn, onSetAlerts,
+  onCall, groupVideo = false, quotesOn = false, onShareContact,
 }: Props) {
   const [draft, setDraft] = useState('')
   const [notices, setNotices] = useState<Notice[]>([])
   const [manageOpen, setManageOpen] = useState(false)
   const [renameDraft, setRenameDraft] = useState(name)
   const [toAdd, setToAdd] = useState<string[]>([])
+  const [quoting, setQuoting] = useState<QuoteRef | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const iAmCreator = me !== '' && me === creator
 
@@ -81,10 +92,14 @@ export default function GroupChat({
     const text = draft.trim()
     if (!text) return
     setDraft('')
-    if (!classicCommands) { onSend(text); return }
+    // A quote wraps whatever is sent; commands are never quoted.
+    const out = (t: string) => {
+      if (quoting) { onSend(encodeQuote(quoting, t)); setQuoting(null) } else onSend(t)
+    }
+    if (!classicCommands) { out(text); return }
     const r = runGroupCommand(text, { me, creator, members, friends })
     switch (r.kind) {
-      case 'send': onSend(r.text); break
+      case 'send': out(r.text); break
       case 'rename': onRename(r.name); break
       case 'add':
         onAddMembers(r.users)
@@ -126,6 +141,8 @@ export default function GroupChat({
           </span>
         </span>
         <span className="group-chat-actions">
+          {onCall && <button type="button" onClick={() => onCall('audio')} title="Call the group">Call</button>}
+          {onCall && groupVideo && <button type="button" onClick={() => onCall('video')} title="Video call the group">Video call</button>}
           <button type="button" onClick={openManage} title="Manage group">Manage</button>
           <button type="button" onClick={onLeave} title="Leave group">Leave</button>
           <button type="button" onClick={onClose} title="Close">×</button>
@@ -140,10 +157,27 @@ export default function GroupChat({
             {!item.line.me && <span className="group-line-sender" style={{ color: senderColor(item.line.sender) }}>{item.line.sender}</span>}
             <span className="group-line-body">{renderBody(item.line.body, item.line.sender)}</span>
             <span className="group-line-ts">{new Date(item.line.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            {quotesOn && (
+              <button
+                type="button"
+                className="group-line-quote"
+                title="Quote"
+                onClick={() => setQuoting({ id: item.line.id, from: item.line.sender, text: quotableText(item.line.body), ts: item.line.ts })}
+              >❝</button>
+            )}
           </div>
         ))}
       </div>
+      {quoting && (
+        <div className="quote-banner">
+          <span className="quote-banner-text">Quoting <strong>{quoting.from}</strong>: {quoting.text}</span>
+          <button type="button" className="link-btn" onClick={() => setQuoting(null)}>Cancel</button>
+        </div>
+      )}
       <div className="group-chat-compose">
+        {onShareContact && (
+          <button type="button" className="emoji-btn" title="Send a contact" onClick={onShareContact}>👤</button>
+        )}
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}

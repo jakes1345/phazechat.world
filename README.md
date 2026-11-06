@@ -55,7 +55,8 @@ Other
 - Stories that expire after 24 hours.
 - Web push notifications (VAPID) and Android push via Firebase Cloud Messaging.
 - Referral rewards: inviting a friend who verifies their email earns a crate of cosmetic items. Nothing is for sale. See `docs/rewards.md`.
-- Six visual themes, labelled Phaze 1 to Phaze 6+, modelled on classic Skype releases from 2007 to 2018. In the web app the theme also decides which features are shown. Spaces, live streams, reactions, read receipts and remote sessions only appear on Phaze 6+. The default theme is Phaze 5.
+- Six visual themes, labelled Phaze 1 to Phaze 6+, modelled on classic Skype releases from 2007 to 2018. In the web app the theme also decides which features are shown, and the theme picker lists what each one adds. Spaces, live streams, reactions, read receipts and remote sessions only appear on Phaze 6+. The default theme is Phaze 5.
+- Era features (web): send contacts, voicemail and group calls from a group chat from Phaze 1; screen sharing in calls from Phaze 2; group video from Phaze 3; video messages from Phaze 4; quotes, drafts, bookmarks, a chat gallery and call recording on Phaze 6+. See `docs/skype-era-gaps.md` section 8.
 
 ### Known gaps
 

@@ -18,8 +18,8 @@ there is nothing in the app to show or hide.
 
 | Feature | Claimed from | Reality |
 | --- | --- | --- |
-| `screen_share` | Skype 4 | **Not implemented.** No in-app screen sharing. Calls are an embedded Jitsi iframe, and whatever sharing Jitsi offers is Jitsi's, not ours and not era-gated. |
-| `group_video` | Skype 5 | **Not implemented.** There is no group calling of any kind — `startCall` only takes a single peer, and `VoiceRoom.tsx` (the one place group voice exists) is a bare Jitsi iframe rather than anything the app controls. See `docs/livekit-evaluation.md` — an SFU is what makes this actually buildable. |
+| `screen_share` | Skype 4 | **Resolved (era-gated).** Group calls run as the app's own WebRTC rooms; `web/src/callCaps.ts` hides the Share screen button before Skype 4. |
+| `group_video` | Skype 5 | **Resolved.** Group chats now have Call and Video call buttons; the server's `convo_call` opens a guest-listed call room and rings every other member, and only members can join it (`nexus_server/group_call_test.go`). Before Skype 5 the group call is voice only, with no camera button. |
 | `mojis` | Skype 7 | **Not implemented.** Nothing distinguishes Skype 7's emoticon experience from any other era's. |
 | `dark_mode` | all modern | Meaningless as a gate; each era's palette decides its own darkness. Should probably be dropped from the feature list. |
 
@@ -183,14 +183,16 @@ substantially after the deep-research pass:
 * Skype Translator (Skype 7)
 * Bots — a whole category of automated contacts, group-chat-capable from
   mid-2016
-* Quoted messages, chat media gallery, call recording (Skype 8)
-* Message drafts, bookmarks, split view, scheduled group calls (Skype 8,
-  2019)
-* Voicemail, call quality indicators, a call-transfer button
+* ~~Quoted messages, chat media gallery, call recording (Skype 8)~~ —
+  built, see #8
+* ~~Message drafts, bookmarks~~ (built, see #8), split view, scheduled
+  group calls (Skype 8, 2019)
+* ~~Voicemail~~ (built, see #8), call quality indicators, a
+  call-transfer button
 * `Skype Me` presence — now dateable: hidden from the status picker at
   Skype 4, removed completely at Skype 5. Distinct from plain Online.
-* Video messages (record up to 3 minutes, send to an offline contact) —
-  launched February 2013, inside the Skype 6.x window
+* ~~Video messages (record up to 3 minutes, send to an offline contact) —
+  launched February 2013, inside the Skype 6.x window~~ — built, see #8
 * **Mojis specifically cannot be reproduced** — they were licensed film
   and TV clips, not something a recreation can legally include. This is a
   permanent gap, not a "not built yet" one; `mojis` should probably stay
@@ -229,6 +231,29 @@ Not changed in this pass — this is a decision to make, not a bug to fix.
   Widening the first to cover every classic era left the second matching
   as well, so four eras stacked both call overlays for the whole call.
   The second is now `!isClassicSkype(theme)`.
+
+## 8. Era features built in the era-features pass
+
+Each feature below is real (no mock data), gated by `hasFeature()` and
+listed in the era picker (`newInEra()` in `web/src/themes.ts`).
+
+| Feature | From | How it works |
+| --- | --- | --- |
+| Send contacts | Skype 3 | A `phaze-contact{...}` body inside the normal (E2EE for DMs) message. Renders as a card with Add contact / Message. DMs and group chats. |
+| Voicemail | Skype 3 | Offered when an outgoing call is declined, times out or the person is offline. Records up to 3 minutes and posts as an attachment marked `kind: voicemail`. |
+| Screen sharing | Skype 4 | Share screen button in group calls from this era on (see #1). |
+| Group calls from a group chat | Skype 3 audio, Skype 5 video | `convo_call` on the server; members get the ringing banner with the group's name. |
+| Video messages | Skype 6 | Camera recorder, up to 3 minutes, attachment `kind: video_message`. |
+| Quotes | Skype 8 | `phaze-quote{...}\n<reply>` inside the message body, so DMs stay E2EE. Click the quote to jump to the original. Editing keeps the quote. |
+| Drafts | Skype 8 | Per-chat unsent text, kept in this browser's `localStorage` only, never on the server. Sidebar shows "Draft:". |
+| Bookmarks | Skype 8 | Stored in the per-user settings store as message ids only, never text. Up to 500. |
+| Chat gallery | Skype 8 | Media, Files, Links and Bookmarks tabs for the open chat, from the history on this device. |
+| Call recording | Skype 8 | Records the call tab plus your mic in the browser, tells the other person, posts to the chat when it stops (or saves to the device if over 25 MB). |
+
+Left out on purpose: Mojis (licensed clips), Translator (the server would
+have to read end-to-end encrypted text), SkypeOut.
+
+Not yet on Android: contact cards and quotes show as raw text there.
 
 ## How to use this file
 

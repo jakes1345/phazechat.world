@@ -15,6 +15,13 @@ interface Props {
   autoJoin?: boolean
   /** Called after leaving, so a group call overlay can close itself. */
   onLeave?: () => void
+  /** Offer a camera. Group video arrived later than group voice, so an
+   *  earlier era's group call is voice only. Defaults to true. */
+  allowVideo?: boolean
+  /** Offer screen sharing (from the era that introduced it). Defaults to true. */
+  allowScreenShare?: boolean
+  /** Turn the camera on as soon as the call connects (a video call). */
+  startWithCamera?: boolean
 }
 
 type Phase = 'idle' | 'joining' | 'joined'
@@ -102,7 +109,7 @@ function PeerTile({ name, stream, state, connecting, isMe, video, audioStream }:
   )
 }
 
-export default function VoiceRoom({ me, channelId, channelName, send, subscribe, turn, autoJoin, onLeave }: Props) {
+export default function VoiceRoom({ me, channelId, channelName, send, subscribe, turn, autoJoin, onLeave, allowVideo = true, allowScreenShare = true, startWithCamera = false }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [err, setErr] = useState('')
   const [mesh, setMesh] = useState<VoiceMesh | null>(null)
@@ -150,7 +157,8 @@ export default function VoiceRoom({ me, channelId, channelName, send, subscribe,
     send({ type: 'voice_join', channel_id: channelId })
     setMesh(m)
     setPhase('joined')
-  }, [me, send, channelId, rerender])
+    if (startWithCamera && allowVideo) void m.setCamera(true)
+  }, [me, send, channelId, rerender, startWithCamera, allowVideo])
 
   const leave = useCallback(() => {
     teardown()
@@ -243,12 +251,16 @@ export default function VoiceRoom({ me, channelId, channelName, send, subscribe,
             <button type="button" className={`voice-mute-btn${local.mic ? '' : ' active'}`} onClick={() => mesh.setMuted(local.mic)}>
               {local.mic ? 'Mute' : 'Unmute'}
             </button>
-            <button type="button" className={`voice-mute-btn${local.cam ? ' active' : ''}`} onClick={() => void mesh.setCamera(!local.cam)} disabled={local.screen}>
-              {local.cam ? 'Camera off' : 'Camera on'}
-            </button>
-            <button type="button" className={`voice-mute-btn${local.screen ? ' active' : ''}`} onClick={() => void mesh.setScreenShare(!local.screen)}>
-              {local.screen ? 'Stop sharing' : 'Share screen'}
-            </button>
+            {allowVideo && (
+              <button type="button" className={`voice-mute-btn${local.cam ? ' active' : ''}`} onClick={() => void mesh.setCamera(!local.cam)} disabled={local.screen}>
+                {local.cam ? 'Camera off' : 'Camera on'}
+              </button>
+            )}
+            {allowScreenShare && (
+              <button type="button" className={`voice-mute-btn${local.screen ? ' active' : ''}`} onClick={() => void mesh.setScreenShare(!local.screen)}>
+                {local.screen ? 'Stop sharing' : 'Share screen'}
+              </button>
+            )}
             <button type="button" className="voice-leave-btn" onClick={leave}>Leave</button>
           </>
         ) : (
