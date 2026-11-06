@@ -1,108 +1,196 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calling Rates — Phaze</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root { --brand: #00AFF0; --brand-dark: #0095CC; --text-dark: #0a0a0a; --text-light: #6b6b75; --bg-light: #fafafa; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text-dark); background: #fff; line-height: 1.6; }
-        a { color: var(--brand); text-decoration: none; }
-        .container { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
-
-        .navbar { background: #fff; border-bottom: 1px solid #e8e8e8; position: sticky; top: 0; z-index: 1000; }
-        .navbar .container { display: flex; align-items: center; justify-content: space-between; height: 60px; }
-        .nav-brand { display: flex; align-items: center; gap: 8px; font-size: 1.4rem; font-weight: 700; color: var(--brand); }
-        .nav-links { display: flex; list-style: none; height: 100%; }
-        .nav-links a { display: flex; align-items: center; height: 100%; padding: 0 18px; color: var(--text-dark); font-size: 0.9rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--brand); border-bottom-color: var(--brand); }
-        .nav-get-btn { background: var(--brand); color: #fff !important; padding: 8px 24px; border-radius: 4px; font-weight: 600; }
-
-        .rates-hero { background: #00AFF0; color: #fff; padding: 60px 0; text-align: center; }
-        .rates-hero h1 { font-size: 2.5rem; font-weight: 300; margin-bottom: 12px; }
-        .rates-hero h1 strong { font-weight: 700; }
-
-        .rates-section { padding: 60px 0; }
-        .rates-section h2 { text-align: center; font-size: 1.8rem; margin-bottom: 40px; font-weight: 400; }
-        
-        .rates-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin-bottom: 60px; }
-        .rate-card { border: 1px solid #e8e8e8; border-radius: 12px; padding: 24px; text-align: center; transition: all 0.2s; }
-        .rate-card:hover { border-color: var(--brand); box-shadow: 0 8px 30px rgba(0,0,0,0.05); }
-        .rate-card h3 { font-size: 1.1rem; margin-bottom: 16px; color: var(--text-light); text-transform: uppercase; letter-spacing: 1px; }
-        .rate-price { font-size: 2.5rem; font-weight: 700; color: var(--brand); margin-bottom: 4px; }
-        .rate-unit { font-size: 0.9rem; color: var(--text-light); }
-        .rate-detail { font-size: 0.85rem; color: var(--text-light); margin-top: 16px; border-top: 1px solid #f0f0f0; padding-top: 16px; }
-
-        .cta-band { background: var(--bg-light); padding: 60px 0; text-align: center; border-top: 1px solid #eee; border-bottom: 1px solid #eee; }
-        .cta-band h2 { font-size: 1.8rem; margin-bottom: 24px; font-weight: 400; }
-        .btn-credit { display: inline-block; background: var(--brand); color: #fff; padding: 14px 40px; border-radius: 6px; font-weight: 700; font-size: 1.1rem; }
-        .btn-credit:hover { background: var(--brand-dark); transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,175,240,0.3); }
-
-        .footer { background: #1a1a1a; color: #999; padding: 40px 0; text-align: center; font-size: 0.8rem; }
-        .footer a { color: #bbb; }
-        
-        @media (max-width: 768px) { .nav-links { display: none; } }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing: Phaze Is Free, No Ads or Subscriptions</title>
+<meta name="description" content="Phaze messages, calls, file sharing, Skype import and self-hosting are free. No ads, no premium tier. Optional supporter badge via Buy Me a Coffee.">
+<link rel="canonical" href="https://phazechat.world/rates">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0077B3">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Phaze">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Pricing: Phaze Is Free, No Ads or Subscriptions">
+<meta property="og:description" content="Phaze messages, calls, file sharing, Skype import and self-hosting are free. No ads, no premium tier. Optional supporter badge via Buy Me a Coffee.">
+<meta property="og:url" content="https://phazechat.world/rates">
+<meta property="og:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@PhazeChatWorld">
+<meta name="twitter:title" content="Pricing: Phaze Is Free, No Ads or Subscriptions">
+<meta name="twitter:description" content="Phaze messages, calls, file sharing, Skype import and self-hosting are free. No ads, no premium tier. Optional supporter badge via Buy Me a Coffee.">
+<meta name="twitter:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta name="twitter:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<link rel="icon" href="/public/site/img/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/public/site/img/favicon-32.png">
+<link rel="apple-touch-icon" href="/public/site/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="/public/site/site.css?v=20261106">
+<script src="/public/site/site.js?v=20261106" defer></script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://phazechat.world/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Pricing",
+     "item": "https://phazechat.world/rates"
+    }
+   ]
+  }
+ ]
+}
+</script>
 </head>
 <body>
-    <nav class="navbar"><div class="container">
-        <a href="/" class="nav-brand"><svg viewBox="0 0 32 32" fill="none" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#00AFF0"/><text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-weight="700" font-family="sans-serif">P</text></svg> Phaze</a>
-        <ul class="nav-links"><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/download">Download</a></li><li><a href="/rates" class="active">Rates</a></li><li><a href="/about">About</a></li></ul>
-        <div class="nav-right"><a href="/download" class="nav-get-btn">Get Phaze</a></div>
-    </div></nav>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+    <nav aria-label="Main"><ul class="nav-links"><li><a href="/features">Features</a></li><li><a href="/skype-alternative">Skype alternative</a></li><li><a href="/download">Download</a></li><li><a href="/security">Security</a></li><li><a href="/rates" aria-current="page">Pricing</a></li><li><a href="/support">Support</a></li></ul></nav>
+    <div class="nav-actions">
+      <a class="btn btn-secondary" href="/web/">Sign in</a>
+      <a class="btn btn-primary" href="/web/">Open Phaze</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-menu"/></svg></button>
+    </div>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu" data-open="false">
+  <nav aria-label="Mobile"><ul><li><a href="/">Home<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/features">Features<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/skype-alternative">Skype alternative<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/download">Download<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/security">Security<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/rates" aria-current="page">Pricing<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/support">Support<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/about">About<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li></ul></nav>
+  <a class="btn btn-secondary btn-lg" href="/web/">Sign in</a>
+  <a class="btn btn-primary btn-lg" href="/web/">Open Phaze in your browser</a>
+</div>
+<main id="main">
 
-    <section class="rates-hero">
-        <div class="container">
-            <h1><strong>Phaze is free.</strong></h1>
-            <p>No subscriptions. No credit packs. No surprise fees.</p>
-        </div>
-    </section>
+<section class="page-hero center">
+  <div class="container">
+    <span class="eyebrow">Pricing</span>
+    <h1>Phaze is free. Really.</h1>
+    <p class="lead">No subscriptions, no credit packs, no premium tier, no ads. Everything below costs $0.</p>
+  </div>
+</section>
 
-    <section class="rates-section">
-        <div class="container">
-            <h2>Here's the actual pricing.</h2>
-            <div class="rates-grid">
-                <div class="rate-card">
-                    <h3>Phaze-to-Phaze</h3>
-                    <div class="rate-price">$0</div>
-                    <div class="rate-unit">forever</div>
-                    <div class="rate-detail">Messages, voice messages, voice + video calls — all free.</div>
-                </div>
-                <div class="rate-card">
-                    <h3>File uploads</h3>
-                    <div class="rate-price">$0</div>
-                    <div class="rate-unit">up to 25MB / file</div>
-                    <div class="rate-detail">Images, audio, video, PDFs, archives.</div>
-                </div>
-                <div class="rate-card">
-                    <h3>Self-host</h3>
-                    <div class="rate-price">$0</div>
-                    <div class="rate-unit">your hardware, your rules</div>
-                    <div class="rate-detail">Phaze is open source. Run the Nexus on your own server with one Docker command.</div>
-                </div>
-                <div class="rate-card">
-                    <h3>Calls to landlines</h3>
-                    <div class="rate-price">—</div>
-                    <div class="rate-unit">not supported</div>
-                    <div class="rate-detail">We don't bridge to the phone network. Phaze is for Phaze users.</div>
-                </div>
-            </div>
-            <p style="text-align:center; color: var(--text-light); margin-top: 32px; font-size: 0.95rem;">
-                How does this stay free? The phazechat.world server runs on a small Cloudflare instance funded by the project. If it grows beyond what donations cover, we'll ask for an optional supporter tier — never paywall the chat.
-            </p>
-        </div>
-    </section>
+<section class="section">
+  <div class="container">
+    <div class="grid grid-4">
+      <article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-chat"/></svg></span><h2 style="font-size:1.08rem">Messages &amp; calls</h2><p style="font-size:2.4rem;font-weight:800;color:var(--text);margin:10px 0 4px">$0</p><p>DMs, group chats, voice messages and voice and video calls between Phaze users.</p></article>
+      <article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-file"/></svg></span><h2 style="font-size:1.08rem">Files</h2><p style="font-size:2.4rem;font-weight:800;color:var(--text);margin:10px 0 4px">$0</p><p>Photos, audio, video, PDFs and archives, up to 25&nbsp;MB each.</p></article>
+      <article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-import"/></svg></span><h2 style="font-size:1.08rem">Skype import</h2><p style="font-size:2.4rem;font-weight:800;color:var(--text);margin:10px 0 4px">$0</p><p>Bring your Skype export, up to 100&nbsp;MB. <a href="/skype-alternative#import">How it works</a>.</p></article>
+      <article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-server"/></svg></span><h2 style="font-size:1.08rem">Self-hosting</h2><p style="font-size:2.4rem;font-weight:800;color:var(--text);margin:10px 0 4px">$0</p><p>Open source under MIT. Run your own server from the Docker image.</p></article>
+    </div>
+    <div class="callout" style="margin-top:28px"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-phone"/></svg><p><strong>No calls to phone numbers.</strong> Unlike Skype Credit, Phaze doesn&rsquo;t connect to landlines or mobiles, and there are no phone numbers to buy. Calls are between Phaze users.</p></div>
+  </div>
+</section>
 
-    <section class="cta-band">
-        <div class="container">
-            <h2>Ready to talk?</h2>
-            <a href="/web/" class="btn-credit">Open Phaze</a>
-            <p style="margin-top: 16px; color: var(--text-light); font-size: 0.9rem;">No payment info required. Pick a username, set a password, you're in.</p>
-        </div>
-    </section>
+<section class="section section-soft" id="support">
+  <div class="container split">
+    <div>
+      <span class="eyebrow"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-heart"/></svg> Supporters</span>
+      <h2 class="h-section">How it stays free</h2>
+      <p class="lead" style="margin-top:14px">phazechat.world runs on Cloudflare and is paid for by the project and by people who choose to chip in. Supporting is optional and never unlocks features: the chat stays free for everyone.</p>
+      <ul class="checks">
+        <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span>Donations go through <strong>Buy Me a Coffee</strong>. No payment details ever touch Phaze&rsquo;s server.</span></li>
+        <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span>Supporters get a <strong>supporter badge</strong> on their profile as a thank-you.</span></li>
+        <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span>Inviting friends earns <strong>cosmetic reward crates</strong>. Nothing in Phaze is for sale.</span></li>
+      </ul>
+      <div class="hero-actions" style="justify-content:flex-start">
+        <a class="btn btn-primary" id="bmc-link" href="https://buymeacoffee.com/phazeworld" rel="noopener"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-heart"/></svg> Support Phaze on Buy Me a Coffee</a>
+      </div>
+      <p class="small muted" style="margin-top:12px">Signed in? Use the Support Phaze button in the app so your badge is matched to your account.</p>
+    </div>
+    <div class="panel">
+      <h3>What you&rsquo;ll never pay for</h3>
+      <div class="kv">
+        <div><span>Messages and calls</span><span>Free</span></div>
+        <div><span>Encryption</span><span>Free, for everyone</span></div>
+        <div><span>Themes and emoticons</span><span>Free</span></div>
+        <div><span>Spaces and live streams</span><span>Free</span></div>
+        <div><span>Ads</span><span>None</span></div>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <footer class="footer"><div class="container">© 2024–2026 Phaze · <a href="/legal">Terms</a> · <a href="/privacy">Privacy</a> · Not affiliated with Microsoft.</div></footer>
+<section class="section">
+  <div class="container">
+    <div class="cta">
+      <h2>Ready to talk?</h2>
+      <p>No payment details. Sign up with a username, a password and an email address you verify.</p>
+      <div class="hero-actions"><a class="btn btn-light btn-lg" href="/web/">Open Phaze <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></div>
+    </div>
+  </div>
+</section>
+<script>
+// Use the operator's configured Buy Me a Coffee link (BMC_URL) when the API is reachable.
+fetch('/api/v1/config').then(function (r) { return r.ok ? r.json() : null; }).then(function (c) {
+  if (c && c.bmc_url && /^https:\/\//.test(c.bmc_url)) document.getElementById('bmc-link').href = c.bmc_url;
+}).catch(function () {});
+</script>
+
+</main>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+        <p>A free, open-source messenger in the classic style. Built for people who miss how chat used to feel.</p>
+      </div>
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="/web/">Open the web app</a></li>
+          <li><a href="/features">Features</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href="/rates">Pricing</a></li>
+          <li><a href="/status">Service status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Switching</h2>
+        <ul>
+          <li><a href="/skype-alternative">Skype alternative</a></li>
+          <li><a href="/skype-alternative#import">Import a Skype export</a></li>
+          <li><a href="/#compare">Compare apps</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/support">Support</a></li>
+          <li><a href="/security">Security</a></li>
+          <li><a href="https://github.com/jakes1345/phazechat.world" rel="noopener">Source code</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Legal</h2>
+        <ul>
+          <li><a href="/privacy">Privacy policy</a></li>
+          <li><a href="/terms">Terms of service</a></li>
+          <li><a href="/legal">Legal notices</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2024&ndash;2026 Phaze. An independent project, not affiliated with Microsoft or Skype.</span>
+      <span><a href="https://x.com/PhazeChatWorld" rel="noopener">X</a> &middot; <a href="https://instagram.com/phazechat.world" rel="noopener">Instagram</a> &middot; <a href="https://github.com/jakes1345/phazechat.world" rel="noopener">GitHub</a></span>
+    </div>
+  </div>
+</footer>
 </body>
 </html>
