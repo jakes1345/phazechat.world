@@ -75,13 +75,14 @@ How it works:
 1. Each install generates its own keypair on first run. The web client keeps it in `localStorage`; Android keeps it in app-private SharedPreferences.
 2. Public keys are never stored on the server. When you open a chat, your client sends a `key_request` and the contact's client replies with its public key. The server only forwards these between friends.
 3. Each message gets a random 24-byte nonce. The body goes over the wire as `E2EE:` followed by hex-encoded nonce and ciphertext. The server stores and relays that string as-is.
-4. The web client pins each contact's key fingerprint (first 8 bytes of SHA-256 of the key) the first time it sees it. If the key later changes, it refuses the new key and shows a warning. Android doesn't pin keys yet.
+4. Both clients pin each contact's key fingerprint (first 8 bytes of SHA-256 of the key) the first time they see it and keep pinned keys across restarts, so messages to an offline contact stay encrypted. If a contact's key changes (they reinstalled or used another device), the client keeps the pinned key and asks before trusting the new one.
+5. Without a key for the contact (first contact while they're offline), the client asks before sending a message unencrypted.
 
 Key backup is optional. Your keypair is encrypted on the device with a key derived from a recovery PIN of at least 8 characters (PBKDF2-SHA256, 600,000 iterations, AES-256-GCM) and only the ciphertext, salt and iteration count are uploaded. On the web, Settings → Backup & Devices restores it on a new device, and a browser that had to create a new identity is reminded that a backup exists. Restoring lets you keep the same identity, which matters because a new keypair looks like a key change to contacts using the web client. The PIN is the only thing protecting the backup from the server, so use a long one.
 
 What isn't encrypted end to end:
 
-- A DM sent before your client has the contact's key. Both clients fall back to plaintext in that case. On the web, the message box shows a lock icon once encryption is active.
+- A DM you choose to send before your client has the contact's key (the app asks first). On the web, the message box shows a lock icon once encryption is active.
 - Attachments. The file itself is uploaded unencrypted under a random name. Only the message carrying its URL is encrypted.
 - Group chats, Spaces channels, Stories and imported Skype history.
 - Calls (see above).
