@@ -78,7 +78,9 @@ func TestCalls_StrangerCannotEndOrRejectSomeoneElsesCall(t *testing.T) {
 	// having seen any hang-up or call_log first.
 	bob.WriteJSON(NexusMessage{Type: "call_answer", Recipient: "alice"})
 	readUntilNot(t, alice,
-		func(m NexusMessage) bool { return m.Type == "call_end" || m.Type == "call_reject" || m.Type == "call_log" },
+		func(m NexusMessage) bool {
+			return m.Type == "call_end" || m.Type == "call_reject" || m.Type == "call_log"
+		},
 		func(m NexusMessage) bool { return m.Type == "call_jitsi" && m.RoomID == room })
 
 	// The call row was left for the real hang-up: it logs as answered.

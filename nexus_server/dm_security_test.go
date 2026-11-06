@@ -80,7 +80,9 @@ func TestDM_EditDeleteReactRequireParticipant(t *testing.T) {
 	// Alice (the author) can edit.
 	a.WriteJSON(NexusMessage{Type: "msg_edit", Recipient: "bob", MsgID: "ab-1", Body: "fixed"})
 	edit := readUntilNot(t, b,
-		func(x NexusMessage) bool { return (x.Type == "msg_edit" || x.Type == "msg_delete") && x.Sender != "alice" },
+		func(x NexusMessage) bool {
+			return (x.Type == "msg_edit" || x.Type == "msg_delete") && x.Sender != "alice"
+		},
 		func(x NexusMessage) bool { return x.Type == "msg_edit" })
 	if edit.Body != "fixed" {
 		t.Fatalf("author edit not relayed: %+v", edit)

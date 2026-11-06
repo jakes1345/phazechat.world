@@ -8,10 +8,10 @@ import (
 // authFailTracker tracks per-IP and per-user consecutive failed auth attempts.
 // When thresholds are breached, connections are throttled or blocked entirely.
 type authFailTracker struct {
-	mu          sync.Mutex
-	ipFails     map[string]*authFail // keyed by IP
-	userFails   map[string]*authFail // keyed by username
-	totpFails   map[string]*authFail // keyed by username — TOTP code attempts
+	mu           sync.Mutex
+	ipFails      map[string]*authFail // keyed by IP
+	userFails    map[string]*authFail // keyed by username
+	totpFails    map[string]*authFail // keyed by username — TOTP code attempts
 	signupCounts map[string]*authFail // keyed by IP — successful registrations
 	// deviceCodeFails counts wrong new-device codes per user across every
 	// challenge. Each challenge allows only a few guesses, but anyone with
