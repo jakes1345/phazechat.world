@@ -878,6 +878,13 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				s.handleBotMessage(client, msg)
 				continue
 			}
+			// No such account: don't persist a history row or queue an
+			// offline message for a name nobody owns (and that someone could
+			// later register to inherit).
+			if !s.userExists(msg.Recipient) {
+				client.Send(NexusMessage{Type: "msg_status", Body: "error", Sender: msg.Recipient, Error: "No such user"})
+				continue
+			}
 			// Trust & safety: drop if either party has blocked the other.
 			// Sender sees a benign delivered_offline status — no oracle leak.
 			if s.isBlocked(msg.Recipient, msg.Sender) || s.isBlocked(msg.Sender, msg.Recipient) {
@@ -896,10 +903,18 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			// the sender produced it. Idempotent on msg_id so retries are
 			// safe. Both ends fetch this via "dm_history" on chat open.
 			s.persistDM(msg.MsgID, msg.Sender, msg.Recipient, msg.Body)
-			s.Mu.RLock()
-			s.Mu.RUnlock()
 
-			if s.sendTo(msg.Recipient, msg) {
+			// Forward only what a DM is made of. Relaying the client's whole
+			// NexusMessage let a sender attach arbitrary fields (turn_config,
+			// status, members, ...) that the recipient's client would act on.
+			dm := NexusMessage{
+				Type:      "msg",
+				Sender:    username,
+				Recipient: msg.Recipient,
+				Body:      msg.Body,
+				MsgID:     msg.MsgID,
+			}
+			if s.sendTo(msg.Recipient, dm) {
 				// delivered live to at least one of their sessions
 			} else {
 				s.storeOfflineMessage(msg.Sender, msg.Recipient, msg.Body, "msg", msg.MsgID)
@@ -1256,9 +1271,29 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if s.isBlocked(msg.Recipient, username) || s.isBlocked(username, msg.Recipient) {
 				continue
 			}
-			msg.Sender = username
+			// The message has to be one between these two people, and only
+			// its author may edit or delete it. Without this the live relay
+			// let anyone push "edits"/"deletes" for any msg_id at anyone.
+			origSender, origRecipient, found := s.dmParticipants(msg.MsgID)
+			if !found {
+				continue
+			}
+			inThread := (origSender == username && origRecipient == msg.Recipient) ||
+				(origSender == msg.Recipient && origRecipient == username)
+			if !inThread {
+				continue
+			}
+			if (msg.Type == "msg_edit" || msg.Type == "msg_delete") && origSender != username {
+				continue
+			}
 			// Mirror the action into durable history so both sides see it
 			// after a refresh / new-device login.
+			relay := NexusMessage{
+				Type:      msg.Type,
+				Sender:    username,
+				Recipient: msg.Recipient,
+				MsgID:     msg.MsgID,
+			}
 			switch msg.Type {
 			case "msg_edit":
 				if len(msg.Body) > 10000 {
@@ -1266,14 +1301,17 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					continue
 				}
 				s.editDM(msg.MsgID, username, msg.Body)
+				relay.Body = msg.Body
 			case "msg_delete":
 				s.deleteDM(msg.MsgID, username)
 			case "msg_react":
-				if msg.Reaction != "" {
-					s.toggleReaction(msg.MsgID, username, msg.Reaction)
+				if msg.Reaction == "" || len(msg.Reaction) > 256 {
+					continue
 				}
+				s.toggleReaction(msg.MsgID, username, msg.Reaction)
+				relay.Reaction = msg.Reaction
 			}
-			s.sendTo(msg.Recipient, msg)
+			s.sendTo(msg.Recipient, relay)
 
 		case "dm_history":
 			if username == "" || msg.Recipient == "" {

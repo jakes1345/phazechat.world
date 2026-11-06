@@ -309,6 +309,21 @@ func (s *NexusServer) reauthConnection(client *Client, current, newUser string) 
 	return false
 }
 
+// userExists reports whether an account with this name exists.
+func (s *NexusServer) userExists(username string) bool {
+	if username == "" {
+		return false
+	}
+	var one int
+	return s.DB.QueryRow(`SELECT 1 FROM users WHERE username = ?`, username).Scan(&one) == nil
+}
+
+// dmParticipants returns who sent and who received a stored DM.
+func (s *NexusServer) dmParticipants(msgID string) (sender, recipient string, ok bool) {
+	err := s.DB.QueryRow(`SELECT sender, recipient FROM dm_messages WHERE msg_id = ?`, msgID).Scan(&sender, &recipient)
+	return sender, recipient, err == nil
+}
+
 // ── Remote screen sessions ────────────────────────────────────────────────
 //
 // A viewer earns the right to signal a host by looking up the host's 6-digit
