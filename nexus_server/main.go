@@ -1023,6 +1023,21 @@ func (s *NexusServer) deleteAccount(username string) error {
 		{`DELETE FROM session_tokens WHERE username = ?`, []any{username}},
 		{`DELETE FROM password_resets WHERE username = ?`, []any{username}},
 		{`DELETE FROM qr_login_tokens WHERE username = ?`, []any{username}},
+		// Everything else keyed by username. Left behind, it was inherited
+		// by whoever registered the name next (including the old owner's
+		// imported Skype history).
+		{`DELETE FROM skype_import_messages WHERE username = ?`, []any{username}},
+		{`DELETE FROM skype_import_contacts WHERE username = ?`, []any{username}},
+		{`DELETE FROM known_devices WHERE username = ?`, []any{username}},
+		{`DELETE FROM device_challenges WHERE username = ?`, []any{username}},
+		{`DELETE FROM contact_groups WHERE owner = ? OR contact = ?`, []any{username, username}},
+		{`DELETE FROM convo_messages WHERE sender = ?`, []any{username}},
+		{`DELETE FROM calls WHERE caller = ? OR callee = ?`, []any{username, username}},
+		{`DELETE FROM invite_codes WHERE inviter = ?`, []any{username}},
+		{`DELETE FROM reward_crates WHERE owner = ?`, []any{username}},
+		{`DELETE FROM reward_crafts WHERE owner = ?`, []any{username}},
+		{`DELETE FROM whiteboard_strokes WHERE author = ?`, []any{username}},
+		{`UPDATE users SET referred_by = '' WHERE referred_by = ?`, []any{username}},
 		// Drop the user last — every other row referencing the username is
 		// already gone, so a foreign-key constraint (if added later) would still
 		// pass.
