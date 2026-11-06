@@ -94,6 +94,24 @@ func TestDeviceVerifyWS_CorrectCodeSignsIn(t *testing.T) {
 	}
 }
 
+// Approved in-app while the new device waits: it can finish without a code.
+func TestDeviceVerifyWS_ApprovedElsewhereCompletes(t *testing.T) {
+	t.Setenv("PHAZE_DEVICE_VERIFICATION", "1")
+	noMailTransport(t)
+	srv, _, wsBase := newTestServer(t)
+	registerAndVerify(t, srv, "alice", "password123")
+	phone, held, chID := heldWSSignIn(t, wsBase, srv, "alice", "424242")
+
+	if r := deviceVerify(t, held, NexusMessage{}); r.Status != "device_verification_required" {
+		t.Fatalf("empty code before approval: %+v", r)
+	}
+	phone.WriteJSON(NexusMessage{Type: "device_approve", ChallengeID: chID})
+	readUntil(t, phone, func(m NexusMessage) bool { return m.Type == "device_result" && m.Status == "approved" })
+	if r := deviceVerify(t, held, NexusMessage{}); r.Status != "ok" || r.QRToken == "" {
+		t.Fatalf("approved sign-in did not complete: %+v", r)
+	}
+}
+
 func TestDeviceVerifyWS_OtherUsersCodeRejected(t *testing.T) {
 	t.Setenv("PHAZE_DEVICE_VERIFICATION", "1")
 	noMailTransport(t)

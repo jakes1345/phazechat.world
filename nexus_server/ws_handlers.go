@@ -571,7 +571,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					client.Send(NexusMessage{
 						Type:        "auth_result",
 						Status:      "device_verification_required",
-						Error:       "Enter the 6-digit code from the email.",
+						Error:       "Not approved yet. Enter the 6-digit code from the email, or approve the sign-in on a device where you're signed in.",
 						ChallengeID: held.challengeID,
 					})
 					continue
