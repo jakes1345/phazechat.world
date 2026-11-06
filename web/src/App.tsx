@@ -639,6 +639,29 @@ export default function App() {
     animationFrameIdRef.current = requestAnimationFrame(tick)
   }
 
+  // One link-code poll at a time; stopped on approval, on "Back to sign in"
+  // and after five minutes. Each new code used to start another interval
+  // that kept polling (and re-signing in) for the full five minutes.
+  const linkPollRef = useRef<{ interval: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(null)
+  const stopLinkPoll = () => {
+    const p = linkPollRef.current
+    if (!p) return
+    clearInterval(p.interval)
+    clearTimeout(p.timeout)
+    linkPollRef.current = null
+  }
+  const startLinkPoll = (tok: string) => {
+    stopLinkPoll()
+    const interval = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
+    const timeout = setTimeout(() => {
+      stopLinkPoll()
+      setLinkBusy(false)
+      setErr('The link code expired. Generate a new one on your other device.')
+    }, 5 * 60 * 1000)
+    linkPollRef.current = { interval, timeout }
+    sendRef.current({ type: 'link_check', token: tok })
+  }
+
   const handleScannedToken = (val: string) => {
     let tok = val.trim()
     if (tok.includes('token=')) {
@@ -647,11 +670,9 @@ export default function App() {
     if (!/^[a-f0-9]{32,128}$/.test(tok)) { setErr('Invalid QR code format'); return }
     setLinkInput(tok)
     stopCamera()
-    setErr('✓ Token scanned: ' + tok)
+    setErr('✓ Code scanned. Waiting for approval on your other device…')
     setLinkBusy(true)
-    const poll = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
-    sendRef.current({ type: 'link_check', token: tok })
-    setTimeout(() => clearInterval(poll), 5 * 60 * 1000)
+    startLinkPoll(tok)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1484,7 +1505,12 @@ export default function App() {
           break
 
         case 'link_check':
-          if (msg.status === 'approved' && msg.qr_token) {
+          // Only the device that is signing in with a link code acts on an
+          // approval. A signed-in device also polls link_check (Settings →
+          // Link a new device) and must not take over the new device's
+          // session.
+          if (msg.status === 'approved' && msg.qr_token && !meRef.current && linkPollRef.current) {
+            stopLinkPoll()
             // Server returned a fresh session token for the linked device.
             localStorage.setItem(SESSION_KEY, msg.qr_token)
             setSessionToken(msg.qr_token)
@@ -3004,12 +3030,9 @@ export default function App() {
                     <button type="button" disabled={linkBusy || linkInput.length < 8} onClick={() => {
                       setLinkBusy(true)
                       setErr('Waiting for approval on your other device…')
-                      const tok = linkInput
-                      const poll = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
-                      sendRef.current({ type: 'link_check', token: tok })
-                      setTimeout(() => clearInterval(poll), 5 * 60 * 1000)
+                      startLinkPoll(linkInput)
                     }}>{linkBusy ? 'Waiting…' : 'Sign in with code'}</button>
-                    <button type="button" className="link-btn" onClick={() => { stopCamera(); setMode('login'); setLinkInput(''); setLinkBusy(false); setErr('') }}>Back to sign in</button>
+                    <button type="button" className="link-btn" onClick={() => { stopCamera(); stopLinkPoll(); setMode('login'); setLinkInput(''); setLinkBusy(false); setErr('') }}>Back to sign in</button>
                   </div>
                 ) : regStep === 'form' ? (
                   <form className="form" onSubmit={(e) => { e.preventDefault(); doRegister() }}>
