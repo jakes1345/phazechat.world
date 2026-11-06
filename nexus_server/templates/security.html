@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security: How Phaze Encrypts DMs & How to Report Bugs</title>
+<meta name="description" content="How Phaze end-to-end encrypts direct messages with NaCl box, what is not covered (groups, Spaces, calls, attachments, metadata), and how to report a vulnerability privately.">
+<link rel="canonical" href="https://phazechat.world/security">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0077B3">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Phaze">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Security: How Phaze Encrypts DMs & How to Report Bugs">
+<meta property="og:description" content="How Phaze end-to-end encrypts direct messages with NaCl box, what is not covered (groups, Spaces, calls, attachments, metadata), and how to report a vulnerability privately.">
+<meta property="og:url" content="https://phazechat.world/security">
+<meta property="og:image" content="https://phazechat.world/public/site/img/og-security.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Phaze security: how encrypted DMs work and how to report a vulnerability">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@PhazeChatWorld">
+<meta name="twitter:title" content="Security: How Phaze Encrypts DMs & How to Report Bugs">
+<meta name="twitter:description" content="How Phaze end-to-end encrypts direct messages with NaCl box, what is not covered (groups, Spaces, calls, attachments, metadata), and how to report a vulnerability privately.">
+<meta name="twitter:image" content="https://phazechat.world/public/site/img/og-security.png">
+<meta name="twitter:image:alt" content="Phaze security: how encrypted DMs work and how to report a vulnerability">
+<link rel="icon" href="/public/site/img/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/public/site/img/favicon-32.png">
+<link rel="apple-touch-icon" href="/public/site/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="/public/site/site.css?v=20261106">
+<script src="/public/site/site.js?v=20261106" defer></script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://phazechat.world/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Security",
+     "item": "https://phazechat.world/security"
+    }
+   ]
+  }
+ ]
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+    <nav aria-label="Main"><ul class="nav-links"><li><a href="/features">Features</a></li><li><a href="/skype-alternative">Skype alternative</a></li><li><a href="/download">Download</a></li><li><a href="/security" aria-current="page">Security</a></li><li><a href="/rates">Pricing</a></li><li><a href="/support">Support</a></li></ul></nav>
+    <div class="nav-actions">
+      <a class="btn btn-secondary" href="/web/">Sign in</a>
+      <a class="btn btn-primary" href="/web/">Open Phaze</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-menu"/></svg></button>
+    </div>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu" data-open="false">
+  <nav aria-label="Mobile"><ul><li><a href="/">Home<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/features">Features<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/skype-alternative">Skype alternative<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/download">Download<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/security" aria-current="page">Security<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/rates">Pricing<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/support">Support<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/about">About<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li></ul></nav>
+  <a class="btn btn-secondary btn-lg" href="/web/">Sign in</a>
+  <a class="btn btn-primary btn-lg" href="/web/">Open Phaze in your browser</a>
+</div>
+<main id="main">
+
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-shield"/></svg> Security</span>
+    <h1>How Phaze protects your messages, and where it doesn&rsquo;t.</h1>
+    <p class="lead">A plain description of Phaze&rsquo;s end-to-end encryption, the parts of the app it doesn&rsquo;t cover, and how to report a security problem. Everything here matches the open-source code.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="#report">Report a vulnerability</a>
+      <a class="btn btn-secondary" href="https://github.com/jakes1345/phazechat.world" rel="noopener"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-github"/></svg> Read the code</a>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+  <div class="doc">
+    <aside class="toc" aria-label="On this page"><h2>On this page</h2><ol><li><a href="#design">Encryption design</a></li><li><a href="#keys">Keys &amp; backups</a></li><li><a href="#not-covered">What isn&rsquo;t covered</a></li><li><a href="#accounts">Account protection</a></li><li><a href="#report">Report a vulnerability</a></li></ol></aside>
+    <article class="prose">
+      <div class="callout"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-lock"/></svg><p><strong>Short version:</strong> one-to-one DMs are end-to-end encrypted once both apps have exchanged keys, and the server only ever sees ciphertext for them. Group chats, Spaces, stories, calls, attachment files and metadata are not end-to-end encrypted.</p></div>
+
+      <h2 id="design">Encryption design</h2>
+      <p>Direct messages use NaCl <code>box</code>: X25519 key agreement with XSalsa20-Poly1305 authenticated encryption. The web app uses <a href="https://github.com/dchest/tweetnacl-js" rel="noopener">tweetnacl-js</a> and the Android app uses Lazysodium, a libsodium binding. Both produce the same wire format, so web and Android users can read each other&rsquo;s messages.</p>
+      <ol>
+        <li><strong>Keys are made on your device.</strong> Each install generates its own keypair the first time it runs. The web app keeps it in the browser&rsquo;s local storage; Android keeps it in app-private storage.</li>
+        <li><strong>Public keys are exchanged, not stored.</strong> When you open a chat, your app sends a key request and your contact&rsquo;s app answers with its public key. The server forwards these only between friends and never stores public keys.</li>
+        <li><strong>Every message is sealed separately.</strong> Each message gets a random 24-byte nonce. It travels as <code>E2EE:</code> followed by the hex-encoded nonce and ciphertext, and the server stores and relays that string as-is.</li>
+        <li><strong>Key changes are flagged.</strong> The web app pins a fingerprint of each contact&rsquo;s key (the first 8 bytes of its SHA-256 hash) the first time it sees it. If the key later changes, it refuses the new key and shows a warning. The Android app doesn&rsquo;t pin keys yet.</li>
+      </ol>
+      <p>On the web, the message box shows a lock icon once encryption is active for a conversation.</p>
+
+      <h2 id="keys">Keys &amp; backups</h2>
+      <p>Because keys live on your device, a new phone or browser would normally mean a new identity, and older messages encrypted to the old key couldn&rsquo;t be read there. Key backup solves this and is optional:</p>
+      <ul>
+        <li>Your keypair is encrypted on your device with a key derived from a PIN you choose, using PBKDF2-SHA256 with 200,000 iterations and AES-256-GCM.</li>
+        <li>Only the ciphertext, the salt and the iteration count are uploaded. The server never sees your PIN or your private key.</li>
+        <li>Restoring the backup on a new device keeps the same identity, so contacts using the web app don&rsquo;t see a key-change warning.</li>
+      </ul>
+      <p>A short PIN can be guessed by someone who has the backup ciphertext, so choose one that isn&rsquo;t easy to guess.</p>
+
+      <h2 id="not-covered">What isn&rsquo;t end-to-end encrypted</h2>
+      <p>Everything below is encrypted in transit, but not end to end. Unless noted, the Phaze server (or the third party named) can read it:</p>
+      <ul>
+        <li><strong>DMs sent before keys are exchanged.</strong> If your app doesn&rsquo;t have your contact&rsquo;s key yet, both apps fall back to plain text. No lock icon means no end-to-end encryption.</li>
+        <li><strong>Attachments.</strong> Files are uploaded unencrypted and stored under a random name. In a DM, only the message carrying the link is encrypted.</li>
+        <li><strong>Group chats, Spaces channels and stories.</strong> These are stored on the server in readable form, so the server and its administrators can read them. The app labels group chats as not end-to-end encrypted.</li>
+        <li><strong>Imported Skype history.</strong> It&rsquo;s stored on the server as it was in your export.</li>
+        <li><strong>Calls and voice channels.</strong> These open a room on the public Jitsi Meet service (<code>meet.jit.si</code>), whose servers carry the audio and video. Live streams and remote screen sessions use direct WebRTC connections, which are encrypted with DTLS-SRTP but may be relayed through Phaze&rsquo;s TURN server.</li>
+        <li><strong>Metadata.</strong> The server knows who talks to whom and when, your contact list, and the IP addresses you connect from.</li>
+      </ul>
+
+      <h2 id="accounts">Account protection</h2>
+      <ul>
+        <li>Passwords are stored as bcrypt hashes with a cost factor of 12.</li>
+        <li>Sign-up requires a verified email address, and disposable email domains are refused.</li>
+        <li>Signing in from a new device has to be approved from a device that&rsquo;s already signed in, or with a code sent to your email.</li>
+        <li>Optional two-factor authentication works with any TOTP authenticator app.</li>
+        <li>You can list your active sessions and revoke any of them, and sign in on a new device by scanning a QR code from a trusted one.</li>
+        <li>Requests are rate-limited, and the admin tools sit behind a separate login that can be restricted to specific IP addresses.</li>
+      </ul>
+
+      <h2 id="report">Report a vulnerability</h2>
+      <p>If you&rsquo;ve found a security problem in Phaze, please report it privately so it can be fixed before it&rsquo;s public.</p>
+      <p><a class="btn btn-primary" href="https://github.com/jakes1345/phazechat.world/security/advisories/new" rel="noopener"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-bug"/></svg> Open a private security advisory on GitHub</a></p>
+      <p>The advisory is visible only to you and the maintainers. Please include:</p>
+      <ul>
+        <li>What the problem is and what an attacker could do with it.</li>
+        <li>Steps to reproduce it, or a proof of concept.</li>
+        <li>Which part is affected: the server, the web app, the Android app or the desktop app, and the version if you know it.</li>
+      </ul>
+      <p>Please don&rsquo;t open a public issue for security bugs. When testing, use your own accounts: don&rsquo;t access other people&rsquo;s data, don&rsquo;t degrade the service for others, and stop once you&rsquo;ve shown the problem exists. Phaze is a small independent project and doesn&rsquo;t run a paid bug bounty, but valid reports can be credited in the advisory if you&rsquo;d like.</p>
+      <p>Not a security issue? <a href="/support">Get help on the support page</a>.</p>
+    </article>
+  </div>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+        <p>A free, open-source messenger in the classic style. Built for people who miss how chat used to feel.</p>
+      </div>
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="/web/">Open the web app</a></li>
+          <li><a href="/features">Features</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href="/rates">Pricing</a></li>
+          <li><a href="/status">Service status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Switching</h2>
+        <ul>
+          <li><a href="/skype-alternative">Skype alternative</a></li>
+          <li><a href="/skype-alternative#import">Import a Skype export</a></li>
+          <li><a href="/#compare">Compare apps</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/support">Support</a></li>
+          <li><a href="/security">Security</a></li>
+          <li><a href="https://github.com/jakes1345/phazechat.world" rel="noopener">Source code</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Legal</h2>
+        <ul>
+          <li><a href="/privacy">Privacy policy</a></li>
+          <li><a href="/terms">Terms of service</a></li>
+          <li><a href="/legal">Legal notices</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2024&ndash;2026 Phaze. An independent project, not affiliated with Microsoft or Skype.</span>
+      <span><a href="https://x.com/PhazeChatWorld" rel="noopener">X</a> &middot; <a href="https://instagram.com/phazechat.world" rel="noopener">Instagram</a> &middot; <a href="https://github.com/jakes1345/phazechat.world" rel="noopener">GitHub</a></span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

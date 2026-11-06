@@ -4313,19 +4313,7 @@ func main() {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		fmt.Fprint(w, "User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /ws\nDisallow: /reset\nSitemap: https://phazechat.world/sitemap.xml\n")
 	})
-	http.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		const base = "https://phazechat.world"
-		today := time.Now().UTC().Format("2006-01-02")
-		paths := []string{"/", "/download", "/features", "/rates", "/about", "/support", "/privacy", "/terms", "/legal", "/status", "/web/"}
-		fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>`)
-		fmt.Fprint(w, `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
-		for _, p := range paths {
-			fmt.Fprintf(w, `<url><loc>%s%s</loc><lastmod>%s</lastmod><changefreq>weekly</changefreq></url>`, base, p, today)
-		}
-		fmt.Fprint(w, `</urlset>`)
-	})
+	registerSiteRoutes() // site_pages.go: /sitemap.xml, /security, /skype-alternative, root icons
 
 	// Search engine verification endpoints.
 	// Google: npx wrangler secret put PHAZE_GSC_VERIFICATION   (e.g. google123abc.html)
@@ -4524,6 +4512,8 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 		ReadHeaderTimeout: 15 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    64 << 10,
+		// www.phazechat.world → apex redirect (site_pages.go).
+		Handler: canonicalHost(http.DefaultServeMux),
 	}
 	err = httpServer.ListenAndServe()
 	if err != nil {
