@@ -730,7 +730,7 @@ export default function App() {
     const fx = effectIn(text, (id) => owned.includes(id))
     if (fx) setActiveFx({ kind: fx as EffectId, seed: Date.now() })
   }, [])
-  const [globalNotice, setGlobalNotice] = useState<{ from: string; msg: string } | null>(null)
+  const [globalNotice, setGlobalNotice] = useState<{ from: string; msg: string; action?: 'restore_keys' } | null>(null)
   const [changelogSeen, setChangelogSeen] = useState(() => localStorage.getItem('phaze_changelog_v') === '2025-05-25')
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [changelogSlide, setChangelogSlide] = useState(0)
@@ -1530,7 +1530,8 @@ export default function App() {
               restoreOfferedRef.current = true
               setGlobalNotice({
                 from: 'Encryption',
-                msg: 'Your account has a key backup. Restore it in Settings → Backup & Devices with your recovery PIN to keep your encryption identity on this device.',
+                msg: 'Your account has a key backup. Restore it with your recovery PIN to keep your encryption identity on this device.',
+                action: 'restore_keys',
               })
             }
           } else if (msg.status === 'stored') {
@@ -2808,7 +2809,10 @@ export default function App() {
           <div className="restore-card" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
             <h2 style={{ color: 'var(--brand)', fontSize: '1.2rem' }}>Notice from {globalNotice.from}</h2>
             <p style={{ margin: '1rem 0', fontSize: '0.95rem', lineHeight: 1.6 }}>{globalNotice.msg}</p>
-            <button type="button" onClick={() => setGlobalNotice(null)} style={{ padding: '0.6rem 2rem', borderRadius: 10, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Got it</button>
+            {globalNotice.action === 'restore_keys' && (
+              <button type="button" onClick={() => { setGlobalNotice(null); setSettingsInitialTab('devices'); setSettingsOpen(true) }} style={{ padding: '0.6rem 2rem', borderRadius: 10, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', marginRight: 8 }}>Restore now</button>
+            )}
+            <button type="button" onClick={() => setGlobalNotice(null)} style={{ padding: '0.6rem 2rem', borderRadius: 10, background: globalNotice.action ? 'transparent' : 'var(--brand)', color: globalNotice.action ? 'var(--brand)' : '#fff', border: globalNotice.action ? '1px solid var(--brand)' : 'none', fontWeight: 700, cursor: 'pointer' }}>{globalNotice.action ? 'Later' : 'Got it'}</button>
           </div>
         </div>
       )}

@@ -16,9 +16,9 @@ import { test, expect, type Browser, type Page } from '@playwright/test'
  * outgoing frames rather than the UI: a message the UI shows as sent but that
  * left the browser in plaintext is exactly the failure being guarded.
  *
- * Tests marked test.fail() document known-broken behaviour. They pass while
- * the bug exists; once it is fixed they start "unexpectedly passing" and the
- * marker should be removed.
+ * Each test guards a bug that shipped once: plaintext after a reload,
+ * undecrypted live edits, silent plaintext to contacts without a key, and a
+ * CSP that blocked the Jitsi call iframe.
  */
 
 const BASE = process.env.PHAZE_E2E_URL
@@ -33,7 +33,7 @@ test.describe.configure({ mode: 'serial' })
 
 type Session = { page: Page; sentDMs: { recipient: string; body: string; type: string }[]; close: () => Promise<void> }
 
-async function signIn(browser: Browser, user: string): Promise<Session> {
+async function signIn(browser: Browser, user: string, opts: { keepNotices?: boolean } = {}): Promise<Session> {
   // Fresh context = fresh localStorage = a brand-new NaCl identity and no pins.
   const context = await browser.newContext()
   const page = await context.newPage()
@@ -51,6 +51,11 @@ async function signIn(browser: Browser, user: string): Promise<Session> {
   await page.fill('input[type="password"][placeholder="Password"]', PASSWORD)
   await page.click('button[type="submit"]:has-text("Sign in")')
   await expect(page.locator('.friend-row').first()).toBeVisible({ timeout: 15_000 })
+  if (!opts.keepNotices) {
+    // A fresh browser for an account with a key backup is offered a restore.
+    const later = page.locator('button', { hasText: 'Later' })
+    if (await later.isVisible({ timeout: 1_500 }).catch(() => false)) await later.click()
+  }
   return { page, sentDMs, close: () => context.close() }
 }
 
@@ -97,9 +102,6 @@ test('DM between online friends is ciphertext on the wire and plaintext for the 
 })
 
 test('an edited DM reaches the peer decrypted', async ({ browser }) => {
-  // Known bug: unwrap() in App.tsx only decrypts type 'msg', so a live
-  // msg_edit shows the raw E2EE: blob until the peer reloads.
-  test.fail()
   const a = await signIn(browser, ALICE)
   const b = await signIn(browser, BOB)
   try {
@@ -123,10 +125,6 @@ test('an edited DM reaches the peer decrypted', async ({ browser }) => {
 })
 
 test('a reload keeps encrypting to a pinned peer who is now offline', async ({ browser }) => {
-  // Known bug: pins are loaded from localStorage but never used as keys, so
-  // after a reload the peer key is unknown until the peer is online again
-  // and the message goes out in plaintext without any warning.
-  test.fail()
   const a = await signIn(browser, ALICE)
   const b = await signIn(browser, BOB)
   try {
@@ -151,9 +149,6 @@ test('a reload keeps encrypting to a pinned peer who is now offline', async ({ b
 })
 
 test('sending to a contact with no known key asks first, and cancelling sends nothing', async ({ browser }) => {
-  // Known bug: sendChat() silently falls back to plaintext when no peer key
-  // is known; there is no confirmation at all.
-  test.fail()
   const a = await signIn(browser, ALICE)
   try {
     await openChat(a.page, CAROL)
@@ -168,11 +163,46 @@ test('sending to a contact with no known key asks first, and cancelling sends no
 })
 
 test('the web CSP allows the Jitsi call iframe', async ({ request }) => {
-  // Known bug: the /web/ CSP sets default-src 'self' and no frame-src, so the
-  // meet.jit.si iframe used for calls is blocked outright.
-  test.fail()
   const res = await request.get(BASE!)
   const csp = res.headers()['content-security-policy'] || ''
   const frameSrc = csp.split(';').map((d) => d.trim()).find((d) => d.startsWith('frame-src')) || ''
   expect(frameSrc).toContain('https://meet.jit.si')
+})
+
+test('a key backup restores the same identity on a fresh browser', async ({ browser }) => {
+  test.setTimeout(90_000)
+  const pin = 'restore-me-123'
+  const a = await signIn(browser, ALICE)
+  let original: string
+  try {
+    original = await a.page.evaluate(() => localStorage.getItem('phaze_nacl_keys_v1') || '')
+    await a.page.locator('button[title="Settings"]:visible').first().click()
+    await a.page.locator('.settings-tab', { hasText: 'Backup & Devices' }).click()
+    await a.page.fill('input[placeholder^="Recovery PIN ("]', pin)
+    await a.page.fill('input[placeholder="Confirm PIN"]', pin)
+    await a.page.locator('button', { hasText: 'Save backup' }).click()
+    await expect(a.page.locator('.settings-msg.ok', { hasText: 'Backup saved' })).toBeVisible({ timeout: 30_000 })
+  } finally {
+    await a.close()
+  }
+
+  // A brand-new browser makes a new identity, then restores the backed-up one.
+  const fresh = await signIn(browser, ALICE, { keepNotices: true })
+  try {
+    const before = await fresh.page.evaluate(() => localStorage.getItem('phaze_nacl_keys_v1') || '')
+    expect(before).not.toBe(original)
+    fresh.page.on('dialog', (d) => void d.accept())
+    // The app points a new browser at the existing backup.
+    await fresh.page.locator('button', { hasText: 'Restore now' }).click({ timeout: 15_000 })
+    await fresh.page.fill('input[placeholder="Recovery PIN"]', 'wrong-pin-0000')
+    await fresh.page.locator('button', { hasText: 'Restore keys' }).click()
+    await expect(fresh.page.locator('.settings-msg.err', { hasText: 'Incorrect PIN' })).toBeVisible({ timeout: 30_000 })
+    await fresh.page.fill('input[placeholder="Recovery PIN"]', pin)
+    await fresh.page.locator('button', { hasText: 'Restore keys' }).click()
+    await expect(fresh.page.locator('.settings-msg.ok', { hasText: 'Keys restored' })).toBeVisible({ timeout: 30_000 })
+    const after = await fresh.page.evaluate(() => localStorage.getItem('phaze_nacl_keys_v1') || '')
+    expect(after).toBe(original)
+  } finally {
+    await fresh.close()
+  }
 })
