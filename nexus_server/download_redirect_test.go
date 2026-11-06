@@ -12,7 +12,7 @@ func TestApkDownloadPrefersReleaseAsset(t *testing.T) {
 	updates.mu.Lock()
 	prev, prevExp := updates.manifest, updates.expires
 	updates.manifest = UpdateManifest{RefreshedAt: time.Now().Unix(), Platforms: map[string]PlatformAsset{
-		"android": {URL: "https://github.com/jakes1345/phazechat.world/releases/download/v1.6.6/Phaze.apk"},
+		"android": {Name: "Phaze.apk", URL: "https://github.com/jakes1345/phazechat.world/releases/download/v1.6.6/Phaze.apk"},
 	}}
 	updates.expires = time.Now().Add(time.Minute)
 	updates.mu.Unlock()

@@ -200,7 +200,11 @@ func (s *NexusServer) httpVerifyDeviceHandler(w http.ResponseWriter, r *http.Req
 		// while this page sat open. Nothing to do, and saying so beats an
 		// error the user can't act on.
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		out := map[string]string{"status": "ok"}
+		if fromDesktopProxy(r) {
+			out["token"] = tok
+		}
+		json.NewEncoder(w).Encode(out)
 		return
 	}
 

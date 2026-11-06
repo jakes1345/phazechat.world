@@ -100,6 +100,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 		}
 		held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
 	}
+	// Every way out of this handler (including delete_account's return)
+	// drops a held sign-in nobody completed.
+	defer dropHeld()
 
 	completePasswordSignIn := func(user, sessTok, deviceInfo string) {
 		metrics.authSuccess.Add(1)
@@ -675,6 +678,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			username = u
+			dropHeld() // signed in another way: the held sign-in is moot
 			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
 			s.autoJoinGlobalSpace(username)
 			// Register alongside any sessions the user already has open
@@ -997,6 +1001,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			// Promote this socket onto the approved session.
 			username = u
+			dropHeld() // signed in another way: the held sign-in is moot
 			// Register alongside any sessions the user already has open
 			// instead of evicting them. Signing in on a second tab, the
 			// desktop app or a phone used to close the previous connection

@@ -2676,7 +2676,7 @@ func (s *NexusServer) fileDownloadHandler(w http.ResponseWriter, r *http.Request
 	// a signed APK, send people to that one so the website always offers the
 	// current app (the copy baked into the image goes stale).
 	if name == "Phaze.apk" {
-		if a, ok := currentUpdateManifest().Platforms["android"]; ok && strings.HasPrefix(a.URL, "https://github.com/") {
+		if a, ok := currentUpdateManifest().Platforms["android"]; ok && a.Name == "Phaze.apk" && strings.HasPrefix(a.URL, "https://github.com/") {
 			w.Header().Set("Cache-Control", "no-store")
 			http.Redirect(w, r, a.URL, http.StatusFound)
 			return
