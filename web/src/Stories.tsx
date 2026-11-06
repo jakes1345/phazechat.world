@@ -28,13 +28,19 @@ export default function Stories({ me, sessionToken }: Props) {
   const [uploading, setUploading] = useState(false)
   const [replyDraft, setReplyDraft] = useState('')
   const [replyOk, setReplyOk] = useState(false)
+  const [replyErr, setReplyErr] = useState('')
   const fileRef = useRef<HTMLInputElement | null>(null)
 
   const refresh = useMemo(() => async () => {
     if (!sessionToken) return
-    const r = await fetch('/api/v1/stories', { credentials: 'include' })
-    if (!r.ok) return
-    const data = await r.json()
+    let data: Story[]
+    try {
+      const r = await fetch('/api/v1/stories', { credentials: 'include' })
+      if (!r.ok) return
+      data = await r.json()
+    } catch {
+      return // offline; the next refresh tries again
+    }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStories(data)
   }, [sessionToken])
@@ -179,12 +185,22 @@ export default function Stories({ me, sessionToken }: Props) {
                   e.preventDefault()
                   const text = replyDraft.trim()
                   if (!text) return
-                  await fetch(`/api/v1/stories/${s.id}/reply`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ body: text }),
-                  })
+                  setReplyErr('')
+                  try {
+                    const res = await fetch(`/api/v1/stories/${s.id}/reply`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ body: text }),
+                    })
+                    if (!res.ok) {
+                      setReplyErr(res.status === 403 ? "You can't reply to this story." : 'Reply failed. Try again.')
+                      return
+                    }
+                  } catch {
+                    setReplyErr("Couldn't reach Phaze. Check your connection.")
+                    return
+                  }
                   setReplyDraft('')
                   setReplyOk(true)
                   setTimeout(() => setReplyOk(false), 1800)
@@ -198,6 +214,7 @@ export default function Stories({ me, sessionToken }: Props) {
                 />
                 <button type="submit" disabled={!replyDraft.trim()}>➤</button>
                 {replyOk && <span className="story-reply-ok">Sent</span>}
+                {replyErr && <span className="story-reply-ok" role="alert" style={{ color: "#f87171" }}>{replyErr}</span>}
               </form>
             )}
           </div>
