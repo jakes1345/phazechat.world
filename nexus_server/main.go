@@ -1979,9 +1979,9 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 			continue
 		}
 		client.Send(NexusMessage{
-			Type:   msgType,
-			Sender: sender,
-			Body:   body,
+			Type:    msgType,
+			Sender:  sender,
+			Body:    body,
 			MsgID:   msgID,
 			ConvoID: convo,
 			Status:  "offline:" + createdAt,
