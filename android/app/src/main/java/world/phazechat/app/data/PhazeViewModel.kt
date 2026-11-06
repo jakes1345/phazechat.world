@@ -1045,18 +1045,100 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun signOut() {
         endCall()
-        prefs.edit().remove("session_token").remove("username").apply()
+        val token = _sessionToken.value
+        if (_me.value != null) {
+            // Stop pushes for this account on this device, then end the
+            // session server-side so the token is useless even if it leaked.
+            prefs.getString("fcm_token", null)?.takeIf { it.isNotEmpty() }?.let {
+                nexus.send(NexusMessage(type = "unregister_fcm_token", body = it))
+            }
+            if (token != null) nexus.send(NexusMessage(type = "revoke_session", qrToken = token))
+        }
+        resetFcmToken()
+        prefs.edit().remove("session_token").remove("username").remove("display_name").apply()
+        clearAccountState()
+        // disconnect() lets the queued revoke go out before closing.
+        nexus.disconnect()
+        nexus.connect()
+    }
+
+    /** Drops everything belonging to the signed-in account. */
+    private fun clearAccountState() {
+        linkPollJob?.cancel()
+        linkPollJob = null
+        typingClearJob?.cancel()
         _me.value = null
         _sessionToken.value = null
+        sessionAuthPending = false
+        _myDisplayName.value = ""
         _friends.value = emptyMap()
         _pending.value = emptyList()
+        _pendingOpenChat.value = null
         _chatLog.value = emptyList()
         _selectedChat.value = null
         _unread.value = emptyMap()
+        _typingFrom.value = null
+        _searchResults.value = emptyList()
+        _convos.value = emptyList()
+        _selectedConvo.value = null
+        _convoLog.value = emptyList()
+        convoLogs.clear()
         _spaces.value = emptyList()
+        _discoverSpaces.value = emptyList()
+        _activeSpace.value = null
+        _channels.value = emptyMap()
+        _activeChannel.value = null
+        _channelMessages.value = emptyList()
+        _channelDraft.value = ""
+        _stories.value = emptyList()
+        _callState.value = null
+        _pendingConference.value = null
+        _activeLinkCode.value = null
+        _linkStatus.value = null
+        _linkError.value = null
+        _keyBackupStatus.value = null
+        _keyBackupError.value = null
+        pendingRestorePin = null
+        _twoFactorUri.value = null
+        _twoFactorStatus.value = null
+        _twoFactorEnabled.value = false
+        _twoFactorBackupCodes.value = null
+        _referralCount.value = 0
+        _referredUsers.value = emptyList()
+        _skypeContacts.value = emptyList()
+        _skypeImportStatus.value = null
+        _deviceChallenge.value = null
+        _deviceVerify.value = null
+        _totpRequired.value = false
+        pendingTotpUsername = ""
+        pendingTotpPassword = ""
+        _plaintextPrompt.value = null
+        _keyChangeWarning.value = null
+        plaintextOk.clear()
+        keyRequested.clear()
+        // Session keys go; keys pinned on this device stay usable, as on the web.
         peerKeys.clear()
-        nexus.disconnect()
-        nexus.connect()
+        for ((peer, pin) in keyPins) pin.publicKey?.let { peerKeys[peer] = it }
+    }
+
+    /**
+     * Invalidates this install's FCM token and fetches a fresh one, so pushes
+     * addressed to the signed-out account stop arriving here. The new token
+     * is registered with whichever account signs in next.
+     */
+    private fun resetFcmToken() {
+        prefs.edit().remove("fcm_token").apply()
+        try {
+            val fm = com.google.firebase.messaging.FirebaseMessaging.getInstance()
+            fm.deleteToken().addOnCompleteListener {
+                fm.token.addOnSuccessListener { t ->
+                    if (!t.isNullOrEmpty()) prefs.edit().putString("fcm_token", t).apply()
+                }
+            }
+        } catch (e: Exception) {
+            // Firebase not initialised (no google-services config): nothing to reset.
+            Log.w(TAG, "FCM reset: ${e.message}")
+        }
     }
 
     // Permanently erase the account (GDPR right-to-erasure). The server

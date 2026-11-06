@@ -1238,6 +1238,16 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			s.DB.Exec("UPDATE users SET fcm_token = ? WHERE username = ?", msg.Body, username)
 			log.Printf("[FCM] registered token for %s", username)
 
+		// Sent on sign-out: stop pushing this account to that device. Only
+		// clears the stored token if it's the one named, so signing out of
+		// an old phone doesn't silence the phone that registered since.
+		case "unregister_fcm_token":
+			if username == "" || msg.Body == "" {
+				continue
+			}
+			s.DB.Exec("UPDATE users SET fcm_token = '' WHERE username = ? AND fcm_token = ?", username, msg.Body)
+			log.Printf("[FCM] unregistered token for %s", username)
+
 		case "subscribe_push":
 			if username == "" {
 				continue
