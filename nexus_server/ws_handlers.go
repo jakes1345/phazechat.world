@@ -145,47 +145,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				// Drop just this connection. The user may still have others
 				// open — another tab, the desktop app, their phone — and only
 				// goes offline when the last one closes.
-				s.Mu.Lock()
-				remaining := s.removeClientLocked(username, client)
-				callPartner := client.CallPartner
-				// Notify call partner before releasing the lock so we can
-				// look up their client while still holding it.
-				if callPartner != "" {
-					// The peer's call lives on one specific connection of
-					// theirs, not on all of them — find that one.
-					if partner := s.callPeerLocked(callPartner, username); partner != nil {
-						partner.InCall = false
-						partner.CallPartner = ""
-						partner.Send(NexusMessage{Type: "call_end", Sender: username})
-
-						// Close out the call row too — client is already
-						// removed from s.Clients, so use the local pointer.
-						var pendingClient *Client
-						var logCaller, logCallee string
-						if client.PendingCallID != 0 {
-							pendingClient, logCaller, logCallee = client, username, callPartner
-						} else if partner.PendingCallID != 0 {
-							pendingClient, logCaller, logCallee = partner, callPartner, username
-						}
-						if pendingClient != nil {
-							kind, answered, duration := s.finalizeCall(pendingClient.PendingCallID, pendingClient.PendingCallAnswered, pendingClient.PendingCallStarted)
-							started := pendingClient.PendingCallStarted
-							pendingClient.PendingCallID = 0
-							pendingClient.PendingCallAnswered = false
-							status := "missed"
-							if answered {
-								status = "answered"
-							}
-							// Only the surviving partner is still connected to receive this live.
-							partner.Send(NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration})
-						}
-					}
-				}
-				s.Mu.Unlock()
+				// detachClient snapshots call state under the lock and does
+				// the partner notification and call-log write after it.
+				remaining := s.detachClient(username, client)
 				if remaining == 0 {
-					s.broadcastPresence(username, "Offline")
-					s.voiceRoomEvictUser(username)
-					s.streamEvictUser(username)
 					log.Printf("User %s disconnected (last session closed)", username)
 				} else {
 					log.Printf("User %s closed a session, %d still open", username, remaining)
@@ -1582,7 +1545,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			pushBody := "Sent a message"
 
-			s.Mu.RLock()
+			// No s.Mu here: sendTo snapshots the registry itself. Holding a
+			// read lock around it took RLock recursively, which deadlocks as
+			// soon as a writer queues between the two acquisitions — and it
+			// also held the lock across network writes and DB inserts.
 			for _, m := range members {
 				if m == username {
 					continue
@@ -1609,7 +1575,6 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					go s.sendFCMPush(m, pushTitle, pushBody)
 				}
 			}
-			s.Mu.RUnlock()
 
 		case "convo_leave":
 			if username == "" || msg.ConvoID == "" {

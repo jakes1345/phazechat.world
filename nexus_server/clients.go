@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 // Connection registry helpers.
 //
 // A user may hold several live connections at once — browser tabs, the desktop
@@ -216,4 +218,77 @@ func (s *NexusServer) pendingCallerLocked(caller string) *Client {
 		}
 	}
 	return nil
+}
+
+// detachClient unregisters one connection and cleans up everything that hung
+// off it: an in-progress call (the partner is told and the call row closed),
+// and — when it was the user's last connection — presence, voice rooms and
+// live streams.
+//
+// State is read and cleared under s.Mu, but every network write and DB call
+// happens after the lock is released: Send can block for the full write
+// deadline on a slow peer, and holding the registry lock across that (or
+// across a DB round-trip) stalls every other connection on the server.
+//
+// Returns how many connections the user still has open.
+func (s *NexusServer) detachClient(username string, client *Client) int {
+	if username == "" || client == nil {
+		return 0
+	}
+	s.Mu.Lock()
+	remaining := s.removeClientLocked(username, client)
+
+	var (
+		partner   *Client
+		logRow    int64
+		answered  bool
+		started   time.Time
+		logCaller string
+		logCallee string
+	)
+	if callPartner := client.CallPartner; callPartner != "" {
+		// The peer's call lives on one specific connection of theirs, not
+		// on all of them — find that one.
+		if partner = s.callPeerLocked(callPartner, username); partner != nil {
+			partner.InCall = false
+			partner.CallPartner = ""
+			// The call row lives on whichever side placed the call.
+			var pendingClient *Client
+			if client.PendingCallID != 0 {
+				pendingClient, logCaller, logCallee = client, username, callPartner
+			} else if partner.PendingCallID != 0 {
+				pendingClient, logCaller, logCallee = partner, callPartner, username
+			}
+			if pendingClient != nil {
+				logRow = pendingClient.PendingCallID
+				answered = pendingClient.PendingCallAnswered
+				started = pendingClient.PendingCallStarted
+				pendingClient.PendingCallID = 0
+				pendingClient.PendingCallAnswered = false
+			}
+		}
+	}
+	client.InCall = false
+	client.CallPartner = ""
+	s.Mu.Unlock()
+
+	if partner != nil {
+		partner.Send(NexusMessage{Type: "call_end", Sender: username})
+		if logRow != 0 {
+			kind, ans, duration := s.finalizeCall(logRow, answered, started)
+			status := "missed"
+			if ans {
+				status = "answered"
+			}
+			// Only the surviving partner is still connected to receive this live.
+			partner.Send(NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration})
+		}
+	}
+
+	if remaining == 0 {
+		s.broadcastPresence(username, "Offline")
+		s.voiceRoomEvictUser(username)
+		s.streamEvictUser(username)
+	}
+	return remaining
 }
