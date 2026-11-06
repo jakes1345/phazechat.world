@@ -902,6 +902,9 @@ export default function App() {
   const keyAskedRef = useRef<Set<string>>(new Set())
   // Contacts the user agreed to message without encryption this session.
   const plaintextOkRef = useRef<Set<string>>(new Set())
+  // A contact whose key no longer matches the pin, waiting for the user to
+  // decide whether to trust the new key.
+  const keyChangesRef = useRef<Record<string, { pk: Uint8Array; fp: string; pinned: string }>>({})
   const meRef = useRef<string | null>(null)
   const selectedRef = useRef<string | null>(null)
   const sendRef = useRef<(m: NexusMessage) => void>(() => {})
@@ -992,7 +995,11 @@ export default function App() {
       }
       const prev = pinsRef.current[peer]
       if (prev && prev.fingerprint !== fp) {
-        setErr(`Possible MITM: ${peer} key changed (pinned ${prev.fingerprint}, now ${fp})`)
+        // Keep the pinned key, but remember the new one: the next send asks
+        // whether to trust it (reinstall or another device) instead of
+        // encrypting to a key the contact may no longer have.
+        keyChangesRef.current[peer] = { pk, fp, pinned: prev.fingerprint }
+        setErr(`${peer}'s encryption key changed (was ${prev.fingerprint}, now ${fp}). You'll be asked before your next message.`)
         return
       }
       if (!prev) {
@@ -1688,6 +1695,7 @@ export default function App() {
           peerKeysRef.current = pinnedPublicKeys(pinsRef.current)
           keyAskedRef.current.clear()
           plaintextOkRef.current.clear()
+          keyChangesRef.current = {}
           setFriends({})
           setPending([])
           setSelected(null)
@@ -2016,7 +2024,27 @@ export default function App() {
   // (first contact while they're offline) the message would be stored on
   // the server in plaintext, so ask once per contact per session.
   const confirmCanSend = useCallback((peer: string): boolean => {
+    const changed = keyChangesRef.current[peer]
+    if (changed) {
+      const trust = window.confirm(
+        `${peer}'s encryption key changed.\n\nPinned: ${changed.pinned}\nNew:    ${changed.fp}\n\n` +
+        'This happens when they reinstall Phaze or sign in on another device. It can also mean someone is ' +
+        'intercepting your messages. If you are not sure, check the new fingerprint with them another way.\n\n' +
+        'Trust the new key and send?',
+      )
+      if (!trust) return false
+      pinsRef.current[peer] = { fingerprint: changed.fp, publicKeyB64: encodePublicKeyB64(changed.pk) }
+      savePins(pinsRef.current)
+      peerKeysRef.current[peer] = changed.pk
+      delete keyChangesRef.current[peer]
+      // Re-read history so their messages under the new key decrypt.
+      const my = meRef.current
+      if (my) sendRef.current({ type: 'dm_history', sender: my, recipient: peer })
+      return true
+    }
     if (peerKeysRef.current[peer] || plaintextOkRef.current.has(peer)) return true
+    // The built-in bot never has a key; its messages are commands.
+    if (peer === 'PhazeBot') return true
     const my = meRef.current
     if (my) sendRef.current({ type: 'key_request', sender: my, recipient: peer })
     const ok = window.confirm(
@@ -2075,9 +2103,9 @@ export default function App() {
       setPinnedIds([])
     }
     setE2eReady(!!peerKeysRef.current[name])
-    if (!peerKeysRef.current[name]) {
-      send({ type: 'key_request', sender: me ?? undefined, recipient: name })
-    }
+    // Ask even when a key is pinned: the reply is how a changed key (the
+    // contact reinstalled or switched device) gets noticed before sending.
+    send({ type: 'key_request', sender: me ?? undefined, recipient: name })
   }
 
   const togglePin = useCallback((line: ChatLine) => {
@@ -2574,6 +2602,7 @@ export default function App() {
             outboxRef.current = []
             keyAskedRef.current.clear()
             plaintextOkRef.current.clear()
+            keyChangesRef.current = {}
             setLog([])
             // The socket is still signed in as this account; once the
             // server has cleared the session cookie, drop it so the client

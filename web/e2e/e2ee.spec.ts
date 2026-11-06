@@ -206,3 +206,38 @@ test('a key backup restores the same identity on a fresh browser', async ({ brow
     await fresh.close()
   }
 })
+
+test('when a contact reinstalls, trusting their new key lets them read new messages', async ({ browser }) => {
+  // alice pins bob's first key.
+  const a = await signIn(browser, ALICE)
+  let b = await signIn(browser, BOB)
+  try {
+    await openChat(b.page, ALICE)
+    await openChat(a.page, BOB)
+    await expect(composer(a.page)).toHaveAttribute('placeholder', /🔒/, { timeout: 10_000 })
+    await b.close()
+
+    // bob comes back on a fresh browser: a new identity.
+    b = await signIn(browser, BOB)
+    await openChat(b.page, ALICE)
+    await a.page.reload()
+    await expect(a.page.locator('.friend-row').first()).toBeVisible({ timeout: 15_000 })
+    await openChat(a.page, BOB)
+
+    const dialogs: string[] = []
+    a.page.on('dialog', (d) => { dialogs.push(d.message()); void d.accept() })
+    const text = uniq('after bob reinstalled')
+    a.sentDMs.length = 0
+    // Give alice's key_request time to bring back bob's new key.
+    await expect.poll(async () => {
+      await send(a.page, text)
+      return a.sentDMs.length
+    }, { timeout: 10_000, intervals: [1_500] }).toBeGreaterThan(0)
+    expect(dialogs.some((m) => m.includes('encryption key changed'))).toBe(true)
+    expect(a.sentDMs[0].body.startsWith('E2EE:')).toBe(true)
+    await expect(b.page.locator('.bubble-text', { hasText: text }).first()).toBeVisible({ timeout: 10_000 })
+  } finally {
+    await a.close()
+    await b.close()
+  }
+})
