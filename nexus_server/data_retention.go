@@ -139,5 +139,8 @@ func (s *NexusServer) sweepExpiredQRLoginTokens() {
 		if n, _ := res.RowsAffected(); n > 0 {
 			log.Printf("[retention] purged %d expired/approved QR login tokens", n)
 		}
+		// New-device challenges expire after minutes; nothing else ever
+		// removed the consumed or expired rows.
+		s.purgeExpiredDeviceChallenges()
 	}
 }

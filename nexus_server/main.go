@@ -4492,7 +4492,17 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 		}
 	}()
 
-	err = http.ListenAndServe(bindAddr+":"+port, nil)
+	// ReadHeaderTimeout stops slow-header (slowloris) connections; idle
+	// keep-alive connections are closed after two minutes. No overall
+	// read/write timeout: WebSockets, large uploads and media downloads
+	// legitimately run long.
+	httpServer := &http.Server{
+		Addr:              bindAddr + ":" + port,
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    64 << 10,
+	}
+	err = httpServer.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
