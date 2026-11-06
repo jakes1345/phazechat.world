@@ -4472,8 +4472,9 @@ func (s *NexusServer) sendSMS(to, body string) error {
 }
 
 func (s *NexusServer) broadcastProfileUpdate(username, displayName, mood string) {
-	s.Mu.RLock()
-	defer s.Mu.RUnlock()
+	// Only the snapshot below takes the read lock. A second, outer RLock
+	// here deadlocked the server whenever a writer (connect/disconnect)
+	// queued between the two: RWMutex blocks new readers once one waits.
 	msg := NexusMessage{
 		Type:        "profile_update",
 		Sender:      username,
