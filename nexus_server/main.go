@@ -1964,7 +1964,7 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 		return
 	}
 
-	rows, err := s.DB.Query("SELECT id, sender, body, msg_type, created_at, COALESCE(msg_id,'') FROM offline_messages WHERE recipient = ? ORDER BY created_at ASC", username)
+	rows, err := s.DB.Query("SELECT id, sender, body, msg_type, created_at, COALESCE(msg_id,''), COALESCE(convo,'') FROM offline_messages WHERE recipient = ? ORDER BY created_at ASC", username)
 	if err != nil {
 		return
 	}
@@ -1973,8 +1973,8 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 	var ids []int64
 	for rows.Next() {
 		var id int64
-		var sender, body, msgType, createdAt, msgID string
-		if err := rows.Scan(&id, &sender, &body, &msgType, &createdAt, &msgID); err != nil {
+		var sender, body, msgType, createdAt, msgID, convo string
+		if err := rows.Scan(&id, &sender, &body, &msgType, &createdAt, &msgID, &convo); err != nil {
 			log.Printf("[db] deliverOfflineMessages scan: %v", err)
 			continue
 		}
@@ -1982,8 +1982,9 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 			Type:   msgType,
 			Sender: sender,
 			Body:   body,
-			MsgID:  msgID,
-			Status: "offline:" + createdAt,
+			MsgID:   msgID,
+			ConvoID: convo,
+			Status:  "offline:" + createdAt,
 		})
 		ids = append(ids, id)
 	}
@@ -2062,9 +2063,48 @@ func (s *NexusServer) listBlocks(blocker string) []string {
 	return out
 }
 
+// abuseReasons are the reasons the apps offer. Anything else is filed as
+// "other" so a report is never lost because a client sent an odd tag.
+var abuseReasons = map[string]bool{
+	"harassment":    true,
+	"spam":          true,
+	"impersonation": true,
+	"inappropriate": true,
+	"other":         true,
+}
+
+const maxAbuseReportBody = 2000
+
+func normalizeAbuseReason(reason string) string {
+	r := strings.ToLower(strings.TrimSpace(reason))
+	if abuseReasons[r] {
+		return r
+	}
+	return "other"
+}
+
+func (s *NexusServer) userExists(username string) bool {
+	var n int
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM users WHERE username = ?`, username).Scan(&n); err != nil {
+		return false
+	}
+	return n > 0
+}
+
 func (s *NexusServer) recordAbuseReport(reporter, subject, reason, body string) error {
-	if reporter == "" || subject == "" || reason == "" {
+	subject = strings.TrimSpace(subject)
+	if reporter == "" || subject == "" {
 		return fmt.Errorf("missing fields")
+	}
+	if strings.EqualFold(reporter, subject) {
+		return fmt.Errorf("you can't report yourself")
+	}
+	if !s.userExists(subject) {
+		return fmt.Errorf("no such user")
+	}
+	reason = normalizeAbuseReason(reason)
+	if len(body) > maxAbuseReportBody {
+		body = body[:maxAbuseReportBody]
 	}
 	_, err := s.DB.Exec(
 		"INSERT INTO abuse_reports (reporter, subject, reason, body) VALUES (?, ?, ?, ?)",
