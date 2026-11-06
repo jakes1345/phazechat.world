@@ -67,22 +67,41 @@ self.addEventListener('fetch', (event) => {
   )
 })
 
+// Paths relative to the worker's own scope, so the desktop build (served
+// from /) and the web build (served from /web/) both work.
+const SCOPE = self.registration.scope
+const ICON = new URL('favicon.svg', SCOPE).href
+
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {}
+  let data = {}
+  if (event.data) {
+    try {
+      data = event.data.json()
+    } catch {
+      // A plain-text push still deserves a notification.
+      data = { body: event.data.text() }
+    }
+  }
   const title = data.title || 'Phaze'
   const body = data.body || 'New message'
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
-      icon: '/web/favicon.svg',
-      badge: '/web/favicon.svg',
+      icon: ICON,
+      badge: ICON,
       tag: 'phaze-msg',
       renotify: true,
     })
   )
 })
 
+// Focus an open Phaze tab instead of opening another one.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  event.waitUntil(clients.openWindow('/web/'))
+  event.waitUntil((async () => {
+    const open = await clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const existing = open.find((c) => c.url.startsWith(SCOPE))
+    if (existing) return existing.focus()
+    return clients.openWindow(SCOPE)
+  })())
 })
