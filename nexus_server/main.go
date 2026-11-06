@@ -1132,13 +1132,41 @@ func (s *NexusServer) checkQRLogin(token string) (string, string, bool, bool) {
 	return username, sess, approved == 1, true
 }
 
+// maxVerifyAttempts is how many wrong guesses a 6-digit email verification
+// code survives. After that the code is burned and the user has to request
+// a new one (resend_verification, itself rate limited), so the million
+// possible codes can't be walked through.
+const maxVerifyAttempts = 5
+
+var (
+	verifyFailMu sync.Mutex
+	verifyFails  = map[string]int{}
+)
+
 func (s *NexusServer) verifyUser(username, code string) bool {
 	var dbCode string
-	err := s.DB.QueryRow("SELECT verification_code FROM users WHERE username = ?", username).Scan(&dbCode)
-	// H6: constant-time comparison to prevent timing side-channels on OTP codes.
-	if err != nil || dbCode == "" || code == "" || subtle.ConstantTimeCompare([]byte(dbCode), []byte(code)) != 1 {
+	err := s.DB.QueryRow("SELECT COALESCE(verification_code, '') FROM users WHERE username = ?", username).Scan(&dbCode)
+	if err != nil || dbCode == "" || code == "" {
 		return false
 	}
+	// H6: constant-time comparison to prevent timing side-channels on OTP codes.
+	if subtle.ConstantTimeCompare([]byte(dbCode), []byte(code)) != 1 {
+		verifyFailMu.Lock()
+		verifyFails[username]++
+		burned := verifyFails[username] >= maxVerifyAttempts
+		if burned {
+			delete(verifyFails, username)
+		}
+		verifyFailMu.Unlock()
+		if burned {
+			s.DB.Exec("UPDATE users SET verification_code = NULL WHERE username = ? AND verification_code = ?", username, dbCode)
+			log.Printf("[verify] %s: too many wrong codes, code invalidated", username)
+		}
+		return false
+	}
+	verifyFailMu.Lock()
+	delete(verifyFails, username)
+	verifyFailMu.Unlock()
 	_, err = s.DB.Exec("UPDATE users SET is_verified = 1, verification_code = NULL WHERE username = ?", username)
 	return err == nil
 }
