@@ -1,12 +1,31 @@
+# Build context is the repo root (nexus_server/Dockerfile). The image only
+# needs: VERSION, nexus_server/, nova_bot/ and web/ (sources + lockfile).
+# Everything else is kept out of the context to make builds faster.
 .git
 .github
 .cursor
-docs
+**/node_modules
 *.md
-web/node_modules
+docs
+scripts
+infra
+packaging
+android
+desktop
+cloudflare
+native_client/vendor
+bin
+
+# Web build output / local env (the image builds web/dist itself)
+web/dist
 web/.vite
 web/.env.local
 web/.env.*.local
-native_client/vendor
+web/playwright-report
+web/test-results
+
+# Local databases and Go test files
+**/*.db
+**/*.db-wal
+**/*.db-shm
 **/*_test.go
-scripts

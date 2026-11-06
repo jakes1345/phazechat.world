@@ -28,7 +28,7 @@
   <launchable type="desktop-id">world.phazechat.Phaze.desktop</launchable>
 
   <url type="homepage">https://phazechat.world</url>
-  <url type="bugtracker">https://github.com/jakes1345/skype7-reborn/issues</url>
+  <url type="bugtracker">https://github.com/jakes1345/phazechat.world/issues</url>
 
   <developer id="world.phazechat">
     <name>Phazechat World</name>
@@ -55,6 +55,9 @@
   </supports>
 
   <releases>
+    <release version="1.6.4" date="2026-09-19">
+      <url type="details">https://github.com/jakes1345/phazechat.world/releases/tag/v1.6.4</url>
+    </release>
     <release version="1.5.0" date="2026-06-16">
       <description>
         <p>

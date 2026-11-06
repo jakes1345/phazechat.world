@@ -1,17 +1,17 @@
 import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from 'react'
 import faviconUrl from '/icon-192.png'
-import jsQR from 'jsqr'
 import type { NexusMessage, TurnConfig } from './nexusTypes'
 import {
   decryptFromPeer,
+  isEncryptedBody,
   decodePublicKeyField,
   encryptForPeer,
   encodePublicKeyB64,
   fingerprint,
   generateKeyPair,
 } from './e2ee'
-import { loadPins, savePins } from './keyPins'
-import { encryptKeypair as encryptKeyBackup } from './keyBackup'
+import { isTrusted, loadPins, pinnedPublicKeys, savePins, trustKey } from './keyPins'
+import { decryptKeypair, encryptKeypair as encryptKeyBackup, type KeyBackupBlob } from './keyBackup'
 import { playPhazeSound, phazeSoundUrl } from './phazeSounds'
 import { PresenceIcon } from './PresenceIcon'
 import { statusesForEra, IDLE_MS, effectiveStatus, type UserStatus } from './presence'
@@ -43,6 +43,22 @@ import { AvatarImg } from './AvatarImg'
 import GroupChat from './GroupChat'
 import { loadMutedConvos, saveMutedConvos } from './groupCommands'
 import './App.css'
+
+// The QR decoder (~130 kB) is only needed on the sign-in screen's
+// "scan a code" option, so it loads on first use instead of with the app.
+type JsQR = typeof import('jsqr').default
+let jsQRModule: JsQR | null = null
+async function loadJsQR(): Promise<JsQR> {
+  if (!jsQRModule) jsQRModule = (await import('jsqr')).default
+  return jsQRModule
+}
+
+// User-authored messages worth holding while the socket reconnects. Typing,
+// presence and other live signals are dropped instead; they'd be stale.
+const QUEUED_WHILE_OFFLINE = new Set([
+  'msg', 'msg_edit', 'msg_delete', 'msg_react', 'convo_msg', 'channel_msg', 'channel_edit', 'channel_react',
+])
+const OUTBOX_LIMIT = 200
 
 // Wails desktop bridge — only present when running inside the Wails desktop app.
 const wails = (() => {
@@ -177,12 +193,15 @@ function saveUnread(me: string, u: Record<string, number>) {
   try { localStorage.setItem(unreadKey(me), JSON.stringify(u)) } catch { /* quota */ }
 }
 
+const canNotify = () => typeof Notification !== 'undefined' && Notification.permission === 'granted'
+
+// Re-sends this browser's push subscription after sign-in. Only runs once the
+// user has granted notification permission (Settings → Notifications asks,
+// from a click); it never prompts on its own.
 async function registerPush(send: (m: NexusMessage) => void) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !canNotify()) return
   try {
-    const reg = await navigator.serviceWorker.register('/web/sw.js', { scope: '/web/' })
-    const perm = await Notification.requestPermission()
-    if (perm !== 'granted') return
+    const reg = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
     const resp = await fetch('/api/v1/vapid-key')
     if (!resp.ok) return
     const { publicKey } = await resp.json() as { publicKey: string }
@@ -428,13 +447,33 @@ type Convo = {
   creator: string
 }
 
+// Server the desktop app connects to. The desktop build serves this client
+// from Wails' own asset server (wails://wails or http://wails.localhost),
+// which proxies HTTP calls to the server but can't carry the WebSocket.
+const DESKTOP_WS_URL = 'wss://phazechat.world/ws'
+
 function defaultWsUrl(): string {
   const u = import.meta.env.VITE_NEXUS_WS as string | undefined
   if (u) return u
-  const { protocol, hostname, port } = window.location
+  const { protocol, host, hostname } = window.location
+  if (protocol === 'wails:' || hostname === 'wails.localhost') return DESKTOP_WS_URL
   const p = protocol === 'https:' ? 'wss:' : 'ws:'
-  const h = port && protocol !== 'https:' ? `${hostname}:${port}` : hostname
-  return `${p}//${h}/ws`
+  // location.host keeps a non-default port for both http and https.
+  return `${p}//${host}/ws`
+}
+
+// True when this page load had to create a new identity (first visit, or
+// cleared storage); then a server-side backup is worth offering to restore.
+let keysGeneratedThisLoad = false
+
+function saveKeys(kp: { publicKey: Uint8Array; secretKey: Uint8Array }) {
+  localStorage.setItem(
+    KEYS_KEY,
+    JSON.stringify({
+      pub: btoa(String.fromCharCode(...kp.publicKey)),
+      sec: btoa(String.fromCharCode(...kp.secretKey)),
+    }),
+  )
 }
 
 function loadOrCreateKeys(): { publicKey: Uint8Array; secretKey: Uint8Array } {
@@ -450,13 +489,8 @@ function loadOrCreateKeys(): { publicKey: Uint8Array; secretKey: Uint8Array } {
     /* fallthrough */
   }
   const kp = generateKeyPair()
-  localStorage.setItem(
-    KEYS_KEY,
-    JSON.stringify({
-      pub: btoa(String.fromCharCode(...kp.publicKey)),
-      sec: btoa(String.fromCharCode(...kp.secretKey)),
-    }),
-  )
+  saveKeys(kp)
+  keysGeneratedThisLoad = true
   return kp
 }
 
@@ -536,6 +570,7 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const animationFrameIdRef = useRef<number | null>(null)
+  const scanCanvasRef = useRef<HTMLCanvasElement | null>(null)
 
   useEffect(() => {
     return () => {
@@ -552,6 +587,7 @@ export default function App() {
     try {
       setErr('')
       setCameraActive(true)
+      await loadJsQR()
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
       streamRef.current = stream
       if (videoRef.current) {
@@ -584,14 +620,15 @@ export default function App() {
       return
     }
 
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (ctx) {
+    // One canvas for the whole scan instead of a new one every frame.
+    const canvas = (scanCanvasRef.current ??= document.createElement('canvas'))
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (ctx && jsQRModule) {
       canvas.width = videoRef.current.videoWidth
       canvas.height = videoRef.current.videoHeight
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      const code = jsQRModule(imageData.data, imageData.width, imageData.height, {
         inversionAttempts: 'dontInvert',
       })
       if (code && code.data) {
@@ -602,6 +639,29 @@ export default function App() {
     animationFrameIdRef.current = requestAnimationFrame(tick)
   }
 
+  // One link-code poll at a time; stopped on approval, on "Back to sign in"
+  // and after five minutes. Each new code used to start another interval
+  // that kept polling (and re-signing in) for the full five minutes.
+  const linkPollRef = useRef<{ interval: ReturnType<typeof setInterval>; timeout: ReturnType<typeof setTimeout> } | null>(null)
+  const stopLinkPoll = () => {
+    const p = linkPollRef.current
+    if (!p) return
+    clearInterval(p.interval)
+    clearTimeout(p.timeout)
+    linkPollRef.current = null
+  }
+  const startLinkPoll = (tok: string) => {
+    stopLinkPoll()
+    const interval = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
+    const timeout = setTimeout(() => {
+      stopLinkPoll()
+      setLinkBusy(false)
+      setErr('The link code expired. Generate a new one on your other device.')
+    }, 5 * 60 * 1000)
+    linkPollRef.current = { interval, timeout }
+    sendRef.current({ type: 'link_check', token: tok })
+  }
+
   const handleScannedToken = (val: string) => {
     let tok = val.trim()
     if (tok.includes('token=')) {
@@ -610,11 +670,9 @@ export default function App() {
     if (!/^[a-f0-9]{32,128}$/.test(tok)) { setErr('Invalid QR code format'); return }
     setLinkInput(tok)
     stopCamera()
-    setErr('✓ Token scanned: ' + tok)
+    setErr('✓ Code scanned. Waiting for approval on your other device…')
     setLinkBusy(true)
-    const poll = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
-    sendRef.current({ type: 'link_check', token: tok })
-    setTimeout(() => clearInterval(poll), 5 * 60 * 1000)
+    startLinkPoll(tok)
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -623,7 +681,8 @@ export default function App() {
     const reader = new FileReader()
     reader.onload = (event) => {
       const img = new Image()
-      img.onload = () => {
+      img.onload = async () => {
+        const jsQR = await loadJsQR()
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')
         if (ctx) {
@@ -671,7 +730,7 @@ export default function App() {
     const fx = effectIn(text, (id) => owned.includes(id))
     if (fx) setActiveFx({ kind: fx as EffectId, seed: Date.now() })
   }, [])
-  const [globalNotice, setGlobalNotice] = useState<{ from: string; msg: string } | null>(null)
+  const [globalNotice, setGlobalNotice] = useState<{ from: string; msg: string; action?: 'restore_keys' } | null>(null)
   const [changelogSeen, setChangelogSeen] = useState(() => localStorage.getItem('phaze_changelog_v') === '2025-05-25')
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [changelogSlide, setChangelogSlide] = useState(0)
@@ -834,11 +893,27 @@ export default function App() {
 
   const wsRef = useRef<WebSocket | null>(null)
   const keysRef = useRef(loadOrCreateKeys())
-  const peerKeysRef = useRef<Record<string, Uint8Array>>({})
-  const pinsRef = useRef(loadPins())
+  const [initialPins] = useState(loadPins)
+  const [initialPeerKeys] = useState(() => pinnedPublicKeys(initialPins))
+  const pinsRef = useRef(initialPins)
+  const peerKeysRef = useRef<Record<string, Uint8Array>>(initialPeerKeys)
+  // Contacts we've already asked for a key this session after receiving
+  // ciphertext we couldn't open, so one burst of messages sends one request.
+  const keyAskedRef = useRef<Set<string>>(new Set())
+  // Contacts the user agreed to message without encryption this session.
+  const plaintextOkRef = useRef<Set<string>>(new Set())
+  // A contact whose key no longer matches the pin, waiting for the user to
+  // decide whether to trust the new key.
+  const keyChangesRef = useRef<Record<string, { pk: Uint8Array; fp: string; pinned: string }>>({})
   const meRef = useRef<string | null>(null)
   const selectedRef = useRef<string | null>(null)
   const sendRef = useRef<(m: NexusMessage) => void>(() => {})
+  // Messages the user sent while the socket was down; flushed after the next
+  // successful sign-in on this connection.
+  const outboxRef = useRef<NexusMessage[]>([])
+  // Latest PIN-encrypted key backup the server returned for this account.
+  const backupBlobRef = useRef<KeyBackupBlob | null>(null)
+  const restoreOfferedRef = useRef(false)
   const callStateRef = useRef<CallState | null>(null)
   const typingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const outTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -919,12 +994,20 @@ export default function App() {
         return
       }
       const prev = pinsRef.current[peer]
-      if (prev && prev.fingerprint !== fp) {
-        setErr(`Possible MITM: ${peer} key changed (pinned ${prev.fingerprint}, now ${fp})`)
+      if (prev && !isTrusted(prev, fp)) {
+        // A key we've never trusted for this contact: keep using the pinned
+        // one, and ask on the next send whether to trust this one (a
+        // reinstall or another device) instead of encrypting to a key the
+        // contact may no longer have.
+        keyChangesRef.current[peer] = { pk, fp, pinned: prev.fingerprint }
+        setErr(`${peer}'s encryption key changed (was ${prev.fingerprint}, now ${fp}). You'll be asked before your next message.`)
         return
       }
-      if (!prev) {
-        pinsRef.current[peer] = { fingerprint: fp, publicKeyB64: encodePublicKeyB64(pk) }
+      // First key, or one of the contact's already trusted devices: encrypt
+      // to whichever of their devices answered last, as before pinning.
+      delete keyChangesRef.current[peer]
+      if (!prev || prev.fingerprint !== fp) {
+        pinsRef.current[peer] = trustKey(prev, fp, encodePublicKeyB64(pk))
         savePins(pinsRef.current)
       }
       const hadKey = !!peerKeysRef.current[peer]
@@ -940,24 +1023,39 @@ export default function App() {
     })()
   }, [])
 
+  // Opens a DM body. Plaintext passes through; ciphertext we can't open
+  // (no key for this contact yet, or it doesn't authenticate) returns null.
+  const openBody = useCallback((body: string, peer: string): string | null => {
+    if (!isEncryptedBody(body)) return body
+    const pk = peerKeysRef.current[peer]
+    if (!pk) {
+      // Ask for the key once so later messages and a history re-pull can
+      // be decrypted.
+      const my = meRef.current
+      if (my && !keyAskedRef.current.has(peer)) {
+        keyAskedRef.current.add(peer)
+        sendRef.current({ type: 'key_request', sender: my, recipient: peer })
+      }
+      return null
+    }
+    try {
+      return decryptFromPeer(body, pk, keysRef.current.secretKey)
+    } catch {
+      return null
+    }
+  }, [])
+
   const unwrap = useCallback((msg: NexusMessage): NexusMessage => {
     const sender = msg.sender ?? ''
     if (!sender) return msg
-    const pk = peerKeysRef.current[sender]
-    const sk = keysRef.current.secretKey
     const out = { ...msg }
-    // Only decrypt body for chat messages — call signaling is not encrypted.
-    // Never let raw ciphertext reach the UI: no peer key yet, or a bad
-    // decrypt, both fall back to a placeholder instead of the E2EE: blob.
-    if (out.body && msg.type === 'msg') {
-      if (pk) {
-        try { out.body = decryptFromPeer(out.body, pk, sk) } catch { out.body = '[Encrypted]' }
-      } else {
-        out.body = '[Encrypted]'
-      }
+    // Chat messages and their edits carry E2EE bodies; call signaling is not
+    // encrypted. Never let raw ciphertext reach the UI.
+    if (out.body && (msg.type === 'msg' || msg.type === 'msg_edit')) {
+      out.body = openBody(out.body, sender) ?? '[Encrypted]'
     }
     return out
-  }, [])
+  }, [openBody])
 
   const stopRinger = useCallback(() => {
     if (ringingAudioRef.current) {
@@ -1026,7 +1124,14 @@ export default function App() {
     sendRef.current = (m: NexusMessage) => {
       const w = wsRef.current
       if (!w || w.readyState !== WebSocket.OPEN) {
-        setErr('Not connected')
+        // Keep what the user wrote and send it once the connection is back
+        // and signed in, instead of showing it as sent and dropping it.
+        if (m.type && QUEUED_WHILE_OFFLINE.has(m.type) && outboxRef.current.length < OUTBOX_LIMIT) {
+          outboxRef.current.push(m)
+          setErr('Reconnecting… your message will be sent when Phaze is back online.')
+        } else {
+          setErr('Not connected')
+        }
         return
       }
       w.send(JSON.stringify(m))
@@ -1047,6 +1152,16 @@ export default function App() {
             const wasLoggedIn = !!meRef.current
             setMe(msg.sender ?? null)
             setErr('')
+            // Send anything written while the connection was down, but only
+            // if this is the same account it was written from.
+            if (outboxRef.current.length) {
+              const queued = outboxRef.current
+              outboxRef.current = []
+              if (!wasLoggedIn || meRef.current === msg.sender) {
+                const w = wsRef.current
+                for (const q of queued) w?.send(JSON.stringify(q))
+              }
+            }
             if (msg.turn_config) setTurn(msg.turn_config)
             if (!wasLoggedIn) playPhazeSound('Login.wav')
             sendRef.current({
@@ -1155,7 +1270,7 @@ export default function App() {
         case 'friend_accepted':
           if (msg.sender) {
             setFriends((f) => ({ ...f, [msg.sender!]: msg.status || 'Online' }))
-            appendLog('system', `${msg.sender} accepted your friend request`, false)
+            appendLog('system', `${msg.sender} accepted your friend request`, false, { peer: msg.sender })
           }
           break
 
@@ -1272,7 +1387,7 @@ export default function App() {
                   ? '📎 Attachment' : (msg.body || '').slice(0, 60)
                 if (wails) {
                   wails.Notify(msg.sender, preview)
-                } else if (Notification.permission === 'granted') {
+                } else if (canNotify()) {
                   new Notification(msg.sender!, { body: preview, icon: '/web/favicon.svg', tag: `dm-${msg.sender}` })
                 }
               }
@@ -1401,7 +1516,12 @@ export default function App() {
           break
 
         case 'link_check':
-          if (msg.status === 'approved' && msg.qr_token) {
+          // Only the device that is signing in with a link code acts on an
+          // approval. A signed-in device also polls link_check (Settings →
+          // Link a new device) and must not take over the new device's
+          // session.
+          if (msg.status === 'approved' && msg.qr_token && !meRef.current && linkPollRef.current) {
+            stopLinkPoll()
             // Server returned a fresh session token for the linked device.
             localStorage.setItem(SESSION_KEY, msg.qr_token)
             setSessionToken(msg.qr_token)
@@ -1413,8 +1533,18 @@ export default function App() {
 
         case 'key_backup_result':
           if (msg.status === 'ok' && msg.key_backup) {
-            // Silently keep the backup available but don't auto-prompt restore.
-            // Users can restore from Settings → Backup & Devices if needed.
+            backupBlobRef.current = msg.key_backup as KeyBackupBlob
+            // This browser just made a new identity but the account has a
+            // backup: point the user at restoring it, so contacts don't see
+            // a key change and older messages stay readable.
+            if (keysGeneratedThisLoad && !restoreOfferedRef.current) {
+              restoreOfferedRef.current = true
+              setGlobalNotice({
+                from: 'Encryption',
+                msg: 'Your account has a key backup. Restore it with your recovery PIN to keep your encryption identity on this device.',
+                action: 'restore_keys',
+              })
+            }
           } else if (msg.status === 'stored') {
             setErr('✓ Recovery PIN saved')
           } else if (msg.status === 'deleted') {
@@ -1492,7 +1622,7 @@ export default function App() {
           if (msg.sender) {
             setCallState({ peer: msg.sender, type: (msg.body as 'audio' | 'video') || 'audio', status: 'ringing', direction: 'incoming' })
             startRinger('CallIncoming.wav')
-            if (Notification.permission === 'granted') {
+            if (canNotify()) {
               new Notification(`Incoming call from ${msg.sender}`, {
                 body: 'Open Phaze to answer',
                 icon: '/web/favicon.svg',
@@ -1565,7 +1695,11 @@ export default function App() {
 
         case 'kicked':
           localStorage.removeItem(SESSION_KEY)
-          peerKeysRef.current = {}
+          outboxRef.current = []
+          peerKeysRef.current = pinnedPublicKeys(pinsRef.current)
+          keyAskedRef.current.clear()
+          plaintextOkRef.current.clear()
+          keyChangesRef.current = {}
           setFriends({})
           setPending([])
           setSelected(null)
@@ -1780,7 +1914,7 @@ export default function App() {
         return
       }
       const data = await res.json().catch(() => ({})) as {
-        status?: string; device_label?: string; code_sent?: boolean
+        status?: string; device_label?: string; code_sent?: boolean; token?: string
       }
       if (data.status === 'device_verification_required') {
         // The session cookie is set but inert until this is approved, so
@@ -1790,12 +1924,20 @@ export default function App() {
         setErr('')
         return
       }
-      // Cookie is set by the server (HttpOnly — never accessible to JS).
-      // Reconnect the WS so the server can pre-auth from the cookie.
+      // Browsers: the HttpOnly cookie authenticates the reconnected socket.
+      // Desktop app: its socket can't carry that cookie, so the server hands
+      // the token back and the socket signs in with it (session_auth).
+      adoptReturnedToken(data.token)
       setWsRetry((n) => n + 1)
     } catch {
       setErr('Network error — please try again')
     }
+  }
+
+  const adoptReturnedToken = (token: string | undefined) => {
+    if (!token) return
+    localStorage.setItem(SESSION_KEY, token)
+    setSessionToken(token)
   }
 
   // Completes a sign-in that's waiting on new-device approval. The session
@@ -1809,11 +1951,12 @@ export default function App() {
         credentials: 'include',
         body: JSON.stringify({ code: code.trim() }),
       })
-      const data = await res.json().catch(() => ({})) as { status?: string; error?: string }
+      const data = await res.json().catch(() => ({})) as { status?: string; error?: string; token?: string }
       if (!res.ok || data.status !== 'ok') {
         setErr(data.error || 'That code was not accepted')
         return
       }
+      adoptReturnedToken(data.token)
       setDeviceVerify(null)
       setDeviceCode('')
       setErr('')
@@ -1836,27 +1979,29 @@ export default function App() {
   const ingestDMHistory = useCallback((peer: string, rows: import('./nexusTypes').DMMessage[]) => {
     const my = meRef.current
     if (!my || !peer || !rows?.length) return
-    const peerKey = peerKeysRef.current[peer]
-    const mySec = keysRef.current.secretKey
     const local = loadHistory(my, peer)
     const byId = new Map<string, ChatLine>(local.map((l) => [l.id, l]))
     for (const r of rows) {
       const isMe = r.sender === my
+      const existing = byId.get(r.msg_id)
+      // Both sides' rows are boxed with the same shared key, so the
+      // contact's key opens ours too. When it can't be opened yet, keep the
+      // readable copy this device already has (your own sent text, or a
+      // message decrypted earlier) instead of overwriting it; a later
+      // history pull after the key arrives fills in the rest.
       let text = r.body || ''
-      // For E2EE bodies we only know how to decrypt if we have the peer key.
-      // Same invariant as unwrap() above: never let raw ciphertext reach the
-      // UI or the local history cache. If the peer key isn't loaded yet, a
-      // later re-open of this chat re-requests dm_history and resolves it.
       if (text) {
-        if (peerKey) {
-          try { text = decryptFromPeer(text, peerKey, mySec) } catch { text = '[Encrypted]' }
+        const opened = openBody(text, peer)
+        if (opened !== null) {
+          text = opened
+        } else if (existing && (existing.file || (existing.text && existing.text !== '[Encrypted]'))) {
+          text = existing.file ? '' : existing.text
         } else {
           text = '[Encrypted]'
         }
       }
       const file = decodeFileBody(text) || undefined
       const ts = Date.parse(r.created_at + 'Z') || Date.now()
-      const existing = byId.get(r.msg_id)
       const line: ChatLine = {
         id: r.msg_id,
         from: r.sender,
@@ -1875,8 +2020,45 @@ export default function App() {
     if (selectedRef.current === peer) {
       setLog(merged)
     }
-  }, [])
+  }, [openBody])
   useEffect(() => { ingestDMHistoryRef.current = ingestDMHistory }, [ingestDMHistory])
+
+  // Returns true when a message to `peer` can be end-to-end encrypted, or
+  // the user agreed to send it in plaintext. Without the contact's key
+  // (first contact while they're offline) the message would be stored on
+  // the server in plaintext, so ask once per contact per session.
+  const confirmCanSend = useCallback((peer: string): boolean => {
+    const changed = keyChangesRef.current[peer]
+    if (changed) {
+      const trust = window.confirm(
+        `${peer}'s encryption key changed.\n\nPinned: ${changed.pinned}\nNew:    ${changed.fp}\n\n` +
+        'This happens when they reinstall Phaze or sign in on another device. It can also mean someone is ' +
+        'intercepting your messages. If you are not sure, check the new fingerprint with them another way.\n\n' +
+        'Trust the new key and send?',
+      )
+      if (!trust) return false
+      pinsRef.current[peer] = trustKey(pinsRef.current[peer], changed.fp, encodePublicKeyB64(changed.pk))
+      savePins(pinsRef.current)
+      peerKeysRef.current[peer] = changed.pk
+      delete keyChangesRef.current[peer]
+      // Re-read history so their messages under the new key decrypt.
+      const my = meRef.current
+      if (my) sendRef.current({ type: 'dm_history', sender: my, recipient: peer })
+      return true
+    }
+    if (peerKeysRef.current[peer] || plaintextOkRef.current.has(peer)) return true
+    // The built-in bot never has a key; its messages are commands.
+    if (peer === 'PhazeBot') return true
+    const my = meRef.current
+    if (my) sendRef.current({ type: 'key_request', sender: my, recipient: peer })
+    const ok = window.confirm(
+      `${peer} hasn't shared an encryption key with this device yet (they may be offline).\n\n` +
+      'Send without end-to-end encryption? The server will be able to read this message.\n\n' +
+      'Choose Cancel to wait until they come online.',
+    )
+    if (ok) plaintextOkRef.current.add(peer)
+    return ok
+  }, [])
 
   // Unlock browser audio on first user interaction so ringtones work without gesture.
   useEffect(() => {
@@ -1915,16 +2097,19 @@ export default function App() {
       // Pull durable history from the server so messages survive a localStorage
       // wipe, a new browser, or a fresh device. Server stores E2EE ciphertext.
       send({ type: 'dm_history', sender: me, recipient: name })
-      // Notify peer we've read their messages
-      send({ type: 'read_receipt', sender: me, recipient: name, body: name })
+      // Read receipts are a Phaze 6+ feature; earlier themes don't tell
+      // contacts what you've seen.
+      if (hasFeature(theme, 'read_receipts')) {
+        send({ type: 'read_receipt', sender: me, recipient: name, body: name })
+      }
     } else {
       setLog([])
       setPinnedIds([])
     }
     setE2eReady(!!peerKeysRef.current[name])
-    if (!peerKeysRef.current[name]) {
-      send({ type: 'key_request', sender: me ?? undefined, recipient: name })
-    }
+    // Ask even when a key is pinned: the reply is how a changed key (the
+    // contact reinstalled or switched device) gets noticed before sending.
+    send({ type: 'key_request', sender: me ?? undefined, recipient: name })
   }
 
   const togglePin = useCallback((line: ChatLine) => {
@@ -1971,12 +2156,13 @@ export default function App() {
           return
         } else if (out.local === 'help') {
           const helpLines = SLASH_COMMANDS.map((c) => `${c.cmd} — ${c.desc}`).join('\n')
-          appendLog('system', `Available commands:\n${helpLines}`, false, { id: newMsgId() })
+          appendLog('system', `Available commands:\n${helpLines}`, false, { id: newMsgId(), peer: selected })
           return
         }
       }
     }
 
+    if (!confirmCanSend(selected)) return
     const peer = peerKeysRef.current[selected]
     const body = peer ? encryptForPeer(plaintext, peer, keysRef.current.secretKey) : plaintext
     const msgId = newMsgId()
@@ -2026,6 +2212,7 @@ export default function App() {
       setErr('File exceeds 25 MB')
       return
     }
+    if (!confirmCanSend(selected)) return
     try {
       const fd = new FormData()
       fd.append('file', file)
@@ -2049,7 +2236,7 @@ export default function App() {
     } catch (e) {
       setErr(`Upload error: ${(e as Error).message}`)
     }
-  }, [selected, me, sessionToken, send, appendLog])
+  }, [selected, me, sessionToken, send, appendLog, confirmCanSend])
 
   const stopRecording = useCallback((cancel = false) => {
     const r = recorderRef.current
@@ -2134,6 +2321,7 @@ export default function App() {
     if (!selected || !me || !editingId) return
     const text = draft.trim()
     if (!text) return
+    if (!confirmCanSend(selected)) return
     const peer = peerKeysRef.current[selected]
     const body = peer ? encryptForPeer(text, peer, keysRef.current.secretKey) : text
     send({ type: 'msg_edit', sender: me, recipient: selected, msg_id: editingId, body })
@@ -2415,7 +2603,18 @@ export default function App() {
           onClose={() => { setSettingsOpen(false); setSettingsInitialTab('profile') }}
           onSignOut={() => {
             localStorage.removeItem(SESSION_KEY)
-            fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
+            outboxRef.current = []
+            keyAskedRef.current.clear()
+            plaintextOkRef.current.clear()
+            keyChangesRef.current = {}
+            setLog([])
+            // The socket is still signed in as this account; once the
+            // server has cleared the session cookie, drop it so the client
+            // reconnects signed out and stops receiving this account's
+            // messages and notifications.
+            void fetch('/api/v1/auth/logout', { method: 'POST', credentials: 'include' })
+              .catch(() => {})
+              .finally(() => wsRef.current?.close())
             setSessionToken(null)
             setMe(null)
             setSettingsOpen(false)
@@ -2432,6 +2631,29 @@ export default function App() {
             send({ type: 'key_backup_put', key_backup: blob })
           }}
           onDeleteBackup={() => send({ type: 'key_backup_delete' })}
+          onRestoreBackup={async (pin: string) => {
+            // Always fetch the current backup, in case it was saved from
+            // another device since this one signed in.
+            const blob = await new Promise<KeyBackupBlob | null>((resolve) => {
+              const timer = setTimeout(() => { off(); resolve(backupBlobRef.current) }, 8000)
+              const off = subscribe((m) => {
+                if (m.type !== 'key_backup_result' || m.status === 'stored' || m.status === 'deleted') return
+                clearTimeout(timer)
+                off()
+                resolve(m.status === 'ok' && m.key_backup ? (m.key_backup as KeyBackupBlob) : null)
+              })
+              send({ type: 'key_backup_get' })
+            })
+            if (!blob) throw new Error('No key backup found for this account.')
+            const kp = await decryptKeypair(blob, pin)
+            keysRef.current = kp
+            saveKeys(kp)
+            keysGeneratedThisLoad = false
+            // Tell contacts' clients about the restored key and re-pull the
+            // open chat so it decrypts with the restored identity.
+            send({ type: 'presence', sender: me, status: (localStorage.getItem(STATUS_KEY) as UserStatus) || 'Online', public_key: encodePublicKeyB64(kp.publicKey) })
+            if (selected) send({ type: 'dm_history', sender: me, recipient: selected })
+          }}
         />
       )}
 
@@ -2629,7 +2851,10 @@ export default function App() {
           <div className="restore-card" onClick={(e) => e.stopPropagation()} style={{ textAlign: 'center' }}>
             <h2 style={{ color: 'var(--brand)', fontSize: '1.2rem' }}>Notice from {globalNotice.from}</h2>
             <p style={{ margin: '1rem 0', fontSize: '0.95rem', lineHeight: 1.6 }}>{globalNotice.msg}</p>
-            <button type="button" onClick={() => setGlobalNotice(null)} style={{ padding: '0.6rem 2rem', borderRadius: 10, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Got it</button>
+            {globalNotice.action === 'restore_keys' && (
+              <button type="button" onClick={() => { setGlobalNotice(null); setSettingsInitialTab('devices'); setSettingsOpen(true) }} style={{ padding: '0.6rem 2rem', borderRadius: 10, background: 'var(--brand)', color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', marginRight: 8 }}>Restore now</button>
+            )}
+            <button type="button" onClick={() => setGlobalNotice(null)} style={{ padding: '0.6rem 2rem', borderRadius: 10, background: globalNotice.action ? 'transparent' : 'var(--brand)', color: globalNotice.action ? 'var(--brand)' : '#fff', border: globalNotice.action ? '1px solid var(--brand)' : 'none', fontWeight: 700, cursor: 'pointer' }}>{globalNotice.action ? 'Later' : 'Got it'}</button>
           </div>
         </div>
       )}
@@ -2851,12 +3076,9 @@ export default function App() {
                     <button type="button" disabled={linkBusy || linkInput.length < 8} onClick={() => {
                       setLinkBusy(true)
                       setErr('Waiting for approval on your other device…')
-                      const tok = linkInput
-                      const poll = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
-                      sendRef.current({ type: 'link_check', token: tok })
-                      setTimeout(() => clearInterval(poll), 5 * 60 * 1000)
+                      startLinkPoll(linkInput)
                     }}>{linkBusy ? 'Waiting…' : 'Sign in with code'}</button>
-                    <button type="button" className="link-btn" onClick={() => { stopCamera(); setMode('login'); setLinkInput(''); setLinkBusy(false); setErr('') }}>Back to sign in</button>
+                    <button type="button" className="link-btn" onClick={() => { stopCamera(); stopLinkPoll(); setMode('login'); setLinkInput(''); setLinkBusy(false); setErr('') }}>Back to sign in</button>
                   </div>
                 ) : regStep === 'form' ? (
                   <form className="form" onSubmit={(e) => { e.preventDefault(); doRegister() }}>
@@ -2905,6 +3127,12 @@ export default function App() {
                         <PresenceIcon status={shownStatus} size={10} /> {shownStatus} ▾
                       </button>
                     </span>
+                    {/* Skype-era themes hide the top bar, and Phaze 6+ (the theme
+                        that enables remote sessions) hides the menu bar too, so
+                        this is the only way in on that theme. */}
+                    {hasFeature(theme, 'remote_control') && (
+                      <button className="hub-me-settings" onClick={() => setRemoteOpen(true)} title="Remote Control" aria-label="Remote Control">🖥</button>
+                    )}
                     <button className="hub-me-settings" onClick={() => setSettingsOpen(true)} title="Settings">⚙</button>
                     {statusMenuOpen && (
                       <div className="presence-menu" onMouseLeave={() => setStatusMenuOpen(false)}>

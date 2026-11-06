@@ -26,6 +26,16 @@ var allowedOrigins = func() map[string]bool {
 	return m
 }()
 
+// desktopWebviewOrigins are the Origin values the Wails desktop app's
+// webview sends: wails://wails (macOS, Linux) and http://wails.localhost
+// (Windows WebView2).
+var desktopWebviewOrigins = map[string]bool{
+	"wails://wails":           true,
+	"wails://wails.localhost": true,
+	"http://wails.localhost":  true,
+	"https://wails.localhost": true,
+}
+
 func originAllowed(r *http.Request) bool {
 	if allowedOrigins == nil {
 		return true
@@ -34,6 +44,11 @@ func originAllowed(r *http.Request) bool {
 	// Native clients (Android, desktop) don't send an Origin header.
 	// Only browsers do, so a missing origin is safe to allow.
 	if origin == "" {
+		return true
+	}
+	// The desktop app's webview loads the client from Wails' asset server;
+	// these origins can't be produced by a web page on the internet.
+	if desktopWebviewOrigins[origin] {
 		return true
 	}
 	return allowedOrigins[origin]

@@ -11,7 +11,9 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"math/big"
@@ -19,6 +21,7 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -396,7 +399,10 @@ const remoteCodeTTL = 10 * time.Minute
 // didn't back up. Existing hashes still verify fine at whatever cost they
 // were created with; bcrypt stores its own cost in the hash string, so
 // raising this doesn't touch anyone's stored password.
-const bcryptCost = 12
+const productionBcryptCost = 12
+
+// bcryptCost is what new hashes use. Only tests lower it (bcrypt_test.go).
+var bcryptCost = productionBcryptCost
 
 // sweepRemoteCodes removes expired remote control codes every 2 minutes.
 func (s *NexusServer) sweepRemoteCodes() {
@@ -903,6 +909,21 @@ func (s *NexusServer) userRole(username string) string {
 	return r
 }
 
+// staffRank is the user's role rank, counting legacy is_admin=1 accounts
+// (made by seed-admin before roles existed) as super_admin, the same way
+// adminLoginHandler does.
+func (s *NexusServer) staffRank(username string) int {
+	rank := roleRank(s.userRole(username))
+	if rank < roleRank("admin") {
+		var isAdmin int
+		s.DB.QueryRow(`SELECT COALESCE(is_admin,0) FROM users WHERE username=?`, username).Scan(&isAdmin)
+		if isAdmin == 1 {
+			return roleRank("super_admin")
+		}
+	}
+	return rank
+}
+
 // roleAtLeast returns true when the user's role rank >= required rank.
 func (s *NexusServer) roleAtLeast(username, minRole string) bool {
 	return roleRank(s.userRole(username)) >= roleRank(minRole)
@@ -976,6 +997,32 @@ func randDigits(n int) (string, error) {
 // user are retained (the subject column is just text, so the username string
 // remains in the safety log — this is the legitimate-interests carve-out).
 func (s *NexusServer) deleteAccount(username string) error {
+	// Files go once the rows are gone: the avatar (or whoever registers the
+	// name next inherits the picture) and story media.
+	var storyMedia []string
+	if rows, err := s.DB.Query(`SELECT media_url FROM stories WHERE author = ?`, username); err == nil {
+		for rows.Next() {
+			var u string
+			if rows.Scan(&u) == nil {
+				storyMedia = append(storyMedia, u)
+			}
+		}
+		rows.Close()
+	}
+	if err := s.deleteAccountRows(username); err != nil {
+		return err
+	}
+	ctx := context.Background()
+	if err := blobs().Delete(ctx, "avatars/"+username+".png"); err != nil && !errors.Is(err, errBlobNotFound) {
+		log.Printf("[delete] avatar for %s: %v", username, err)
+	}
+	for _, u := range storyMedia {
+		s.deleteStoryMedia(ctx, u)
+	}
+	return nil
+}
+
+func (s *NexusServer) deleteAccountRows(username string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
@@ -1006,6 +1053,21 @@ func (s *NexusServer) deleteAccount(username string) error {
 		{`DELETE FROM session_tokens WHERE username = ?`, []any{username}},
 		{`DELETE FROM password_resets WHERE username = ?`, []any{username}},
 		{`DELETE FROM qr_login_tokens WHERE username = ?`, []any{username}},
+		// Everything else keyed by username. Left behind, it was inherited
+		// by whoever registered the name next (including the old owner's
+		// imported Skype history).
+		{`DELETE FROM skype_import_messages WHERE username = ?`, []any{username}},
+		{`DELETE FROM skype_import_contacts WHERE username = ?`, []any{username}},
+		{`DELETE FROM known_devices WHERE username = ?`, []any{username}},
+		{`DELETE FROM device_challenges WHERE username = ?`, []any{username}},
+		{`DELETE FROM contact_groups WHERE owner = ? OR contact = ?`, []any{username, username}},
+		{`DELETE FROM convo_messages WHERE sender = ?`, []any{username}},
+		{`DELETE FROM calls WHERE caller = ? OR callee = ?`, []any{username, username}},
+		{`DELETE FROM invite_codes WHERE inviter = ?`, []any{username}},
+		{`DELETE FROM reward_crates WHERE owner = ?`, []any{username}},
+		{`DELETE FROM reward_crafts WHERE owner = ?`, []any{username}},
+		{`DELETE FROM whiteboard_strokes WHERE author = ?`, []any{username}},
+		{`UPDATE users SET referred_by = '' WHERE referred_by = ?`, []any{username}},
 		// Drop the user last — every other row referencing the username is
 		// already gone, so a foreign-key constraint (if added later) would still
 		// pass.
@@ -1130,13 +1192,41 @@ func (s *NexusServer) checkQRLogin(token string) (string, string, bool, bool) {
 	return username, sess, approved == 1, true
 }
 
+// maxVerifyAttempts is how many wrong guesses a 6-digit email verification
+// code survives. After that the code is burned and the user has to request
+// a new one (resend_verification, itself rate limited), so the million
+// possible codes can't be walked through.
+const maxVerifyAttempts = 5
+
+var (
+	verifyFailMu sync.Mutex
+	verifyFails  = map[string]int{}
+)
+
 func (s *NexusServer) verifyUser(username, code string) bool {
 	var dbCode string
-	err := s.DB.QueryRow("SELECT verification_code FROM users WHERE username = ?", username).Scan(&dbCode)
-	// H6: constant-time comparison to prevent timing side-channels on OTP codes.
-	if err != nil || dbCode == "" || code == "" || subtle.ConstantTimeCompare([]byte(dbCode), []byte(code)) != 1 {
+	err := s.DB.QueryRow("SELECT COALESCE(verification_code, '') FROM users WHERE username = ?", username).Scan(&dbCode)
+	if err != nil || dbCode == "" || code == "" {
 		return false
 	}
+	// H6: constant-time comparison to prevent timing side-channels on OTP codes.
+	if subtle.ConstantTimeCompare([]byte(dbCode), []byte(code)) != 1 {
+		verifyFailMu.Lock()
+		verifyFails[username]++
+		burned := verifyFails[username] >= maxVerifyAttempts
+		if burned {
+			delete(verifyFails, username)
+		}
+		verifyFailMu.Unlock()
+		if burned {
+			s.DB.Exec("UPDATE users SET verification_code = NULL WHERE username = ? AND verification_code = ?", username, dbCode)
+			log.Printf("[verify] %s: too many wrong codes, code invalidated", username)
+		}
+		return false
+	}
+	verifyFailMu.Lock()
+	delete(verifyFails, username)
+	verifyFailMu.Unlock()
 	_, err = s.DB.Exec("UPDATE users SET is_verified = 1, verification_code = NULL WHERE username = ?", username)
 	return err == nil
 }
@@ -1866,50 +1956,74 @@ func (s *NexusServer) listSessions(username string) []map[string]string {
 	return out
 }
 
-func (s *NexusServer) exportUserData(username string) map[string]interface{} {
-	out := map[string]interface{}{"username": username}
-	// Profile
-	var email, mood, displayName string
-	s.DB.QueryRow("SELECT email, mood, display_name FROM users WHERE username = ?", username).Scan(&email, &mood, &displayName)
-	out["email"] = email
-	out["mood"] = mood
-	out["display_name"] = displayName
-	// Friends. friends rows are directional (user_a = whoever sent the
-	// original request, regardless of who accepted), so this has to check
-	// both sides like getFriends does — otherwise a user who only ever
-	// accepted requests (never sent one) would export an empty list.
-	rows, _ := s.DB.Query(
-		`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END as friend
-		 FROM friends
-		 WHERE (user_a = ? OR user_b = ?) AND status = 'accepted'`,
-		username, username, username)
-	var friends []string
-	if rows != nil {
-		for rows.Next() {
-			var u string
-			if err := rows.Scan(&u); err != nil {
-				log.Printf("[db] exportUserData friends scan: %v", err)
-				continue
+// exportQuery runs one export query and returns each row as a column→value
+// map, so every table can be dumped without a struct per table.
+func (s *NexusServer) exportQuery(query string, args ...any) []map[string]any {
+	rows, err := s.DB.Query(query, args...)
+	if err != nil {
+		log.Printf("[export] %v", err)
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	cols, _ := rows.Columns()
+	out := []map[string]any{}
+	for rows.Next() {
+		vals := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]any, len(cols))
+		for i, c := range cols {
+			if b, ok := vals[i].([]byte); ok {
+				row[c] = string(b)
+			} else {
+				row[c] = vals[i]
 			}
-			friends = append(friends, u)
 		}
-		rows.Close()
+		out = append(out, row)
 	}
-	out["friends"] = friends
-	// Messages (offline store only — live messages are E2EE so server never sees plaintext)
-	msgRows, _ := s.DB.Query("SELECT sender, recipient, body, created_at FROM offline_messages WHERE sender = ? OR recipient = ? ORDER BY created_at ASC", username, username)
-	var msgs []map[string]string
-	if msgRows != nil {
-		for msgRows.Next() {
-			var sender, recipient, body, createdAt string
-			msgRows.Scan(&sender, &recipient, &body, &createdAt)
-			msgs = append(msgs, map[string]string{"from": sender, "to": recipient, "body": body, "at": createdAt})
-		}
-		msgRows.Close()
+	return out
+}
+
+// exportUserData collects everything the server stores about a user, for
+// the "Download my data" export. Secrets (password hash, 2FA secret,
+// session tokens, verification codes) are left out.
+func (s *NexusServer) exportUserData(username string) map[string]any {
+	out := map[string]any{"username": username}
+	profile := s.exportQuery(`SELECT username, email, display_name, mood, status, created_at,
+	        COALESCE(supporter, 0) AS supporter, COALESCE(role, 'user') AS role,
+	        COALESCE(totp_enabled, 0) AS two_factor_enabled, COALESCE(referred_by, '') AS referred_by,
+	        COALESCE(signup_ip, '') AS signup_ip, COALESCE(last_ip, '') AS last_ip
+	   FROM users WHERE username = ?`, username)
+	if len(profile) == 1 {
+		out["profile"] = profile[0]
 	}
-	out["messages"] = msgs
+	// friends rows are directional (user_a sent the request), so check both
+	// sides.
+	out["friends"] = s.exportQuery(`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END AS username, status
+	   FROM friends WHERE user_a = ? OR user_b = ?`, username, username, username)
+	out["blocked"] = s.exportQuery(`SELECT blocked FROM blocks WHERE blocker = ?`, username)
+	out["contact_groups"] = s.exportQuery(`SELECT contact, group_name FROM contact_groups WHERE owner = ?`, username)
+	out["settings"] = s.exportQuery(`SELECT * FROM user_settings WHERE username = ?`, username)
+	// Direct messages exactly as stored: end-to-end encrypted DMs are
+	// ciphertext ("E2EE:…") that only your devices can open.
+	out["direct_messages"] = s.exportQuery(`SELECT * FROM dm_messages WHERE sender = ? OR recipient = ? ORDER BY created_at`, username, username)
+	out["queued_messages"] = s.exportQuery(`SELECT sender, recipient, body, msg_type, created_at FROM offline_messages WHERE sender = ? OR recipient = ? ORDER BY created_at`, username, username)
+	out["group_messages_sent"] = s.exportQuery(`SELECT convo_id, body, sent_at FROM convo_messages WHERE sender = ? ORDER BY sent_at`, username)
+	out["channel_messages_sent"] = s.exportQuery(`SELECT * FROM channel_messages WHERE sender = ?`, username)
+	out["stories"] = s.exportQuery(`SELECT media_url, media_kind, caption, created_at, expires_at FROM stories WHERE author = ?`, username)
+	out["calls"] = s.exportQuery(`SELECT caller, callee, kind, started_at, answered, duration_s FROM calls WHERE caller = ? OR callee = ? ORDER BY started_at`, username, username)
+	out["skype_import_contacts"] = s.exportQuery(`SELECT skype_id, display_name, email, phaze_username FROM skype_import_contacts WHERE username = ?`, username)
+	out["skype_import_messages"] = s.exportQuery(`SELECT conversation_id, conversation_display, sender_display, body, sent_at FROM skype_import_messages WHERE username = ?`, username)
+	out["devices"] = s.exportQuery(`SELECT device_id, label, first_seen, last_seen, last_ip FROM known_devices WHERE username = ?`, username)
+	out["sessions"] = s.exportQuery(`SELECT device_info, created_at, expires_at FROM session_tokens WHERE username = ? AND revoked = 0`, username)
+	out["reward_crates"] = s.exportQuery(`SELECT source, item, shards, created_at, opened_at FROM reward_crates WHERE owner = ?`, username)
 	out["exported_at"] = time.Now().UTC().Format(time.RFC3339)
-	out["note"] = "Live E2EE messages are not stored server-side. This export contains only metadata and queued offline messages."
+	out["note"] = "Everything Phaze's server stores about your account. End-to-end encrypted direct messages appear as ciphertext (E2EE:…), because the server can't read them. Your encryption keys live only on your devices."
 	return out
 }
 
@@ -1925,7 +2039,7 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 		return
 	}
 
-	rows, err := s.DB.Query("SELECT id, sender, body, msg_type, created_at, COALESCE(msg_id,'') FROM offline_messages WHERE recipient = ? ORDER BY created_at ASC", username)
+	rows, err := s.DB.Query("SELECT id, sender, body, msg_type, created_at, COALESCE(msg_id,''), COALESCE(convo,'') FROM offline_messages WHERE recipient = ? ORDER BY created_at ASC", username)
 	if err != nil {
 		return
 	}
@@ -1934,8 +2048,8 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 	var ids []int64
 	for rows.Next() {
 		var id int64
-		var sender, body, msgType, createdAt, msgID string
-		if err := rows.Scan(&id, &sender, &body, &msgType, &createdAt, &msgID); err != nil {
+		var sender, body, msgType, createdAt, msgID, convo string
+		if err := rows.Scan(&id, &sender, &body, &msgType, &createdAt, &msgID, &convo); err != nil {
 			log.Printf("[db] deliverOfflineMessages scan: %v", err)
 			continue
 		}
@@ -1944,7 +2058,10 @@ func (s *NexusServer) deliverOfflineMessages(username string, client *Client) {
 			Sender: sender,
 			Body:   body,
 			MsgID:  msgID,
-			Status: "offline:" + createdAt,
+			// Group messages queued while offline need their conversation,
+			// or the client can't tell which group they belong to.
+			ConvoID: convo,
+			Status:  "offline:" + createdAt,
 		})
 		ids = append(ids, id)
 	}
@@ -2352,7 +2469,7 @@ func (s *NexusServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 
 	v := os.Getenv("Phaze_LATEST_VERSION")
 	if v == "" {
-		v = "1.0.0-Phaze"
+		v = Version
 	}
 
 	turnOK := TurnSecret != "" && TurnURL != ""
@@ -2558,6 +2675,17 @@ func (s *NexusServer) fileDownloadHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// The APK in the image is only a fallback: once a GitHub release carries
+	// a signed APK, send people to that one so the website always offers the
+	// current app (the copy baked into the image goes stale).
+	if name == "Phaze.apk" {
+		if a, ok := currentUpdateManifest().Platforms["android"]; ok && a.Name == "Phaze.apk" && strings.HasPrefix(a.URL, "https://github.com/") {
+			w.Header().Set("Cache-Control", "no-store")
+			http.Redirect(w, r, a.URL, http.StatusFound)
+			return
+		}
+	}
+
 	// Force octet-stream + attachment for every binary so mobile browsers
 	// (Samsung Internet, Chrome Android) save to Downloads instead of
 	// handing off to the package installer or a file viewer.
@@ -2607,27 +2735,57 @@ func (s *NexusServer) legalHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "templates/legal.html")
 }
 
+// resetPage renders every state of the password-reset page. html/template
+// escapes the token and error text: the token comes straight from the URL,
+// and printing it raw let a crafted link run script on phazechat.world.
+var resetPage = template.Must(template.New("reset").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>{{.Title}}</title><style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:520px;margin:80px auto;padding:20px;color:#1a1a1a}input{box-sizing:border-box;width:100%;padding:10px;margin:8px 0;font-size:1rem}button{background:#0077B3;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:1rem;cursor:pointer}a{color:#0077B3}</style></head><body><h1>{{.Title}}</h1>{{if .Form}}<form method="POST" action="/reset"><input type="hidden" name="token" value="{{.Token}}"><label>New password (min. 8 chars)<input type="password" name="password" minlength="8" autocomplete="new-password" required></label><button type="submit">Set new password</button></form>{{else}}<p>{{.Message}}</p><p><a href="/">Back to Phaze</a></p>{{end}}</body></html>`))
+
+type resetPageData struct {
+	Title, Token, Message string
+	Form                  bool
+}
+
+func (s *NexusServer) renderReset(w http.ResponseWriter, status int, d resetPageData) {
+	h := w.Header()
+	writeSecurityHeaders(w)
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	// The token is in the URL: don't leak it to other sites via Referer.
+	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+	w.WriteHeader(status)
+	if err := resetPage.Execute(w, d); err != nil {
+		log.Printf("[reset] render: %v", err)
+	}
+}
+
 func (s *NexusServer) resetHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if r.Method == http.MethodPost {
+		r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "bad form", http.StatusBadRequest)
+			s.renderReset(w, http.StatusBadRequest, resetPageData{Title: "Reset failed", Message: "The form could not be read. Please try the link again."})
 			return
 		}
-		token = r.FormValue("token")
-		pw := r.FormValue("password")
+		token = r.PostFormValue("token")
+		pw := r.PostFormValue("password")
 		if err := s.consumePasswordReset(token, pw); err != nil {
-			fmt.Fprintf(w, `<!doctype html><meta charset=utf-8><title>Reset failed</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:20px"><h1>Reset failed</h1><p>%s</p><p><a href="/">Back to Phaze</a></p>`, err.Error())
+			s.renderReset(w, http.StatusBadRequest, resetPageData{Title: "Reset failed", Message: err.Error()})
 			return
 		}
-		fmt.Fprint(w, `<!doctype html><meta charset=utf-8><title>Password reset</title><body style="font-family:system-ui;max-width:520px;margin:80px auto;padding:20px"><h1>Password updated</h1><p>You can now log in with your new password.</p><p><a href="/">Back to Phaze</a></p>`)
+		s.renderReset(w, http.StatusOK, resetPageData{Title: "Password updated", Message: "You can now log in with your new password."})
+		return
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if token == "" {
-		http.Error(w, "missing token", http.StatusBadRequest)
+		s.renderReset(w, http.StatusBadRequest, resetPageData{Title: "Reset link incomplete", Message: "This reset link is missing its token. Request a new one from the sign-in screen."})
 		return
 	}
-	fmt.Fprintf(w, `<!doctype html><html><head><meta charset=utf-8><title>Reset Phaze password</title><style>body{font-family:system-ui;max-width:520px;margin:80px auto;padding:20px}input{width:100%%;padding:10px;margin:8px 0;font-size:1rem}button{background:#00AFF0;color:#fff;border:0;padding:12px 24px;border-radius:6px;font-size:1rem;cursor:pointer}</style></head><body><h1>Reset your Phaze password</h1><form method="POST"><input type="hidden" name="token" value="%s"><label>New password (min. 8 chars)<input type="password" name="password" minlength="8" required></label><button type="submit">Set new password</button></form></body></html>`, token)
+	s.renderReset(w, http.StatusOK, resetPageData{Title: "Reset your Phaze password", Token: token, Form: true})
 }
 
 // adminFromRequest authenticates an admin caller. Expects phaze_admin_token cookie
@@ -3096,6 +3254,14 @@ func (s *NexusServer) adminBanHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	reason := strings.TrimSpace(reqBody.Reason)
 
+	// Ban, unban, 2FA reset and delete follow the same hierarchy as role
+	// changes: you can only act on users ranked below you. Without this a
+	// plain admin could ban, delete or strip 2FA from a super_admin.
+	if action != "role" && s.staffRank(target) >= s.staffRank(admin) {
+		http.Error(w, "cannot act on a peer or higher-ranked user", http.StatusForbidden)
+		return
+	}
+
 	switch action {
 	case "ban":
 		res, err := s.DB.Exec(
@@ -3224,14 +3390,29 @@ func (s *NexusServer) adminLoginHandler(w http.ResponseWriter, r *http.Request) 
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		TOTP     string `json:"totp"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&body); err != nil {
 		http.Error(w, "bad json", http.StatusBadRequest)
 		return
 	}
 	if !s.authenticateUser(body.Username, body.Password) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
+	}
+	// Staff accounts with 2FA must pass it here too. The admin token is an
+	// ordinary session token, so skipping this check let a password alone
+	// open both the portal and the user's whole account.
+	if _, enabled := s.totpStatus(body.Username); enabled {
+		code := strings.TrimSpace(body.TOTP)
+		if code == "" {
+			http.Error(w, "two-factor code required", http.StatusUnauthorized)
+			return
+		}
+		if !s.verifyTOTP(body.Username, code) && !s.consumeBackupCode(body.Username, code) {
+			http.Error(w, "invalid two-factor code", http.StatusUnauthorized)
+			return
+		}
 	}
 	role := s.userRole(body.Username)
 	// is_admin=1 accounts created via seed-admin count as super_admin
@@ -3814,6 +3995,23 @@ func refreshUpdateManifest(repo string) UpdateManifest {
 }
 
 func (s *NexusServer) versionHandler(w http.ResponseWriter, r *http.Request) {
+	manifest := currentUpdateManifest()
+
+	// Backwards-compat shim: older clients only look at `version` and `url`.
+	// New clients use `platforms` + `release_notes`.
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	out := struct {
+		UpdateManifest
+		// Legacy fields:
+		URL string `json:"url"`
+	}{UpdateManifest: manifest, URL: manifest.ReleaseURL}
+	json.NewEncoder(w).Encode(out)
+}
+
+// currentUpdateManifest returns the latest-release manifest, refreshed from
+// GitHub at most every updateTTL.
+func currentUpdateManifest() UpdateManifest {
 	repo := strings.TrimSpace(os.Getenv("PHAZE_RELEASE_REPO"))
 	if repo == "" {
 		// This fallback pointed at a repo that has never existed, so every
@@ -3835,17 +4033,7 @@ func (s *NexusServer) versionHandler(w http.ResponseWriter, r *http.Request) {
 		updates.expires = time.Now().Add(updateTTL)
 		updates.mu.Unlock()
 	}
-
-	// Backwards-compat shim: older clients only look at `version` and `url`.
-	// New clients use `platforms` + `release_notes`.
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=60")
-	out := struct {
-		UpdateManifest
-		// Legacy fields:
-		URL string `json:"url"`
-	}{UpdateManifest: manifest, URL: manifest.ReleaseURL}
-	json.NewEncoder(w).Encode(out)
+	return manifest
 }
 
 func (s *NexusServer) statsHandler(w http.ResponseWriter, r *http.Request) {
@@ -3939,11 +4127,10 @@ func (s *NexusServer) vapidKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *NexusServer) exportHandler(w http.ResponseWriter, r *http.Request) {
-	// H5: prefer Authorization header; fall back to query param for backwards compat.
-	tok := ""
-	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
-		tok = strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
-	}
+	// Session cookie or Authorization header. The old ?token= query
+	// parameter is still read for existing clients, but it ends up in
+	// proxy and server logs, so the web client no longer uses it.
+	tok := tokenFromRequest(r)
 	if tok == "" {
 		tok = r.URL.Query().Get("token")
 	}
@@ -4032,7 +4219,7 @@ func initSentry(component string) {
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              dsn,
 		Environment:      env,
-		Release:          os.Getenv("FLY_MACHINE_VERSION"),
+		Release:          Version,
 		TracesSampleRate: 0.05,
 		ServerName:       component,
 	})
@@ -4042,6 +4229,28 @@ func initSentry(component string) {
 	}
 	log.Printf("[sentry] error reporting enabled (env=%s)", env)
 }
+
+// jitsiOrigin hosts the rooms that calls and voice channels open in an
+// iframe (web/src/CallScreen.tsx, VoiceRoom.tsx).
+const jitsiOrigin = "https://meet.jit.si"
+
+// Headers for the React SPA under /web/. Without frame-src the browser
+// refuses to load the Jitsi iframe, so no web call can connect.
+const webPermissionsPolicy = "camera=(self \"" + jitsiOrigin + "\"), " +
+	"microphone=(self \"" + jitsiOrigin + "\"), " +
+	"display-capture=(self \"" + jitsiOrigin + "\"), " +
+	"autoplay=(self \"" + jitsiOrigin + "\"), " +
+	"fullscreen=(self \"" + jitsiOrigin + "\")"
+
+const webContentSecurityPolicy = "default-src 'self'; " +
+	"connect-src 'self' wss://phazechat.world wss://*.phazechat.world; " +
+	"img-src 'self' data: blob:; " +
+	"media-src 'self' blob:; " +
+	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+	"font-src 'self' https://fonts.gstatic.com; " +
+	"script-src 'self'; " +
+	"frame-src " + jitsiOrigin + "; " +
+	"frame-ancestors 'none'"
 
 func main() {
 	resolveWorkingDir()
@@ -4063,6 +4272,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Pick the upload/avatar store now so a misconfigured bucket stops the
+	// boot instead of failing the first upload.
+	blobs()
+
 	// Enable WAL mode for better concurrent access
 	db.Exec("PRAGMA journal_mode=WAL")
 	db.Exec("PRAGMA busy_timeout=5000")
@@ -4095,7 +4308,7 @@ func main() {
 	http.HandleFunc("/twiml/outbound", rateLimit(server.twimlHandler))
 
 	fs := http.FileServer(http.Dir("public"))
-	http.Handle("/public/", http.StripPrefix("/public/", fs))
+	http.Handle("/public/", publicFilesHandler(fs))
 	http.Handle("/.well-known/", http.StripPrefix("/.well-known/", http.FileServer(http.Dir("public/.well-known"))))
 	http.HandleFunc("/downloads/", server.fileDownloadHandler)
 
@@ -4113,19 +4326,12 @@ func main() {
 		http.HandleFunc("/web/", func(w http.ResponseWriter, r *http.Request) {
 			// Explicit Permissions-Policy so getUserMedia/getDisplayMedia work
 			// even when the SPA is reached via embedding proxies or CDN paths
-			// that strip defaults. Top-level HTTPS already allows these, but
-			// being explicit avoids edge-case "permission denied" silently.
-			w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), autoplay=(self)")
+			// that strip defaults. Calls and voice channels run in a Jitsi
+			// iframe, so the Jitsi origin has to be delegated the same
+			// features or its allow= attribute is ignored.
+			w.Header().Set("Permissions-Policy", webPermissionsPolicy)
 			// M1: Content-Security-Policy for the React SPA.
-			w.Header().Set("Content-Security-Policy",
-				"default-src 'self'; "+
-					"connect-src 'self' wss://phazechat.world wss://*.phazechat.world; "+
-					"img-src 'self' data: blob:; "+
-					"media-src 'self' blob:; "+
-					"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
-					"font-src 'self' https://fonts.gstatic.com; "+
-					"script-src 'self'; "+
-					"frame-ancestors 'none'")
+			w.Header().Set("Content-Security-Policy", webContentSecurityPolicy)
 			rel := strings.TrimPrefix(r.URL.Path, "/web/")
 			candidate := filepath.Join(webDir, filepath.FromSlash(rel))
 			if rel != "" {
@@ -4155,24 +4361,12 @@ func main() {
 		w.Header().Set("Cache-Control", "public, max-age=86400")
 		fmt.Fprint(w, "User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /ws\nDisallow: /reset\nSitemap: https://phazechat.world/sitemap.xml\n")
 	})
-	http.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/xml; charset=utf-8")
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		const base = "https://phazechat.world"
-		today := time.Now().UTC().Format("2006-01-02")
-		paths := []string{"/", "/download", "/features", "/rates", "/about", "/support", "/privacy", "/terms", "/legal", "/status", "/web/"}
-		fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>`)
-		fmt.Fprint(w, `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
-		for _, p := range paths {
-			fmt.Fprintf(w, `<url><loc>%s%s</loc><lastmod>%s</lastmod><changefreq>weekly</changefreq></url>`, base, p, today)
-		}
-		fmt.Fprint(w, `</urlset>`)
-	})
+	registerSiteRoutes() // site_pages.go: /sitemap.xml, /security, /skype-alternative, root icons
 
 	// Search engine verification endpoints.
-	// Google: flyctl secrets set PHAZE_GSC_VERIFICATION=google123abc.html
-	// Bing:   flyctl secrets set PHAZE_BING_VERIFICATION=<xml-code>
-	// Yandex: flyctl secrets set PHAZE_YANDEX_VERIFICATION=<code>
+	// Google: npx wrangler secret put PHAZE_GSC_VERIFICATION   (e.g. google123abc.html)
+	// Bing:   npx wrangler secret put PHAZE_BING_VERIFICATION  (the XML code)
+	// Yandex: npx wrangler secret put PHAZE_YANDEX_VERIFICATION
 	http.HandleFunc("/google", func(w http.ResponseWriter, r *http.Request) {
 		v := os.Getenv("PHAZE_GSC_VERIFICATION")
 		if v == "" {
@@ -4268,7 +4462,7 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 		json.NewEncoder(w).Encode(map[string]string{
 			"bmc_url":       bmc,
 			"support_email": os.Getenv("PHAZE_SUPPORT_EMAIL"),
-			"version":       "1.0.0-Phaze",
+			"version":       Version,
 		})
 	}))
 	// Warn loudly if we're not configured to trust the real-client-IP header.
@@ -4276,9 +4470,9 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 	// and a PHAZE_ADMIN_IPS allowlist would compare against the edge IP and
 	// lock EVERYONE out of the admin portal with a 404.
 	if trustedProxyHeader == "" {
-		log.Printf("[WARN] PHAZE_TRUST_PROXY_HEADER is unset — all stored IPs will be the edge proxy IP, not real clients. On Fly.io set PHAZE_TRUST_PROXY_HEADER=Fly-Client-IP.")
+		log.Printf("[WARN] PHAZE_TRUST_PROXY_HEADER is unset — all stored IPs will be the edge proxy IP, not real clients. Behind Cloudflare the Worker sets it to X-Phaze-Client-IP; on Fly.io use Fly-Client-IP.")
 		if strings.TrimSpace(os.Getenv("PHAZE_ADMIN_IPS")) != "" {
-			log.Printf("[WARN] PHAZE_ADMIN_IPS is set but PHAZE_TRUST_PROXY_HEADER is not — the admin IP allowlist compares against the edge IP and will 404 EVERYONE, including you. Set PHAZE_TRUST_PROXY_HEADER=Fly-Client-IP.")
+			log.Printf("[WARN] PHAZE_ADMIN_IPS is set but PHAZE_TRUST_PROXY_HEADER is not — the admin IP allowlist compares against the edge IP and will 404 EVERYONE, including you. Set PHAZE_TRUST_PROXY_HEADER to your edge proxy's client-IP header.")
 		}
 	}
 	// Admin portal — hidden path, not /admin. Set PHAZE_ADMIN_PATH env var
@@ -4357,7 +4551,19 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 		}
 	}()
 
-	err = http.ListenAndServe(bindAddr+":"+port, nil)
+	// ReadHeaderTimeout stops slow-header (slowloris) connections; idle
+	// keep-alive connections are closed after two minutes. No overall
+	// read/write timeout: WebSockets, large uploads and media downloads
+	// legitimately run long.
+	httpServer := &http.Server{
+		Addr:              bindAddr + ":" + port,
+		ReadHeaderTimeout: 15 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    64 << 10,
+		// www.phazechat.world → apex redirect (site_pages.go).
+		Handler: canonicalHost(http.DefaultServeMux),
+	}
+	err = httpServer.ListenAndServe()
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
@@ -4393,8 +4599,9 @@ func (s *NexusServer) sendSMS(to, body string) error {
 }
 
 func (s *NexusServer) broadcastProfileUpdate(username, displayName, mood string) {
-	s.Mu.RLock()
-	defer s.Mu.RUnlock()
+	// Only the snapshot below takes the read lock. A second, outer RLock
+	// here deadlocked the server whenever a writer (connect/disconnect)
+	// queued between the two: RWMutex blocks new readers once one waits.
 	msg := NexusMessage{
 		Type:        "profile_update",
 		Sender:      username,
@@ -4457,12 +4664,7 @@ func (s *NexusServer) avatarHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// 404 when no picture is set: clients render their own letter-circle
 	// fallback, which beats shipping one generic silhouette to everybody.
-	path := "avatars/" + username + ".png"
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		http.NotFound(w, r)
-		return
-	}
-	http.ServeFile(w, r, path)
+	serveBlob(w, r, "avatars/"+username+".png")
 }
 
 // uploadHandler accepts authenticated multipart uploads for in-chat
@@ -4473,10 +4675,11 @@ func (s *NexusServer) avatarHandler(w http.ResponseWriter, r *http.Request) {
 // learns which conversation references which upload.
 const maxUploadBytes = 25 * 1024 * 1024 // 25 MB
 
-// uploadDir returns the directory where chat attachments are stored. In
-// production (Fly) set PHAZE_UPLOAD_DIR=/data/uploads so files persist on
-// the mounted volume; otherwise we fall back to public/uploads relative to
-// the working directory for local dev.
+// uploadDir returns the directory where chat attachments are stored when
+// the blob store is local disk (see blobstore.go). Set
+// PHAZE_UPLOAD_DIR=/data/uploads on a host with a mounted volume so files
+// persist; otherwise we fall back to public/uploads relative to the working
+// directory for local dev.
 func uploadDir() string {
 	if d := os.Getenv("PHAZE_UPLOAD_DIR"); d != "" {
 		return d
@@ -4551,6 +4754,13 @@ func (s *NexusServer) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "file content does not match extension", http.StatusUnsupportedMediaType)
 			return
 		}
+	case ext == ".heic":
+		// HEIC is an ISO-BMFF file: "ftyp" at offset 4 and a HEIF brand.
+		if !isHEIC(headBuf[:n]) {
+			log.Printf("[upload] rejected %s: ext=%s not HEIF uploader=%s", hdr.Filename, ext, uploader)
+			http.Error(w, "file content does not match extension", http.StatusUnsupportedMediaType)
+			return
+		}
 	case ext == ".pdf":
 		if detected != "application/pdf" {
 			log.Printf("[upload] rejected %s: ext=%s detected=%s uploader=%s", hdr.Filename, ext, detected, uploader)
@@ -4559,25 +4769,14 @@ func (s *NexusServer) uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := os.MkdirAll(uploadDir(), 0o755); err != nil {
-		http.Error(w, "storage error", http.StatusInternalServerError)
-		return
-	}
 	rnd, err := randHex(16)
 	if err != nil {
 		http.Error(w, "rng error", http.StatusInternalServerError)
 		return
 	}
 	storedName := rnd + ext
-	outPath := filepath.Join(uploadDir(), storedName)
-	out, err := os.Create(outPath)
-	if err != nil {
-		http.Error(w, "storage error", http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, io.LimitReader(file, maxUploadBytes)); err != nil {
-		os.Remove(outPath)
+	if err := blobs().Put(r.Context(), "uploads/"+storedName, file, hdr.Size, detected); err != nil {
+		log.Printf("[upload] store %s: %v", storedName, err)
 		http.Error(w, "write error", http.StatusInternalServerError)
 		return
 	}
@@ -4600,23 +4799,95 @@ func (s *NexusServer) uploadsServeHandler(w http.ResponseWriter, r *http.Request
 		http.NotFound(w, r)
 		return
 	}
-	full := filepath.Join(uploadDir(), name)
-	if _, err := os.Stat(full); err != nil {
+	ext := strings.ToLower(filepath.Ext(name))
+	ctype, inline := uploadContentType(ext)
+	if ctype == "" {
+		// Not a type the upload handler accepts: never serve it.
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	// Force download for non-image files — prevents a browser from executing
-	// HTML/SVG/JS if one somehow slips through the extension allowlist.
-	ext := strings.ToLower(filepath.Ext(name))
-	switch ext {
-	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".heic":
-		// Images inline fine; browsers treat them as media, not scripts.
-	default:
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
+	h := w.Header()
+	h.Set("Cache-Control", "public, max-age=86400")
+	// Always declare the type ourselves. Left unset, http.ServeContent sniffs
+	// the bytes and would serve an HTML payload as text/html on our origin.
+	h.Set("Content-Type", ctype)
+	h.Set("X-Content-Type-Options", "nosniff")
+	// Even if a browser rendered the file as a document, it gets no script,
+	// no same-origin access and no network.
+	h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox")
+	if !inline {
+		h.Set("Content-Disposition", "attachment; filename=\""+name+"\"")
 	}
-	http.ServeFile(w, r, full)
+	serveBlob(w, r, "uploads/"+name)
+}
+
+// publicFilesHandler serves /public/ except the uploads directory. Uploads
+// live under public/uploads by default and must only be served by
+// uploadsServeHandler, which sets a safe Content-Type and CSP; the plain
+// file server would sniff them.
+func publicFilesHandler(fs http.Handler) http.Handler {
+	publicFS := http.StripPrefix("/public/", fs)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if p := path.Clean("/" + strings.TrimPrefix(r.URL.Path, "/public/")); p == "/uploads" || strings.HasPrefix(p, "/uploads/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		publicFS.ServeHTTP(w, r)
+	})
+}
+
+// uploadContentType maps each extension the upload handler accepts to the
+// Content-Type it is served with, and whether it may be shown inline
+// (media) or must download. An empty type means the extension isn't allowed.
+func uploadContentType(ext string) (ctype string, inline bool) {
+	switch ext {
+	case ".png":
+		return "image/png", true
+	case ".jpg", ".jpeg":
+		return "image/jpeg", true
+	case ".gif":
+		return "image/gif", true
+	case ".webp":
+		return "image/webp", true
+	case ".bmp":
+		return "image/bmp", true
+	case ".heic":
+		return "image/heic", true
+	case ".mp4":
+		return "video/mp4", true
+	case ".mov":
+		return "video/quicktime", true
+	case ".webm":
+		return "video/webm", true
+	case ".m4a":
+		return "audio/mp4", true
+	case ".mp3":
+		return "audio/mpeg", true
+	case ".ogg":
+		return "audio/ogg", true
+	case ".wav":
+		return "audio/wav", true
+	case ".pdf":
+		return "application/pdf", false
+	case ".txt", ".md", ".log", ".csv":
+		return "text/plain; charset=utf-8", false
+	case ".json":
+		return "application/json", false
+	}
+	return "", false
+}
+
+// isHEIC reports whether head starts like a HEIF/HEIC file.
+func isHEIC(head []byte) bool {
+	if len(head) < 12 || string(head[4:8]) != "ftyp" {
+		return false
+	}
+	switch string(head[8:12]) {
+	case "heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1":
+		return true
+	}
+	return false
 }
 
 func (s *NexusServer) handleBotMessage(client *Client, msg NexusMessage) {
@@ -4637,7 +4908,7 @@ func (s *NexusServer) handleBotMessage(client *Client, msg NexusMessage) {
 	case cmd == "/webrtc":
 		reply.Body = "Phaze voice/video uses WebRTC (Pion on desktop, browser APIs on web). Signaling goes over Nexus; media is peer-to-peer when possible, with TURN from your relay when NAT blocks direct paths."
 	case cmd == "/version":
-		reply.Body = "Nexus Server v1.0.0-Phaze"
+		reply.Body = "Nexus Server v" + Version
 	case cmd == "/pstn":
 		if pstnBridgeEnabled() {
 			reply.Body = "PSTN bridge is ON for this relay (Twilio). Link your phone in Settings for verified outbound. Otherwise use WebRTC calls in chat."

@@ -84,6 +84,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private const val TAG = "PhazeVM"
         private const val PREFS = "phaze_prefs"
+        private const val KEY_PINS_PREF = "key_pins_v1"
     }
 
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -100,6 +101,41 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     val pendingVerification = _pendingVerification.asStateFlow()
     private val _pendingVerifyUsername = MutableStateFlow("")
     val pendingVerifyUsername = _pendingVerifyUsername.asStateFlow()
+
+    // Stable id for this install, sent with password sign-ins so the server
+    // can recognise the device once it's been approved. Random, kept in
+    // prefs; it outlives sign-out on purpose (like the web's device cookie).
+    private val deviceId: String = prefs.getString("device_id", null)
+        ?: java.util.UUID.randomUUID().toString().also { prefs.edit().putString("device_id", it).apply() }
+
+    /** A password sign-in held for new-device approval, waiting for the emailed code. */
+    data class DeviceVerifyPrompt(val username: String, val label: String?, val challengeId: Long?)
+    private val _deviceVerify = MutableStateFlow<DeviceVerifyPrompt?>(null)
+    val deviceVerify = _deviceVerify.asStateFlow()
+
+    /** Someone is signing in to this account from a new device: approve or deny. */
+    data class DeviceChallenge(val id: Long, val label: String, val ip: String, val ts: Long)
+    private val _deviceChallenge = MutableStateFlow<DeviceChallenge?>(null)
+    val deviceChallenge = _deviceChallenge.asStateFlow()
+
+    // True while the last auth sent on this socket was session_auth, so a
+    // failure can be told apart from a wrong password.
+    private var sessionAuthPending = false
+
+    // A message waiting on the user's OK to go out without end-to-end
+    // encryption (the contact's key isn't known on this device yet).
+    data class PlaintextPrompt(val peer: String, internal val send: () -> Unit, internal val cancel: () -> Unit)
+    private val _plaintextPrompt = MutableStateFlow<PlaintextPrompt?>(null)
+    val plaintextPrompt = _plaintextPrompt.asStateFlow()
+    // Contacts the user agreed to message unencrypted this session.
+    private val plaintextOk = mutableSetOf<String>()
+    // Contacts we've already sent a key_request to this session.
+    private val keyRequested = mutableSetOf<String>()
+
+    /** A contact presented a different key from the one pinned on this device. */
+    data class KeyChangeWarning(val peer: String, val pinned: String, val offered: String, internal val publicKeyB64: String)
+    private val _keyChangeWarning = MutableStateFlow<KeyChangeWarning?>(null)
+    val keyChangeWarning = _keyChangeWarning.asStateFlow()
 
     // Profile
     private val _myDisplayName = MutableStateFlow(prefs.getString("display_name", "") ?: "")
@@ -430,7 +466,13 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     // Crypto
     private var keyPair: NaClKeyPair
-    private val peerKeys = mutableMapOf<String, ByteArray>()
+    // Contacts' keys pinned on this device (persisted), and the keys usable
+    // for encryption right now. Loaded from the pins at startup so chats
+    // decrypt immediately and offline contacts can still be messaged.
+    private var keyPins: Map<String, KeyPin> = decodePins(prefs.getString(KEY_PINS_PREF, null))
+    private val peerKeys = java.util.concurrent.ConcurrentHashMap<String, ByteArray>().apply {
+        for ((peer, pin) in keyPins) pin.publicKey?.let { put(peer, it) }
+    }
 
     init {
         keyPair = loadOrCreateKeys()
@@ -465,12 +507,24 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private fun observeConnection() {
         viewModelScope.launch {
             nexus.state.collect { st ->
+                if (st == ConnState.DISCONNECTED && _deviceVerify.value != null) {
+                    // The server only finishes a held sign-in on the socket
+                    // that started it, so the emailed code is useless now.
+                    // Say so instead of letting the next code entry fail.
+                    _deviceVerify.value = null
+                    _authError.value = "The connection dropped while waiting for your code. Sign in again to get a new one."
+                }
                 if (st == ConnState.CONNECTED) {
                     val tok = _sessionToken.value ?: return@collect
-                    nexus.send(NexusMessage(type = "session_auth", qrToken = tok, deviceInfo = "android/${Build.MODEL}"))
+                    sendSessionAuth(tok)
                 }
             }
         }
+    }
+
+    private fun sendSessionAuth(token: String) {
+        sessionAuthPending = true
+        nexus.send(NexusMessage(type = "session_auth", qrToken = token, deviceInfo = "android/${Build.MODEL}"))
     }
 
     private var linkPollJob: Job? = null
@@ -484,12 +538,38 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         _authError.value = null
         pendingTotpUsername = username
         pendingTotpPassword = password
-        nexus.send(NexusMessage(type = "auth", sender = username, body = password, deviceInfo = "android/${Build.MODEL}"))
+        sessionAuthPending = false
+        nexus.send(NexusMessage(type = "auth", sender = username, body = password, deviceInfo = "android/${Build.MODEL}", deviceId = deviceId))
     }
 
     fun loginWithTotp(totpCode: String) {
         _authError.value = null
-        nexus.send(NexusMessage(type = "auth", sender = pendingTotpUsername, body = pendingTotpPassword, totpCode = totpCode, deviceInfo = "android/${Build.MODEL}"))
+        sessionAuthPending = false
+        nexus.send(NexusMessage(type = "auth", sender = pendingTotpUsername, body = pendingTotpPassword, totpCode = totpCode, deviceInfo = "android/${Build.MODEL}", deviceId = deviceId))
+    }
+
+    /** Finishes a sign-in held for new-device approval with the emailed 6-digit code. */
+    fun verifyNewDevice(code: String) {
+        val p = _deviceVerify.value ?: return
+        // An empty code asks the server to finish the sign-in if it was
+        // approved from another session meanwhile.
+        val c = code.trim()
+        _authError.value = null
+        nexus.send(NexusMessage(type = "device_verify", sender = p.username, body = c, challengeId = p.challengeId, deviceId = deviceId))
+    }
+
+    fun cancelNewDeviceVerification() {
+        _deviceVerify.value = null
+        _authError.value = null
+        pendingTotpUsername = ""
+        pendingTotpPassword = ""
+    }
+
+    /** Approve or deny a sign-in from a new device, asked for by [deviceChallenge]. */
+    fun answerDeviceChallenge(approve: Boolean) {
+        val ch = _deviceChallenge.value ?: return
+        _deviceChallenge.value = null
+        nexus.send(NexusMessage(type = if (approve) "device_approve" else "device_deny", challengeId = ch.id))
     }
 
     fun cancelTotp() {
@@ -555,8 +635,8 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Encrypt this device's NaCl keypair with [pin] and upload to server. */
     fun backupKeys(pin: String) {
-        if (pin.length < 4) {
-            _keyBackupError.value = "PIN must be at least 4 characters"
+        KeyBackup.pinProblem(pin)?.let {
+            _keyBackupError.value = it
             return
         }
         _keyBackupError.value = null
@@ -585,8 +665,9 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Fetch the encrypted keypair backup from server and decrypt with [pin]. */
     fun restoreKeys(pin: String) {
-        if (pin.length < 4) {
-            _keyBackupError.value = "PIN must be at least 4 characters"
+        // Any length: backups made before the 8-character minimum must stay restorable.
+        if (pin.isEmpty()) {
+            _keyBackupError.value = "Enter your backup PIN"
             return
         }
         _keyBackupError.value = null
@@ -642,11 +723,96 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     fun sendMessage(text: String) {
         val peer = _selectedChat.value ?: return
         val username = _me.value ?: return
-        val peerPub = peerKeys[peer]
-        val body = if (peerPub != null) encryptForPeer(text, peerPub, keyPair.secretKey) else text
-        val msgId = "${username}-${System.nanoTime()}"
-        nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = body, msgId = msgId))
-        appendChat(ChatLine(id = msgId, from = username, text = text, me = true, ts = System.currentTimeMillis()))
+        withEncryptionConsent(peer) {
+            val msgId = "${username}-${System.nanoTime()}"
+            nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = sealFor(peer, text), msgId = msgId))
+            appendChat(ChatLine(id = msgId, from = username, text = text, me = true, ts = System.currentTimeMillis()))
+        }
+    }
+
+    /** Encrypts [text] for [peer] when their key is known; plaintext otherwise. */
+    private fun sealFor(peer: String, text: String): String {
+        val peerPub = peerKeys[peer] ?: return text
+        return encryptForPeer(text, peerPub, keyPair.secretKey)
+    }
+
+    /**
+     * Runs [send] now if a message to [peer] can be end-to-end encrypted, or
+     * the user already agreed to send to them unencrypted this session.
+     * Otherwise asks the contact for their key and asks the user (once per
+     * contact per session) before anything goes out in plaintext, like the
+     * web client. [onCancel] runs if the user declines.
+     */
+    private fun withEncryptionConsent(peer: String, onCancel: () -> Unit = {}, send: () -> Unit) {
+        if (peerKeys.containsKey(peer) || peer in plaintextOk) { send(); return }
+        requestPeerKey(peer, force = true)
+        _plaintextPrompt.value?.cancel?.invoke()
+        _plaintextPrompt.value = PlaintextPrompt(peer, send, onCancel)
+    }
+
+    /** The user answered [plaintextPrompt]. */
+    fun answerPlaintextPrompt(sendUnencrypted: Boolean) {
+        val p = _plaintextPrompt.value ?: return
+        _plaintextPrompt.value = null
+        // The key may have arrived while the dialog was up: then it goes
+        // out encrypted either way, and no consent is recorded.
+        if (peerKeys.containsKey(p.peer)) { p.send(); return }
+        if (sendUnencrypted) {
+            plaintextOk.add(p.peer)
+            p.send()
+        } else {
+            p.cancel()
+        }
+    }
+
+    private fun requestPeerKey(peer: String, force: Boolean = false) {
+        val me = _me.value ?: return
+        if (!force && !keyRequested.add(peer)) return
+        keyRequested.add(peer)
+        nexus.send(NexusMessage(type = "key_request", sender = me, recipient = peer))
+    }
+
+    /**
+     * Takes a public key a contact presented. The first key seen is pinned;
+     * a different one later is refused and the user is warned, as on the web.
+     */
+    private fun acceptPeerKey(peer: String, publicKeyB64: String, fingerprintHint: String?) {
+        if (peer == _me.value) return
+        when (val d = decidePeerKey(keyPins[peer], publicKeyB64, fingerprintHint)) {
+            is PinDecision.Accept -> {
+                if (d.newPin) savePin(peer, d.pin)
+                val pk = d.pin.publicKey ?: return
+                val hadKey = peerKeys.containsKey(peer)
+                peerKeys[peer] = pk
+                // Just learned it: re-pull the open chat so rows that came in
+                // before the key can be decrypted.
+                if (!hadKey && peer == _selectedChat.value) {
+                    _me.value?.let { nexus.send(NexusMessage(type = "dm_history", sender = it, recipient = peer)) }
+                }
+            }
+            is PinDecision.Changed -> {
+                Log.w(TAG, "key for $peer changed: pinned ${d.pinned}, offered ${d.offered}")
+                if (_keyChangeWarning.value?.peer != peer) {
+                    _keyChangeWarning.value = KeyChangeWarning(peer, d.pinned, d.offered, publicKeyB64)
+                }
+            }
+            PinDecision.Invalid -> Log.w(TAG, "ignoring malformed key or fingerprint for $peer")
+        }
+    }
+
+    private fun savePin(peer: String, pin: KeyPin) {
+        keyPins = keyPins + (peer to pin)
+        prefs.edit().putString(KEY_PINS_PREF, encodePins(keyPins)).apply()
+    }
+
+    /** The user dismissed the key-change warning; [trustNewKey] re-pins the contact's new key. */
+    fun answerKeyChange(trustNewKey: Boolean) {
+        val w = _keyChangeWarning.value ?: return
+        _keyChangeWarning.value = null
+        if (!trustNewKey) return
+        keyPins = keyPins - w.peer
+        peerKeys.remove(w.peer)
+        acceptPeerKey(w.peer, w.publicKeyB64, w.offered)
     }
 
     // ── User search ──────────────────────────────────────────────
@@ -679,10 +845,10 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     // ── Message edit / delete / react (DMs) ──────────────────────
     fun editMessage(msgId: String, newText: String) {
         val peer = _selectedChat.value ?: return
-        val peerPub = peerKeys[peer]
-        val body = if (peerPub != null) encryptForPeer(newText, peerPub, keyPair.secretKey) else newText
-        nexus.send(NexusMessage(type = "msg_edit", recipient = peer, msgId = msgId, body = body))
-        _chatLog.value = _chatLog.value.map { if (it.id == msgId) it.copy(text = newText, edited = true) else it }
+        withEncryptionConsent(peer) {
+            nexus.send(NexusMessage(type = "msg_edit", recipient = peer, msgId = msgId, body = sealFor(peer, newText)))
+            _chatLog.value = _chatLog.value.map { if (it.id == msgId) it.copy(text = newText, edited = true) else it }
+        }
     }
     fun deleteMessage(msgId: String) {
         val peer = _selectedChat.value ?: return
@@ -715,6 +881,10 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun sendFile(uri: android.net.Uri) {
         val peer = _selectedChat.value ?: return
+        withEncryptionConsent(peer) { uploadAndSendFile(peer, uri) }
+    }
+
+    private fun uploadAndSendFile(peer: String, uri: android.net.Uri) {
         val username = _me.value ?: return
         val token = _sessionToken.value ?: return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -753,12 +923,11 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                     val size = j.optLong("size", bytes.size.toLong())
                     if (fileUrl.isNotEmpty()) {
                         val msgId = "${username}-${System.nanoTime()}"
-                        val peerPub = peerKeys[peer]
                         val fileJson = JSONObject().apply {
                             put("url", fileUrl); put("name", fileName); put("mime", mime); put("size", size)
                         }
                         val plaintext = "phaze-file${fileJson}"
-                        val encBody = if (peerPub != null) encryptForPeer(plaintext, peerPub, keyPair.secretKey) else plaintext
+                        val encBody = sealFor(peer, plaintext)
                         nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = encBody, msgId = msgId))
                         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                             appendChat(ChatLine(id = msgId, from = username, text = plaintext, me = true, kind = "file", fileUrl = fileUrl, fileName = fileName, ts = System.currentTimeMillis()))
@@ -778,7 +947,13 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun sendVoiceMessage(filePath: String) {
-        val peer = _selectedChat.value ?: return
+        val peer = _selectedChat.value ?: run { java.io.File(filePath).delete(); return }
+        withEncryptionConsent(peer, onCancel = { java.io.File(filePath).delete() }) {
+            uploadAndSendVoice(peer, filePath)
+        }
+    }
+
+    private fun uploadAndSendVoice(peer: String, filePath: String) {
         val username = _me.value ?: return
         val token = _sessionToken.value ?: return
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -802,12 +977,11 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                     val size = j.optLong("size", bytes.size.toLong())
                     if (fileUrl.isNotEmpty()) {
                         val msgId = "${username}-${System.nanoTime()}"
-                        val peerPub = peerKeys[peer]
                         val fileJson = JSONObject().apply {
                             put("url", fileUrl); put("name", voiceFileName); put("mime", mime); put("size", size)
                         }
                         val plaintext = "phaze-file${fileJson}"
-                        val body = if (peerPub != null) encryptForPeer(plaintext, peerPub, keyPair.secretKey) else plaintext
+                        val body = sealFor(peer, plaintext)
                         nexus.send(NexusMessage(type = "msg", sender = username, recipient = peer, body = body, msgId = msgId))
                         viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
                             appendChat(ChatLine(id = msgId, from = username, text = plaintext, me = true, kind = "voice", fileUrl = fileUrl, fileName = voiceFileName, ts = System.currentTimeMillis()))
@@ -878,18 +1052,100 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun signOut() {
         endCall()
-        prefs.edit().remove("session_token").remove("username").apply()
+        val token = _sessionToken.value
+        if (_me.value != null) {
+            // Stop pushes for this account on this device, then end the
+            // session server-side so the token is useless even if it leaked.
+            prefs.getString("fcm_token", null)?.takeIf { it.isNotEmpty() }?.let {
+                nexus.send(NexusMessage(type = "unregister_fcm_token", body = it))
+            }
+            if (token != null) nexus.send(NexusMessage(type = "revoke_session", qrToken = token))
+        }
+        resetFcmToken()
+        prefs.edit().remove("session_token").remove("username").remove("display_name").apply()
+        clearAccountState()
+        // disconnect() lets the queued revoke go out before closing.
+        nexus.disconnect()
+        nexus.connect()
+    }
+
+    /** Drops everything belonging to the signed-in account. */
+    private fun clearAccountState() {
+        linkPollJob?.cancel()
+        linkPollJob = null
+        typingClearJob?.cancel()
         _me.value = null
         _sessionToken.value = null
+        sessionAuthPending = false
+        _myDisplayName.value = ""
         _friends.value = emptyMap()
         _pending.value = emptyList()
+        _pendingOpenChat.value = null
         _chatLog.value = emptyList()
         _selectedChat.value = null
         _unread.value = emptyMap()
+        _typingFrom.value = null
+        _searchResults.value = emptyList()
+        _convos.value = emptyList()
+        _selectedConvo.value = null
+        _convoLog.value = emptyList()
+        convoLogs.clear()
         _spaces.value = emptyList()
+        _discoverSpaces.value = emptyList()
+        _activeSpace.value = null
+        _channels.value = emptyMap()
+        _activeChannel.value = null
+        _channelMessages.value = emptyList()
+        _channelDraft.value = ""
+        _stories.value = emptyList()
+        _callState.value = null
+        _pendingConference.value = null
+        _activeLinkCode.value = null
+        _linkStatus.value = null
+        _linkError.value = null
+        _keyBackupStatus.value = null
+        _keyBackupError.value = null
+        pendingRestorePin = null
+        _twoFactorUri.value = null
+        _twoFactorStatus.value = null
+        _twoFactorEnabled.value = false
+        _twoFactorBackupCodes.value = null
+        _referralCount.value = 0
+        _referredUsers.value = emptyList()
+        _skypeContacts.value = emptyList()
+        _skypeImportStatus.value = null
+        _deviceChallenge.value = null
+        _deviceVerify.value = null
+        _totpRequired.value = false
+        pendingTotpUsername = ""
+        pendingTotpPassword = ""
+        _plaintextPrompt.value = null
+        _keyChangeWarning.value = null
+        plaintextOk.clear()
+        keyRequested.clear()
+        // Session keys go; keys pinned on this device stay usable, as on the web.
         peerKeys.clear()
-        nexus.disconnect()
-        nexus.connect()
+        for ((peer, pin) in keyPins) pin.publicKey?.let { peerKeys[peer] = it }
+    }
+
+    /**
+     * Invalidates this install's FCM token and fetches a fresh one, so pushes
+     * addressed to the signed-out account stop arriving here. The new token
+     * is registered with whichever account signs in next.
+     */
+    private fun resetFcmToken() {
+        prefs.edit().remove("fcm_token").apply()
+        try {
+            val fm = com.google.firebase.messaging.FirebaseMessaging.getInstance()
+            fm.deleteToken().addOnCompleteListener {
+                fm.token.addOnSuccessListener { t ->
+                    if (!t.isNullOrEmpty()) prefs.edit().putString("fcm_token", t).apply()
+                }
+            }
+        } catch (e: Exception) {
+            // Firebase not initialised (no google-services config): nothing to reset.
+            Log.w(TAG, "FCM reset: ${e.message}")
+        }
     }
 
     // Permanently erase the account (GDPR right-to-erasure). The server
@@ -1066,6 +1322,8 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         JitsiCalls.unregister(getApplication(), conferenceEndReceiver)
+        // Without this the socket (and its reconnect loop) outlives the VM.
+        nexus.disconnect()
         super.onCleared()
     }
 
@@ -1077,10 +1335,15 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         _chatLog.value = _chatLog.value + line
     }
 
-    private fun decrypt(body: String?, sender: String?): String {
-        if (body == null) return ""
-        val pk = sender?.let { peerKeys[it] } ?: return body
-        return try { decryptFromPeer(body, pk, keyPair.secretKey) } catch (_: Exception) { "[Encrypted]" }
+    /**
+     * Opens a DM body from/with [peer]. Plaintext passes through; ciphertext
+     * we can't open yet shows a placeholder, never raw hex, and asks the
+     * contact for their key so a later history re-pull can decrypt it.
+     */
+    private fun decrypt(body: String?, peer: String?): String {
+        val pk = peer?.let { peerKeys[it] }
+        if (pk == null && peer != null && peer != _me.value && isEncryptedBody(body)) requestPeerKey(peer)
+        return displayDmBody(body, pk?.let { k -> { b: String -> decryptFromPeer(b, k, keyPair.secretKey) } })
     }
 
     private fun observeMessages() {
@@ -1094,27 +1357,20 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private fun handleMessage(msg: NexusMessage) {
         when (msg.type) {
             "link_check" -> {
+                // Only the device signing in with a link code acts on this;
+                // a signed-in device polling its own link must not take over
+                // the new device's session (mirrors the web client).
                 if (msg.status == "approved" && msg.qrToken != null) {
+                    if (_me.value != null || linkPollJob?.isActive != true) return
                     linkPollJob?.cancel()
-                    _me.value = msg.sender
+                    linkPollJob = null
                     _authError.value = null
+                    // The link only hands over a session token: sign this
+                    // socket in with it. The user is set on auth_result ok.
+                    // Kept in memory so a reconnect resumes it; persisted on ok.
                     _sessionToken.value = msg.qrToken
-                    prefs.edit().putString("session_token", msg.qrToken).apply()
-                    msg.sender?.let { prefs.edit().putString("username", it).apply() }
-
-                    nexus.send(NexusMessage(
-                        type = "presence", sender = msg.sender, status = _myStatus.value,
-                        publicKey = encodePublicKeyB64(keyPair.publicKey),
-                        keyFingerprint = fingerprint(keyPair.publicKey),
-                    ))
-                    // Re-announce the picked status so the server persists it for this session.
-                    nexus.send(NexusMessage(type = "status_update", body = _myStatus.value))
-                    val fcmToken = prefs.getString("fcm_token", null)
-                    if (!fcmToken.isNullOrEmpty()) {
-                        nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
-                    }
-                    loadSpaces()
-                } else if (msg.error != null) {
+                    sendSessionAuth(msg.qrToken)
+                } else if (msg.error != null && linkPollJob?.isActive == true) {
                     linkPollJob?.cancel()
                     _authError.value = msg.error
                 }
@@ -1141,38 +1397,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
 
-            "auth_result" -> {
-                if (msg.status == "totp_required") {
-                    _totpRequired.value = true
-                    _authError.value = null
-                } else if (msg.status == "ok") {
-                    _totpRequired.value = false
-                    _me.value = msg.sender
-                    _authError.value = null
-                    msg.qrToken?.let { tok ->
-                        _sessionToken.value = tok
-                        prefs.edit().putString("session_token", tok).apply()
-                    }
-                    msg.sender?.let { prefs.edit().putString("username", it).apply() }
-                    nexus.send(NexusMessage(
-                        type = "presence", sender = msg.sender, status = _myStatus.value,
-                        publicKey = encodePublicKeyB64(keyPair.publicKey),
-                        keyFingerprint = fingerprint(keyPair.publicKey),
-                    ))
-                    // Refresh open chat after reconnect so missed messages appear
-                    _selectedChat.value?.let { peer ->
-                        nexus.send(NexusMessage(type = "dm_history", sender = msg.sender, recipient = peer))
-                    }
-                    // Register FCM token so push notifications work on this device
-                    val fcmToken = prefs.getString("fcm_token", null)
-                    if (!fcmToken.isNullOrEmpty()) {
-                        nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
-                    }
-                    loadSpaces()
-                } else {
-                    _authError.value = msg.error ?: msg.status ?: "Auth failed"
-                }
-            }
+            "auth_result" -> handleAuthResult(msg)
 
             "register_result" -> {
                 when (msg.status) {
@@ -1309,7 +1534,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                             msg.ts ?: existing?.lastTs ?: 0L,
                         ))
                     }
-                    msg.publicKey?.let { pk -> decodePublicKeyB64(pk)?.let { peerKeys[sender] = it } }
+                    msg.publicKey?.let { pk -> acceptPeerKey(sender, pk, msg.keyFingerprint) }
                     if (msg.status == "Offline" && _callState.value?.peer == sender) {
                         clearCall()
                     }
@@ -1369,7 +1594,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 val text = decrypt(msg.body, sender)
                 val line = ChatLine(
                     id = msg.msgId ?: "${sender}-${System.nanoTime()}",
-                    from = sender, text = text.ifEmpty { "[Encrypted]" }, me = false,
+                    from = sender, text = text.ifEmpty { ENCRYPTED_PLACEHOLDER }, me = false,
                     kind = msg.kind, fileUrl = msg.fileUrl, fileName = msg.fileName,
                 )
                 if (_selectedChat.value == sender) appendChat(line)
@@ -1384,6 +1609,32 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             "dm_history" -> handleDmHistory(msg)
+
+            // Someone signed in to this account from a device it hasn't
+            // approved; their session is held until we approve or deny.
+            "device_challenge" -> {
+                val id = msg.challengeId ?: return
+                if (_me.value == null) return
+                _deviceChallenge.value = DeviceChallenge(
+                    id = id,
+                    label = msg.body ?: "an unrecognised device",
+                    ip = msg.status ?: "",
+                    ts = msg.ts ?: System.currentTimeMillis(),
+                )
+            }
+            // Resolved, possibly from another of our sessions or by the
+            // emailed code: close the prompt if it's this one.
+            "device_result" -> {
+                val cur = _deviceChallenge.value
+                if (cur != null && (msg.challengeId == null || msg.challengeId == cur.id)) {
+                    _deviceChallenge.value = null
+                }
+                when {
+                    msg.error != null -> _actionStatus.value = msg.error
+                    msg.status == "approved" -> _actionStatus.value = "Approved sign-in from ${msg.body ?: "a new device"}."
+                    msg.status == "denied" -> _actionStatus.value = "Blocked sign-in from ${msg.body ?: "a new device"}."
+                }
+            }
 
             "key_request" -> {
                 msg.sender?.let { sender ->
@@ -1495,7 +1746,9 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             "msg_edit" -> {
                 val id = msg.msgId ?: return
                 val sender = msg.sender ?: return
-                val text = decrypt(msg.body, sender)
+                // Our own edit relayed from another of our devices is keyed to the recipient.
+                val peer = if (sender == _me.value) msg.recipient else sender
+                val text = decrypt(msg.body, peer)
                 _chatLog.value = _chatLog.value.map { if (it.id == id) it.copy(text = text, edited = true) else it }
             }
             "msg_delete" -> {
@@ -1583,6 +1836,93 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun handleAuthResult(msg: NexusMessage) {
+        val wasSessionAuth = sessionAuthPending
+        sessionAuthPending = false
+        when (msg.status) {
+            "totp_required" -> {
+                _totpRequired.value = true
+                _authError.value = if (msg.error?.contains("Too many") == true) msg.error else null
+            }
+            "device_verification_required" -> {
+                // Password (and 2FA) were right, but this install is new to
+                // the account: the server emailed a code and asked the
+                // account's other sessions to approve. Collect the code.
+                val prev = _deviceVerify.value
+                _totpRequired.value = false
+                _deviceVerify.value = DeviceVerifyPrompt(
+                    username = prev?.username ?: pendingTotpUsername,
+                    label = msg.body ?: prev?.label,
+                    challengeId = msg.challengeId ?: prev?.challengeId,
+                )
+                // The first answer's text is written for clients without a
+                // code screen; the screen explains it. Later ones (wrong
+                // code etc.) are shown.
+                _authError.value = if (prev != null) msg.error else null
+            }
+            "device_verification_failed" -> {
+                _deviceVerify.value = null
+                _authError.value = msg.error ?: "Sign-in could not be verified. Sign in again."
+            }
+            "ok" -> onSignedIn(msg)
+            else -> {
+                if (wasSessionAuth && msg.error?.contains("Too many") != true) {
+                    // The stored session is dead (expired, revoked, banned):
+                    // forget it, or every reconnect would retry it forever.
+                    _sessionToken.value = null
+                    prefs.edit().remove("session_token").apply()
+                }
+                _authError.value = msg.error ?: msg.status ?: "Auth failed"
+            }
+        }
+    }
+
+    private fun onSignedIn(msg: NexusMessage) {
+        _totpRequired.value = false
+        _deviceVerify.value = null
+        pendingTotpUsername = ""
+        pendingTotpPassword = ""
+        _me.value = msg.sender
+        _authError.value = null
+        msg.qrToken?.let { tok ->
+            _sessionToken.value = tok
+            prefs.edit().putString("session_token", tok).apply()
+        }
+        msg.sender?.let { prefs.edit().putString("username", it).apply() }
+        nexus.send(NexusMessage(
+            type = "presence", sender = msg.sender, status = _myStatus.value,
+            publicKey = encodePublicKeyB64(keyPair.publicKey),
+            keyFingerprint = fingerprint(keyPair.publicKey),
+        ))
+        // Re-announce the picked status so the server persists it for this session.
+        nexus.send(NexusMessage(type = "status_update", body = _myStatus.value))
+        // Refresh open chat after reconnect so missed messages appear
+        _selectedChat.value?.let { peer ->
+            nexus.send(NexusMessage(type = "dm_history", sender = msg.sender, recipient = peer))
+        }
+        // Register FCM token so push notifications work on this device
+        val fcmToken = prefs.getString("fcm_token", null)
+        if (!fcmToken.isNullOrEmpty()) {
+            nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
+        } else {
+            // No stored token (first run, or a refresh after sign-out that
+            // failed offline): ask Firebase directly instead of waiting for
+            // onNewToken, which may never fire again.
+            try {
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                    .addOnSuccessListener { t ->
+                        if (!t.isNullOrEmpty()) {
+                            prefs.edit().putString("fcm_token", t).apply()
+                            nexus.send(NexusMessage(type = "register_fcm_token", body = t))
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.w(TAG, "FCM token fetch: ${e.message}")
+            }
+        }
+        loadSpaces()
+    }
+
     private fun handleKeyBackupResult(msg: NexusMessage) {
         when {
             // Server acknowledged a successful put (status = "stored")
@@ -1649,11 +1989,8 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 val isMe = sender == me
                 val isDeleted = r.optBoolean("deleted", false)
                 val isEdited = r.optBoolean("edited", false)
-                var text = if (isDeleted) "" else r.optString("body", "")
-                val pk = peerKeys[if (isMe) peer else sender]
-                if (pk != null && text.isNotEmpty()) {
-                    text = try { decryptFromPeer(text, pk, keyPair.secretKey) } catch (_: Exception) { "[Encrypted]" }
-                }
+                // Both directions open with the contact's key (NaCl box).
+                val text = if (isDeleted) "" else decrypt(r.optString("body", ""), peer)
                 lines.add(ChatLine(
                     id = r.optString("msg_id", "$i"),
                     from = sender, text = text, me = isMe,

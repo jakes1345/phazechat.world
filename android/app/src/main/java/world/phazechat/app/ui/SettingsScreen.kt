@@ -417,7 +417,7 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = backupPin,
                         onValueChange = { backupPin = it },
-                        label = { Text("Backup PIN (min 4 chars)") },
+                        label = { Text("Backup PIN (${world.phazechat.app.crypto.KeyBackup.MIN_PIN_LENGTH}+ characters)") },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -430,7 +430,7 @@ fun SettingsScreen(
                             backupPin = ""
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = backupPin.length >= 4
+                        enabled = backupPin.length >= world.phazechat.app.crypto.KeyBackup.MIN_PIN_LENGTH
                     ) { Text("Backup My Keys") }
                 }
             }
@@ -467,7 +467,7 @@ fun SettingsScreen(
                             restorePin = ""
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = restorePin.length >= 4
+                        enabled = restorePin.isNotEmpty()
                     ) { Text("Restore My Keys") }
                 }
             }

@@ -50,6 +50,8 @@ class PhazeFCMService : FirebaseMessagingService() {
         // over the socket next time the app opens.
         val prefs = getSharedPreferences("phaze_prefs", Context.MODE_PRIVATE)
         if (prefs.getString("my_status", "Online") == "Do Not Disturb") return
+        // Signed out: a push still in flight for the old account isn't shown.
+        if (prefs.getString("session_token", null).isNullOrEmpty()) return
 
         val title = message.notification?.title ?: message.data["title"] ?: "Phaze"
         val body = message.notification?.body ?: message.data["body"] ?: ""

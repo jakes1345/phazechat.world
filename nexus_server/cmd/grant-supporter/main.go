@@ -2,15 +2,21 @@
 // directly in the SQLite DB. Use when someone donated via Buy Me a Coffee
 // but didn't fill out the in-app form, or when you want to grant it manually.
 //
-// Run on Fly:
+// Production (Cloudflare Containers, see cloudflare/README.md): there is no
+// shell into the container and its disk is rebuilt from the Litestream
+// replica in R2 on every start, so grant the badge from the admin portal
+// instead (PHAZE_ADMIN_PATH, default /nexus-cmd > Supporters: grant a
+// pending request, or "grant directly" by username). That calls the same
+// UPDATE through the live server.
 //
-//	fly ssh console -a skype7-reborn -C \
-//	  "/app/grant-supporter -username alice"
+// This CLI is for self-hosted Docker installs and offline copies:
 //
-// Revoke:
+//	docker exec <container> /app/grant-supporter -username alice
+//	docker exec <container> /app/grant-supporter -username alice -revoke
 //
-//	fly ssh console -a skype7-reborn -C \
-//	  "/app/grant-supporter -username alice -revoke"
+//	# a copy restored from the bucket (changes stay in the copy):
+//	litestream restore -config nexus_server/litestream.yml -o ./copy.db /data/nexus.db
+//	go run ./cmd/grant-supporter -db ./copy.db -username alice
 package main
 
 import (

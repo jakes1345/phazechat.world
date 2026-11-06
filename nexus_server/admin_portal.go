@@ -126,15 +126,15 @@ async function api(method, path, body) {
   const r = await fetch(path, opts);
   if (!r.ok) {
     const txt = await r.text();
-    if (r.status === 401 || r.status === 403) { logout(); }
+    if ((r.status === 401 || r.status === 403) && path !== '/api/v1/admin/login') { logout(); }
     throw new Error(r.status + ': ' + txt);
   }
   const ct = r.headers.get('content-type') || '';
   return ct.includes('json') ? r.json() : r.text();
 }
 
-async function login(u, p) {
-  const res = await api('POST', '/api/v1/admin/login', { username: u, password: p });
+async function login(u, p, code) {
+  const res = await api('POST', '/api/v1/admin/login', { username: u, password: p, totp: code });
   STATE.username = res.username;
   STATE.authenticated = true;
   render();
@@ -228,12 +228,12 @@ function renderLogin() {
   const root = $('#root');
   root.innerHTML = '';
   const wrap = html('<div class="login-wrap"></div>');
-  const card = html('<form class="login"><h2>Command Center</h2><p class="sub">Phaze admin access only.</p><input name="u" placeholder="Username" autocomplete="username"><input name="p" type="password" placeholder="Password" autocomplete="current-password"><button type="submit">Sign in</button><div class="err" hidden></div></form>');
+  const card = html('<form class="login"><h2>Command Center</h2><p class="sub">Phaze admin access only.</p><input name="u" placeholder="Username" autocomplete="username"><input name="p" type="password" placeholder="Password" autocomplete="current-password"><input name="c" placeholder="2FA code (if enabled)" autocomplete="one-time-code" inputmode="numeric"><button type="submit">Sign in</button><div class="err" hidden></div></form>');
   card.addEventListener('submit', async (e) => {
     e.preventDefault();
     const errEl = card.querySelector('.err');
     errEl.hidden = true;
-    try { await login(card.querySelector('[name=u]').value.trim(), card.querySelector('[name=p]').value); }
+    try { await login(card.querySelector('[name=u]').value.trim(), card.querySelector('[name=p]').value, card.querySelector('[name=c]').value.trim()); }
     catch (err) { errEl.textContent = err.message; errEl.hidden = false; }
   });
   wrap.appendChild(card);

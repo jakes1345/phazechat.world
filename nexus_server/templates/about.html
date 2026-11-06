@@ -1,82 +1,168 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About Phaze — Our Mission</title>
-    <meta name="description" content="Phaze is a free, encrypted communication platform built for privacy. No ads, no tracking, no data harvesting. Learn about our mission.">
-    <meta name="theme-color" content="#00AFF0">
-    <link rel="canonical" href="https://phazechat.world/about">
-    <link rel="icon" type="image/svg+xml" href="/web/favicon.svg">
-    <link rel="icon" type="image/png" sizes="32x32" href="/web/favicon-32.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="/web/icon-192.png">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="About Phaze — Our Mission">
-    <meta property="og:description" content="Free encrypted communication. No ads, no tracking, no data harvesting.">
-    <meta property="og:url" content="https://phazechat.world/about">
-    <meta property="og:image" content="https://phazechat.world/web/icon-512.png">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root { --brand: #00AFF0; --brand-dark: #0095CC; --text-dark: #0a0a0a; --text-light: #6b6b75; --bg-light: #fafafa; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text-dark); background: #fff; line-height: 1.6; }
-        a { color: var(--brand); text-decoration: none; }
-        .container { max-width: 800px; margin: 0 auto; padding: 0 20px; }
-
-        .navbar { background: #fff; border-bottom: 1px solid #e8e8e8; position: sticky; top: 0; z-index: 1000; }
-        .navbar .container { max-width: 1140px; display: flex; align-items: center; justify-content: space-between; height: 60px; }
-        .nav-brand { display: flex; align-items: center; gap: 8px; font-size: 1.4rem; font-weight: 700; color: var(--brand); }
-        .nav-links { display: flex; list-style: none; height: 100%; }
-        .nav-links a { display: flex; align-items: center; height: 100%; padding: 0 18px; color: var(--text-dark); font-size: 0.9rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--brand); border-bottom-color: var(--brand); }
-        .nav-get-btn { background: var(--brand); color: #fff !important; padding: 8px 24px; border-radius: 4px; font-weight: 600; }
-
-        .about-hero { padding: 80px 0; text-align: center; background: var(--bg-light); border-bottom: 1px solid #eee; }
-        .about-hero h1 { font-size: 3rem; font-weight: 300; margin-bottom: 20px; }
-        .about-hero h1 strong { font-weight: 700; color: var(--brand); }
-
-        .about-content { padding: 80px 0; }
-        .about-content h2 { font-size: 1.8rem; margin-bottom: 24px; color: var(--text-dark); }
-        .about-content p { font-size: 1.1rem; color: var(--text-light); margin-bottom: 24px; }
-        
-        .mission-box { background: var(--brand); color: #fff; padding: 40px; border-radius: 16px; margin: 40px 0; }
-        .mission-box h3 { font-size: 1.5rem; margin-bottom: 16px; }
-        .mission-box p { color: rgba(255,255,255,0.9); font-size: 1.1rem; margin-bottom: 0; }
-
-        .footer { background: #1a1a1a; color: #999; padding: 40px 0; text-align: center; font-size: 0.8rem; border-top: 1px solid #333; }
-        .footer a { color: #bbb; }
-        
-        @media (max-width: 768px) { .nav-links { display: none; } .about-hero h1 { font-size: 2.2rem; } }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About Phaze: An Independent, Open-Source Messenger</title>
+<meta name="description" content="Why Phaze exists, how it works and what it will never do. An independent, open-source messenger in the style of classic Skype.">
+<link rel="canonical" href="https://phazechat.world/about">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0077B3">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Phaze">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="About Phaze: An Independent, Open-Source Messenger">
+<meta property="og:description" content="Why Phaze exists, how it works and what it will never do. An independent, open-source messenger in the style of classic Skype.">
+<meta property="og:url" content="https://phazechat.world/about">
+<meta property="og:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@PhazeChatWorld">
+<meta name="twitter:title" content="About Phaze: An Independent, Open-Source Messenger">
+<meta name="twitter:description" content="Why Phaze exists, how it works and what it will never do. An independent, open-source messenger in the style of classic Skype.">
+<meta name="twitter:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta name="twitter:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<link rel="icon" href="/public/site/img/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/public/site/img/favicon-32.png">
+<link rel="apple-touch-icon" href="/public/site/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="/public/site/site.css?v=20261106">
+<script src="/public/site/site.js?v=20261106" defer></script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://phazechat.world/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "About",
+     "item": "https://phazechat.world/about"
+    }
+   ]
+  }
+ ]
+}
+</script>
 </head>
 <body>
-    <nav class="navbar"><div class="container">
-        <a href="/" class="nav-brand"><svg viewBox="0 0 32 32" fill="none" width="32" height="32"><circle cx="16" cy="16" r="15" fill="#00AFF0"/><text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-weight="700" font-family="sans-serif">P</text></svg> Phaze</a>
-        <ul class="nav-links"><li><a href="/">Home</a></li><li><a href="/features">Features</a></li><li><a href="/download">Download</a></li><li><a href="/rates">Rates</a></li><li><a href="/about" class="active">About</a></li></ul>
-        <div class="nav-right"><a href="/download" class="nav-get-btn">Get Phaze</a></div>
-    </div></nav>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+    <nav aria-label="Main"><ul class="nav-links"><li><a href="/features">Features</a></li><li><a href="/skype-alternative">Skype alternative</a></li><li><a href="/download">Download</a></li><li><a href="/security">Security</a></li><li><a href="/rates">Pricing</a></li><li><a href="/support">Support</a></li></ul></nav>
+    <div class="nav-actions">
+      <a class="btn btn-secondary" href="/web/">Sign in</a>
+      <a class="btn btn-primary" href="/web/">Open Phaze</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-menu"/></svg></button>
+    </div>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu" data-open="false">
+  <nav aria-label="Mobile"><ul><li><a href="/">Home<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/features">Features<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/skype-alternative">Skype alternative<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/download">Download<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/security">Security<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/rates">Pricing<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/support">Support<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/about" aria-current="page">About<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li></ul></nav>
+  <a class="btn btn-secondary btn-lg" href="/web/">Sign in</a>
+  <a class="btn btn-primary btn-lg" href="/web/">Open Phaze in your browser</a>
+</div>
+<main id="main">
 
-    <section class="about-hero">
-        <div class="container">
-            <h1><strong>About</strong> Phaze</h1>
-            <p>We built Phaze because our favorite messenger disappeared and nothing else felt right.</p>
-        </div>
-    </section>
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">About</span>
+    <h1>Built because the messenger we grew up with disappeared.</h1>
+    <p class="lead">Skype shut down in May 2025, and its replacement was a workplace meeting app. We wanted the messenger back: a contact list, presence, a mood message and a chat window. So we built one.</p>
+  </div>
+</section>
+<section class="section">
+  <div class="container split">
+    <div class="prose">
+      <h2 style="margin-top:0">What Phaze is</h2>
+      <p>Phaze is an independent, open-source messenger. It recreates the feel of classic Skype, with six era themes modelled on releases from 2007 to 2018, and adds things classic Skype didn&rsquo;t have, like end-to-end encrypted DMs, Spaces for communities, and an import for your old Skype export.</p>
+      <h2>How it works</h2>
+      <p>One Go server handles accounts, message relay and storage. The web app is built with React; Android is a native Kotlin app; the desktop apps wrap the web app. One-to-one DMs are encrypted on your device. Calls currently run on the public Jitsi Meet service, which we say plainly everywhere it matters. <a href="/security">Read the security overview</a>.</p>
+      <h2>What we won&rsquo;t do</h2>
+      <p>No ads, no tracking, no selling data, no paywalled chat. If you&rsquo;d rather not trust our server, the code is MIT-licensed and you can run your own.</p>
+      <h2>Get involved</h2>
+      <p>The repository is at <a href="https://github.com/jakes1345/phazechat.world" rel="noopener">github.com/jakes1345/phazechat.world</a>. Bug reports are the most useful thing you can send. Phaze is not affiliated with Microsoft or Skype.</p>
+    </div>
+    <div class="panel">
+      <h3>Phaze at a glance</h3>
+      <div class="kv">
+        <div><span>Price</span><span>Free</span></div>
+        <div><span>License</span><span>MIT</span></div>
+        <div><span>Platforms</span><span>Web, Android, Windows, Linux</span></div>
+        <div><span>Encryption</span><span>NaCl box for DMs</span></div>
+        <div><span>Default theme</span><span>Phaze 5 (2014 look)</span></div>
+        <div><span>Hosting</span><span>Cloudflare</span></div>
+      </div>
+      <div class="hero-actions" style="justify-content:flex-start;margin-top:22px">
+        <a class="btn btn-primary" href="/web/">Open Phaze</a>
+        <a class="btn btn-secondary" href="/status">Service status</a>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <section class="about-content">
-        <div class="container">
-            <h2>Why we built it</h2>
-            <p>The classic desktop messenger we grew up on was retired, and its replacement is a conference-call app for work meetings. We wanted DMs, voice calls, a real contact list — the stuff a proper messenger actually has. So we built it.</p>
-
-            <h2>How it works</h2>
-            <p>Messages are encrypted on your device before they're sent. The server stores ciphertext and cannot read them. Calls run on WebRTC; right now that means a Jitsi Meet room per call rather than Phaze's own relay, which we're moving away from — see the Privacy Policy for exactly what that means for who can see a call.</p>
-            <p>No tracking, no ads, nothing sold. The code is open source. If you don't want to use our server, run your own with one Docker command.</p>
-
-            <h2>Contributing</h2>
-            <p>The repo is at <a href="https://github.com/jakes1345/phazechat.world">github.com/jakes1345/phazechat.world</a>. Bug reports are the most useful thing right now.</p>
-        </div>
-    </section>
-
-    <footer class="footer"><div class="container">© 2024–2026 Phaze · <a href="/legal">Terms</a> · <a href="/privacy">Privacy</a> · Not affiliated with Microsoft.</div></footer>
+</main>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+        <p>A free, open-source messenger in the classic style. Built for people who miss how chat used to feel.</p>
+      </div>
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="/web/">Open the web app</a></li>
+          <li><a href="/features">Features</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href="/rates">Pricing</a></li>
+          <li><a href="/status">Service status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Switching</h2>
+        <ul>
+          <li><a href="/skype-alternative">Skype alternative</a></li>
+          <li><a href="/skype-alternative#import">Import a Skype export</a></li>
+          <li><a href="/#compare">Compare apps</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/support">Support</a></li>
+          <li><a href="/security">Security</a></li>
+          <li><a href="https://github.com/jakes1345/phazechat.world" rel="noopener">Source code</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Legal</h2>
+        <ul>
+          <li><a href="/privacy">Privacy policy</a></li>
+          <li><a href="/terms">Terms of service</a></li>
+          <li><a href="/legal">Legal notices</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2024&ndash;2026 Phaze. An independent project, not affiliated with Microsoft or Skype.</span>
+      <span><a href="https://x.com/PhazeChatWorld" rel="noopener">X</a> &middot; <a href="https://instagram.com/phazechat.world" rel="noopener">Instagram</a> &middot; <a href="https://github.com/jakes1345/phazechat.world" rel="noopener">GitHub</a></span>
+    </div>
+  </div>
+</footer>
 </body>
 </html>

@@ -70,6 +70,113 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var username string
+	// Device identity for password sign-ins on this socket (see wsDeviceID).
+	wsDeviceCookie := deviceIDFromRequest(r)
+	wsUserAgent := r.UserAgent()
+
+	// A password sign-in on this socket that's held for new-device approval.
+	// device_verify finishes it with the emailed code, on this socket only:
+	// the held session token never leaves the server.
+	var held struct {
+		username    string
+		token       string
+		deviceInfo  string
+		challengeID int64
+	}
+
+	// completePasswordSignIn registers this socket as user and sends the
+	// sign-in burst (auth_result with a session token, presence, offline
+	// messages, friends, requests, conversations). Shared by "auth" and
+	// "device_verify". sessTok is an already-issued session to hand out, or
+	// "" to issue a new one.
+	// dropHeld forgets this socket's held sign-in and revokes its session
+	// token. That token was never sent anywhere, so once the socket stops
+	// waiting on it (signed in another way, started a new attempt or
+	// closed) nothing could ever use it — but an approval from another
+	// device would otherwise turn it into a live session nobody holds.
+	dropHeld := func() {
+		if held.token != "" {
+			s.revokeSession(held.token)
+		}
+		held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+	}
+	// Every way out of this handler (including delete_account's return)
+	// drops a held sign-in nobody completed.
+	defer dropHeld()
+
+	completePasswordSignIn := func(user, sessTok, deviceInfo string) {
+		metrics.authSuccess.Add(1)
+		authTracker.recordSuccess(client.IP, user) // clear fail counters
+		if held.token == sessTok {
+			// Handing out the held session itself: it's no longer orphaned.
+			held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+		}
+		dropHeld()
+		if s.reauthConnection(client, username, user) {
+			// Already signed in as this user on this socket.
+			client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username, QRToken: sessTok})
+			return
+		}
+		username = user
+		s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
+		s.autoJoinGlobalSpace(username)
+		if sessTok == "" {
+			sessTok, _ = s.issueSessionToken(username, deviceInfo)
+		}
+		// Register alongside any sessions the user already has open
+		// instead of evicting them. Signing in on a second tab, the
+		// desktop app or a phone used to close the previous connection
+		// and send it "kicked", which the web client treats as a full
+		// sign-out — so opening a second tab logged the first one out.
+		s.Mu.Lock()
+		client.Username = username
+		client.Status = "Online"
+		s.addClientLocked(username, client)
+		s.Mu.Unlock()
+		log.Printf("User %s authenticated", username)
+
+		client.Send(NexusMessage{
+			Type:       "auth_result",
+			Status:     "ok",
+			Sender:     username,
+			QRToken:    sessTok,
+			TurnConfig: s.generateMediaToken(username),
+		})
+
+		s.announcePresence(username)
+		s.deliverOfflineMessages(username, client)
+
+		pending := s.getPendingRequests(username)
+		if len(pending) > 0 {
+			client.Send(NexusMessage{Type: "pending_requests", Results: pending})
+		}
+
+		for _, cm := range s.userConversations(username) {
+			cm.Type = "convo_info"
+			client.Send(cm)
+		}
+		if groups := s.getContactGroups(username); len(groups) > 0 {
+			client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
+		}
+
+		friends := s.getFriends(username)
+		for _, f := range friends {
+			status := "Offline"
+			s.Mu.RLock()
+			if conns := s.Clients[f]; len(conns) > 0 {
+				// Status is mirrored across a user's connections, so any
+				// of them reports the same value.
+				status = publicStatus(conns[0].Status)
+			}
+			s.Mu.RUnlock()
+			var lastSec int64
+			s.DB.QueryRow(`SELECT COALESCE(MAX(strftime('%s', created_at)), 0) FROM dm_messages
+				WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)`,
+				username, f, f, username).Scan(&lastSec)
+			client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
+		}
+		s.sendReferralPerks(client, username, s.getFriends(username))
+	}
 
 	// Cookie pre-auth: web clients set an HttpOnly cookie at login time.
 	// The browser sends it automatically with every WS upgrade request, so
@@ -141,51 +248,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 		err := ws.ReadJSON(&msg)
 		if err != nil {
 			log.Printf("Read error: %v", err)
+			dropHeld()
 			if username != "" {
 				// Drop just this connection. The user may still have others
 				// open — another tab, the desktop app, their phone — and only
 				// goes offline when the last one closes.
-				s.Mu.Lock()
-				remaining := s.removeClientLocked(username, client)
-				callPartner := client.CallPartner
-				// Notify call partner before releasing the lock so we can
-				// look up their client while still holding it.
-				if callPartner != "" {
-					// The peer's call lives on one specific connection of
-					// theirs, not on all of them — find that one.
-					if partner := s.callPeerLocked(callPartner, username); partner != nil {
-						partner.InCall = false
-						partner.CallPartner = ""
-						partner.Send(NexusMessage{Type: "call_end", Sender: username})
-
-						// Close out the call row too — client is already
-						// removed from s.Clients, so use the local pointer.
-						var pendingClient *Client
-						var logCaller, logCallee string
-						if client.PendingCallID != 0 {
-							pendingClient, logCaller, logCallee = client, username, callPartner
-						} else if partner.PendingCallID != 0 {
-							pendingClient, logCaller, logCallee = partner, callPartner, username
-						}
-						if pendingClient != nil {
-							kind, answered, duration := s.finalizeCall(pendingClient.PendingCallID, pendingClient.PendingCallAnswered, pendingClient.PendingCallStarted)
-							started := pendingClient.PendingCallStarted
-							pendingClient.PendingCallID = 0
-							pendingClient.PendingCallAnswered = false
-							status := "missed"
-							if answered {
-								status = "answered"
-							}
-							// Only the surviving partner is still connected to receive this live.
-							partner.Send(NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration})
-						}
-					}
-				}
-				s.Mu.Unlock()
+				// detachClient snapshots call state under the lock and does
+				// the partner notification and call-log write after it.
+				remaining := s.detachClient(username, client)
 				if remaining == 0 {
-					s.broadcastPresence(username, "Offline")
-					s.voiceRoomEvictUser(username)
-					s.streamEvictUser(username)
 					log.Printf("User %s disconnected (last session closed)", username)
 				} else {
 					log.Printf("User %s closed a session, %d still open", username, remaining)
@@ -426,65 +497,141 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			authTracker.recordTOTPSuccess(msg.Sender)
-			metrics.authSuccess.Add(1)
-			authTracker.recordSuccess(client.IP, msg.Sender) // clear fail counters
-			username = msg.Sender
-			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
-			s.autoJoinGlobalSpace(username)
-			sessTok, _ := s.issueSessionToken(username, msg.DeviceInfo)
-			// Register alongside any sessions the user already has open
-			// instead of evicting them. Signing in on a second tab, the
-			// desktop app or a phone used to close the previous connection
-			// and send it "kicked", which the web client treats as a full
-			// sign-out — so opening a second tab logged the first one out.
-			s.Mu.Lock()
-			client.Username = username
-			client.Status = "Online"
-			s.addClientLocked(username, client)
-			s.Mu.Unlock()
-			log.Printf("User %s authenticated", username)
 
-			client.Send(NexusMessage{
-				Type:       "auth_result",
-				Status:     "ok",
-				Sender:     username,
-				QRToken:    sessTok,
-				TurnConfig: s.generateMediaToken(username),
-			})
-
-			s.announcePresence(username)
-			s.deliverOfflineMessages(username, client)
-
-			pending := s.getPendingRequests(username)
-			if len(pending) > 0 {
-				client.Send(NexusMessage{Type: "pending_requests", Results: pending})
-			}
-
-			for _, cm := range s.userConversations(username) {
-				cm.Type = "convo_info"
-				client.Send(cm)
-			}
-			if groups := s.getContactGroups(username); len(groups) > 0 {
-				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
-			}
-
-			friends := s.getFriends(username)
-			for _, f := range friends {
-				status := "Offline"
-				s.Mu.RLock()
-				if conns := s.Clients[f]; len(conns) > 0 {
-					// Status is mirrored across a user's connections, so any
-					// of them reports the same value.
-					status = publicStatus(conns[0].Status)
+			// ── New-device check, same rules as /api/v1/auth/login ──
+			// Without this, the WebSocket was a way around new-device
+			// approval: password (+TOTP) alone got a full session.
+			deviceID := wsDeviceID(wsDeviceCookie, msg.DeviceID, msg.Sender, msg.DeviceInfo, client.IP)
+			deviceKnown := s.isKnownDevice(msg.Sender, deviceID)
+			botAccount := isBotAccount(msg.Sender)
+			if deviceVerificationEnabled() && !deviceKnown && !botAccount && s.canDeliverChallenge(msg.Sender) {
+				label := wsDeviceLabel(wsUserAgent, msg.DeviceInfo)
+				pendingTok, err := s.issueSessionToken(msg.Sender, msg.DeviceInfo)
+				if err == nil {
+					err = s.markSessionPendingDevice(pendingTok)
 				}
-				s.Mu.RUnlock()
-				var lastSec int64
-				s.DB.QueryRow(`SELECT COALESCE(MAX(strftime('%s', created_at)), 0) FROM dm_messages
-					WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)`,
-					username, f, f, username).Scan(&lastSec)
-				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
+				if err != nil {
+					client.Send(NexusMessage{Type: "auth_result", Error: "Session error — try again"})
+					continue
+				}
+				// The held session exists so an in-app approval (or the
+				// emailed code) has something to lift; its token is not
+				// handed out. Approving also trusts deviceID, so signing
+				// in again from this device then goes straight through.
+				challengeID, _ := s.createDeviceChallenge(msg.Sender, deviceID, pendingTok, label, client.IP)
+				log.Printf("[device] %s: WS sign-in from new device %q held for approval", msg.Sender, label)
+				// Remember it on this socket so device_verify can finish
+				// the sign-in with the emailed code. A newer held sign-in
+				// replaces an older one, whose session nobody will receive.
+				dropHeld()
+				held.username, held.token, held.deviceInfo, held.challengeID = msg.Sender, pendingTok, msg.DeviceInfo, challengeID
+				// Both clients show Error for any auth_result that isn't
+				// ok/totp_required. Failure counters are deliberately left
+				// alone until the sign-in actually completes.
+				client.Send(NexusMessage{
+					Type:        "auth_result",
+					Status:      "device_verification_required",
+					Error:       "New device: enter the code we emailed you, or approve this sign-in from a device where you're already signed in to Phaze (or sign in here with a link code from it), then sign in again.",
+					Body:        label,
+					ChallengeID: challengeID,
+				})
+				continue
 			}
-			s.sendReferralPerks(client, username, s.getFriends(username))
+			if !deviceKnown {
+				if deviceVerificationEnabled() && !botAccount {
+					log.Printf("[device] %s: no session open and no mail transport — allowing WS sign-in from %q unverified",
+						msg.Sender, wsDeviceLabel(wsUserAgent, msg.DeviceInfo))
+				}
+				s.rememberDevice(msg.Sender, deviceID, wsDeviceLabel(wsUserAgent, msg.DeviceInfo), client.IP)
+			} else {
+				s.touchDevice(msg.Sender, deviceID, client.IP)
+			}
+
+			completePasswordSignIn(msg.Sender, "", msg.DeviceInfo)
+
+		// ── Finish a held sign-in with the emailed code ──
+		// Only the socket that got device_verification_required can do
+		// this, and only for the challenge it was given: the code is checked
+		// against that held session, so a code from any other sign-in
+		// (another account's included) never matches. Same checks and
+		// attempt caps as /api/v1/auth/verify-device.
+		case "device_verify":
+			if held.token == "" ||
+				(msg.Sender != "" && msg.Sender != held.username) ||
+				(msg.ChallengeID != 0 && msg.ChallengeID != held.challengeID) {
+				client.Send(NexusMessage{
+					Type:   "auth_result",
+					Status: "device_verification_failed",
+					Error:  "No sign-in is waiting for a code here. Sign in again.",
+				})
+				continue
+			}
+			if authTracker.isIPThrottled(client.IP) {
+				metrics.authFailure.Add(1)
+				client.Send(NexusMessage{
+					Type:        "auth_result",
+					Status:      "device_verification_required",
+					Error:       "Too many attempts. Try again later.",
+					ChallengeID: held.challengeID,
+				})
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			heldUser, stillPending := s.sessionState(held.token)
+			if heldUser != held.username {
+				// Denied from another session, revoked or expired.
+				held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+				client.Send(NexusMessage{
+					Type:   "auth_result",
+					Status: "device_verification_failed",
+					Error:  "This sign-in was denied or has expired. Sign in again.",
+				})
+				continue
+			}
+			if stillPending {
+				if strings.TrimSpace(msg.Body) == "" {
+					client.Send(NexusMessage{
+						Type:        "auth_result",
+						Status:      "device_verification_required",
+						Error:       "Not approved yet. Enter the 6-digit code from the email, or approve the sign-in on a device where you're signed in.",
+						ChallengeID: held.challengeID,
+					})
+					continue
+				}
+				if _, err := s.verifyDeviceChallenge(held.token, msg.Body); err != nil {
+					metrics.authFailure.Add(1)
+					authTracker.recordFail(client.IP, held.username)
+					if err == errBadCode {
+						// Still guessable: keep the held sign-in.
+						client.Send(NexusMessage{
+							Type:        "auth_result",
+							Status:      "device_verification_required",
+							Error:       "Incorrect code",
+							ChallengeID: held.challengeID,
+						})
+						continue
+					}
+					// Expired, burned or throttled: this attempt is over.
+					s.revokeSession(held.token)
+					held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+					client.Send(NexusMessage{
+						Type:   "auth_result",
+						Status: "device_verification_failed",
+						Error:  err.Error(),
+					})
+					continue
+				}
+				// Close the approve/deny prompt on the user's other sessions.
+				s.sendTo(held.username, NexusMessage{
+					Type:        "device_result",
+					Status:      "approved",
+					ChallengeID: held.challengeID,
+				})
+			}
+			// Approved, either by this code or in-app from another session
+			// while this one waited: hand out the held session itself.
+			log.Printf("[device] %s: held WS sign-in completed", held.username)
+			completePasswordSignIn(held.username, held.token, held.deviceInfo)
 
 		case "session_auth":
 			if authTracker.isIPThrottled(client.IP) {
@@ -526,7 +673,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "auth_result", Error: body, Status: "banned"})
 				continue
 			}
+			if s.reauthConnection(client, username, u) {
+				client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username, QRToken: msg.QRToken})
+				continue
+			}
 			username = u
+			dropHeld() // signed in another way: the held sign-in is moot
 			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
 			s.autoJoinGlobalSpace(username)
 			// Register alongside any sessions the user already has open
@@ -589,8 +741,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "delete_account_result", Error: "Not authenticated"})
 				continue
 			}
-			if msg.Body == "" || !s.authenticateUser(username, msg.Body) {
-				client.Send(NexusMessage{Type: "delete_account_result", Error: "Password confirmation required"})
+			if ok, throttled := s.confirmPassword(username, msg.Body); !ok {
+				errText := "Password confirmation required"
+				if throttled {
+					errText = reauthThrottledMsg
+				}
+				client.Send(NexusMessage{Type: "delete_account_result", Error: errText})
 				continue
 			}
 			if err := s.deleteAccount(username); err != nil {
@@ -601,9 +757,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			log.Printf("[delete_account] erased account %s", username)
 			s.broadcastPresence(username, "Offline")
 			client.Send(NexusMessage{Type: "delete_account_result", Status: "ok"})
-			s.Mu.Lock()
-			delete(s.Clients, username)
-			s.Mu.Unlock()
+			// Every other session of the deleted account goes too. Only
+			// removing the map entry left those sockets running with the
+			// old name in their handler — still able to act as the deleted
+			// user, or as whoever registers the name next.
+			s.detachClient(username, client)
+			s.dropAllClients(username, NexusMessage{Type: "kicked", Body: "This account has been deleted."})
 			ws.Close()
 			return
 
@@ -654,6 +813,27 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "totp_result", Error: "Not authenticated"})
 				continue
 			}
+			// Re-enrolling over a live 2FA secret would let anyone holding
+			// just a session token (no password, no authenticator) swap in
+			// their own secret and take the account's second factor. With
+			// 2FA on, it has to be turned off first — and disable_totp asks
+			// for the password.
+			if _, enabled := s.totpStatus(username); enabled {
+				client.Send(NexusMessage{Type: "totp_result", Error: "Two-factor authentication is already on. Turn it off first (that needs your password), then set it up again."})
+				continue
+			}
+			// Current clients don't send a password here; newer ones may,
+			// and if they do it has to be right.
+			if msg.Body != "" {
+				if ok, throttled := s.confirmPassword(username, msg.Body); !ok {
+					errText := "Password incorrect"
+					if throttled {
+						errText = reauthThrottledMsg
+					}
+					client.Send(NexusMessage{Type: "totp_result", Error: errText})
+					continue
+				}
+			}
 			uri, secret, err := s.generateTOTPURI(username)
 			if err != nil {
 				client.Send(NexusMessage{Type: "totp_result", Error: "Could not generate secret"})
@@ -690,8 +870,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			if !s.authenticateUser(username, msg.Body) {
-				client.Send(NexusMessage{Type: "totp_result", Error: "Password required"})
+			if ok, throttled := s.confirmPassword(username, msg.Body); !ok {
+				errText := "Password required"
+				if throttled {
+					errText = reauthThrottledMsg
+				}
+				client.Send(NexusMessage{Type: "totp_result", Error: errText})
 				continue
 			}
 			s.disableTOTP(username)
@@ -735,8 +919,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			oldPw, newPw := msg.Body[:idx], msg.Body[idx+1:]
-			if !s.authenticateUser(username, oldPw) {
-				client.Send(NexusMessage{Type: "change_password_result", Error: "Current password incorrect"})
+			if ok, throttled := s.confirmPassword(username, oldPw); !ok {
+				errText := "Current password incorrect"
+				if throttled {
+					errText = reauthThrottledMsg
+				}
+				client.Send(NexusMessage{Type: "change_password_result", Error: errText})
 				continue
 			}
 			if len(newPw) < 8 {
@@ -807,8 +995,13 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			authTracker.recordSuccess(client.IP, u)
+			if s.reauthConnection(client, username, u) {
+				client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username, QRToken: sess})
+				continue
+			}
 			// Promote this socket onto the approved session.
 			username = u
+			dropHeld() // signed in another way: the held sign-in is moot
 			// Register alongside any sessions the user already has open
 			// instead of evicting them. Signing in on a second tab, the
 			// desktop app or a phone used to close the previous connection
@@ -840,6 +1033,13 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				s.handleBotMessage(client, msg)
 				continue
 			}
+			// No such account: don't persist a history row or queue an
+			// offline message for a name nobody owns (and that someone could
+			// later register to inherit).
+			if !s.userExists(msg.Recipient) {
+				client.Send(NexusMessage{Type: "msg_status", Body: "error", Sender: msg.Recipient, Error: "No such user"})
+				continue
+			}
 			// Trust & safety: drop if either party has blocked the other.
 			// Sender sees a benign delivered_offline status — no oracle leak.
 			if s.isBlocked(msg.Recipient, msg.Sender) || s.isBlocked(msg.Sender, msg.Recipient) {
@@ -858,10 +1058,18 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			// the sender produced it. Idempotent on msg_id so retries are
 			// safe. Both ends fetch this via "dm_history" on chat open.
 			s.persistDM(msg.MsgID, msg.Sender, msg.Recipient, msg.Body)
-			s.Mu.RLock()
-			s.Mu.RUnlock()
 
-			if s.sendTo(msg.Recipient, msg) {
+			// Forward only what a DM is made of. Relaying the client's whole
+			// NexusMessage let a sender attach arbitrary fields (turn_config,
+			// status, members, ...) that the recipient's client would act on.
+			dm := NexusMessage{
+				Type:      "msg",
+				Sender:    username,
+				Recipient: msg.Recipient,
+				Body:      msg.Body,
+				MsgID:     msg.MsgID,
+			}
+			if s.sendTo(msg.Recipient, dm) {
 				// delivered live to at least one of their sessions
 			} else {
 				s.storeOfflineMessage(msg.Sender, msg.Recipient, msg.Body, "msg", msg.MsgID)
@@ -1054,6 +1262,16 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			s.DB.Exec("UPDATE users SET fcm_token = ? WHERE username = ?", msg.Body, username)
 			log.Printf("[FCM] registered token for %s", username)
 
+		// Sent on sign-out: stop pushing this account to that device. Only
+		// clears the stored token if it's the one named, so signing out of
+		// an old phone doesn't silence the phone that registered since.
+		case "unregister_fcm_token":
+			if username == "" || msg.Body == "" {
+				continue
+			}
+			s.DB.Exec("UPDATE users SET fcm_token = '' WHERE username = ? AND fcm_token = ?", username, msg.Body)
+			log.Printf("[FCM] unregistered token for %s", username)
+
 		case "subscribe_push":
 			if username == "" {
 				continue
@@ -1218,9 +1436,29 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if s.isBlocked(msg.Recipient, username) || s.isBlocked(username, msg.Recipient) {
 				continue
 			}
-			msg.Sender = username
+			// The message has to be one between these two people, and only
+			// its author may edit or delete it. Without this the live relay
+			// let anyone push "edits"/"deletes" for any msg_id at anyone.
+			origSender, origRecipient, found := s.dmParticipants(msg.MsgID)
+			if !found {
+				continue
+			}
+			inThread := (origSender == username && origRecipient == msg.Recipient) ||
+				(origSender == msg.Recipient && origRecipient == username)
+			if !inThread {
+				continue
+			}
+			if (msg.Type == "msg_edit" || msg.Type == "msg_delete") && origSender != username {
+				continue
+			}
 			// Mirror the action into durable history so both sides see it
 			// after a refresh / new-device login.
+			relay := NexusMessage{
+				Type:      msg.Type,
+				Sender:    username,
+				Recipient: msg.Recipient,
+				MsgID:     msg.MsgID,
+			}
 			switch msg.Type {
 			case "msg_edit":
 				if len(msg.Body) > 10000 {
@@ -1228,14 +1466,17 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					continue
 				}
 				s.editDM(msg.MsgID, username, msg.Body)
+				relay.Body = msg.Body
 			case "msg_delete":
 				s.deleteDM(msg.MsgID, username)
 			case "msg_react":
-				if msg.Reaction != "" {
-					s.toggleReaction(msg.MsgID, username, msg.Reaction)
+				if msg.Reaction == "" || len(msg.Reaction) > 256 {
+					continue
 				}
+				s.toggleReaction(msg.MsgID, username, msg.Reaction)
+				relay.Reaction = msg.Reaction
 			}
-			s.sendTo(msg.Recipient, msg)
+			s.sendTo(msg.Recipient, relay)
 
 		case "dm_history":
 			if username == "" || msg.Recipient == "" {
@@ -1582,7 +1823,10 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			pushBody := "Sent a message"
 
-			s.Mu.RLock()
+			// No s.Mu here: sendTo snapshots the registry itself. Holding a
+			// read lock around it took RLock recursively, which deadlocks as
+			// soon as a writer queues between the two acquisitions — and it
+			// also held the lock across network writes and DB inserts.
 			for _, m := range members {
 				if m == username {
 					continue
@@ -1609,7 +1853,6 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 					go s.sendFCMPush(m, pushTitle, pushBody)
 				}
 			}
-			s.Mu.RUnlock()
 
 		case "convo_leave":
 			if username == "" || msg.ConvoID == "" {
@@ -1859,46 +2102,72 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			client.PendingCallRoom = roomID
 			client.PendingCallID = callID
 			client.PendingCallStarted = startedAt
+			client.PendingCallAnswered = false
+			// Remember who was called, so only they can answer or reject.
+			setPendingCallee(client, msg.Recipient)
 			s.Mu.Unlock()
-			msg.RoomID = roomID
+			// Forward only the fields a callee needs, never whatever else
+			// the caller put on the wire.
+			ringMsg := NexusMessage{
+				Type:      "call_offer",
+				Sender:    username,
+				Recipient: msg.Recipient,
+				Body:      msg.Body,
+				SDP:       msg.SDP,
+				RoomID:    roomID,
+			}
 			// Ring every session they have open — laptop and phone at once,
 			// whichever picks up takes the call.
 			for _, c := range ring {
-				c.Send(msg)
+				c.Send(ringMsg)
 			}
 
 		case "call_answer":
 			if username == "" {
 				continue
 			}
-			msg.Sender = username
 			s.Mu.Lock()
 			var roomID string
-			caller := s.pendingCallerLocked(msg.Recipient)
+			var stillRinging []*Client
+			// Only the person this call was placed to can answer it, and only
+			// while it's still ringing. Without the callee check anyone could
+			// "answer" someone else's outgoing call and be handed its room.
+			caller := s.outgoingCallLocked(msg.Recipient, username)
+			if caller != nil && caller.PendingCallRoom == "" {
+				caller = nil // already answered on another device
+			}
 			if caller != nil {
 				roomID = caller.PendingCallRoom
 				caller.PendingCallRoom = ""
 				caller.PendingCallAnswered = true
 				caller.InCall = true
 				caller.CallPartner = username
-			}
-			// This connection takes the call; the caller talks to this one.
-			client.InCall = true
-			client.CallPartner = msg.Recipient
-			// Our other sessions are still ringing for a call that's now
-			// answered — collect them so we can call them off.
-			var stillRinging []*Client
-			for _, c := range s.Clients[username] {
-				if c != client {
-					stillRinging = append(stillRinging, c)
+				// This connection takes the call; the caller talks to this one.
+				client.InCall = true
+				client.CallPartner = msg.Recipient
+				// Our other sessions are still ringing for a call that's now
+				// answered — collect them so we can call them off.
+				for _, c := range s.Clients[username] {
+					if c != client {
+						stillRinging = append(stillRinging, c)
+					}
 				}
 			}
 			s.Mu.Unlock()
 
-			jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: msg.Body}
-			if caller != nil {
-				caller.Send(jitsiMsg)
+			if caller == nil {
+				// Nothing to answer: the caller hung up, it was answered
+				// elsewhere, or it was never ours. Both clients clear their
+				// call UI on call_end.
+				client.Send(NexusMessage{Type: "call_end", Sender: msg.Recipient})
+				continue
 			}
+			kind := msg.Body
+			if kind != "audio" && kind != "video" {
+				kind = ""
+			}
+			jitsiMsg := NexusMessage{Type: "call_jitsi", RoomID: roomID, Body: kind}
+			caller.Send(jitsiMsg)
 			client.Send(jitsiMsg)
 			for _, c := range stillRinging {
 				c.Send(NexusMessage{Type: "call_end", Sender: msg.Recipient, Body: "answered_elsewhere"})
@@ -1911,54 +2180,99 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
+			peer := msg.Recipient
+			if peer == "" {
+				continue
+			}
 			s.Mu.Lock()
-			// The peer's side of this call lives on one specific connection.
-			// If they haven't answered yet it's still only pending, so fall
-			// back to whichever of their connections holds the pending call.
-			peerClient := s.callPeerLocked(msg.Recipient, username)
-			if peerClient == nil {
-				peerClient = s.pendingCallerLocked(msg.Recipient)
-			}
-
-			// The call row lives on whichever side placed the call — find
-			// it before either client's state gets cleared below.
-			var pendingClient *Client
-			var logCaller, logCallee string
-			if client.PendingCallID != 0 {
-				pendingClient, logCaller, logCallee = client, username, msg.Recipient
-			} else if peerClient != nil && peerClient.PendingCallID != 0 {
-				pendingClient, logCaller, logCallee = peerClient, msg.Recipient, username
-			}
-			var logMsg *NexusMessage
-			if pendingClient != nil {
-				kind, answered, duration := s.finalizeCall(pendingClient.PendingCallID, pendingClient.PendingCallAnswered, pendingClient.PendingCallStarted)
-				started := pendingClient.PendingCallStarted
-				pendingClient.PendingCallID = 0
-				pendingClient.PendingCallAnswered = false
-				status := "missed"
-				if answered {
-					status = "answered"
+			var (
+				participant bool
+				notify      []*Client // peer connections to relay the hang-up to
+				dialler     *Client   // connection holding the call row
+				ownOther    *Client   // another of our devices that had answered
+				logCaller   string
+				logCallee   string
+			)
+			switch {
+			case client.InCall && client.CallPartner == peer:
+				// An answered call on this very connection.
+				participant = true
+				if pc := s.callPeerLocked(peer, username); pc != nil {
+					notify = []*Client{pc}
 				}
-				m := NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration}
-				logMsg = &m
+				if pendingCalleeOf(client) == peer {
+					dialler, logCaller, logCallee = client, username, peer
+				} else if pc := s.outgoingCallLocked(peer, username); pc != nil {
+					dialler, logCaller, logCallee = pc, peer, username
+				}
+			case pendingCalleeOf(client) == peer && (client.PendingCallRoom != "" || client.PendingCallID != 0):
+				// The caller hanging up. Still ringing: every one of the
+				// callee's devices is ringing, so tell them all.
+				participant = true
+				dialler, logCaller, logCallee = client, username, peer
+				if client.PendingCallRoom != "" {
+					notify = append(notify, s.Clients[peer]...)
+				} else if pc := s.callPeerLocked(peer, username); pc != nil {
+					notify = []*Client{pc}
+				}
+			default:
+				// The callee rejecting (or ending from another of their
+				// devices). Only valid if `peer` really is calling us.
+				if pc := s.outgoingCallLocked(peer, username); pc != nil {
+					participant = true
+					dialler, logCaller, logCallee = pc, peer, username
+					notify = []*Client{pc}
+					// If another of our devices had answered, it's in the
+					// call too and needs releasing.
+					if mine := s.callPeerLocked(username, peer); mine != nil && mine != client {
+						mine.InCall = false
+						mine.CallPartner = ""
+						ownOther = mine
+					}
+				}
 			}
-
+			if !participant {
+				// Not a party to any call with `peer`: refuse rather than
+				// let anyone tear down someone else's call.
+				s.Mu.Unlock()
+				continue
+			}
+			var callID int64
+			var answered bool
+			var started time.Time
+			if dialler != nil {
+				callID, answered, started = clearOutgoingCallLocked(dialler)
+			}
 			client.InCall = false
 			client.CallPartner = ""
-			if peerClient != nil {
-				peerClient.InCall = false
-				peerClient.CallPartner = ""
+			for _, c := range notify {
+				if c.CallPartner == username {
+					c.InCall = false
+					c.CallPartner = ""
+				}
 			}
 			s.Mu.Unlock()
 
-			if peerClient != nil {
-				peerClient.Send(msg)
+			// Relay with the authenticated sender, never the client's claim.
+			relay := NexusMessage{Type: msg.Type, Sender: username, Recipient: peer}
+			for _, c := range notify {
+				c.Send(relay)
+			}
+			if ownOther != nil {
+				ownOther.Send(NexusMessage{Type: "call_end", Sender: peer})
 			}
 			// The call log is history, not signalling — every session on both
-			// sides should see it so their call lists agree.
-			if logMsg != nil {
-				s.sendTo(username, *logMsg)
-				s.sendTo(msg.Recipient, *logMsg)
+			// sides should see it so their call lists agree. The DB write
+			// happens here, after s.Mu is released.
+			if callID != 0 {
+				kind, ans, duration := s.finalizeCall(callID, answered, started)
+				status := "missed"
+				if ans {
+					status = "answered"
+				}
+				logMsg := NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration}
+				s.sendTo(username, logMsg)
+				s.sendTo(peer, logMsg)
 			}
 
 		case "call_invite":
@@ -1969,8 +2283,12 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "call_error", Error: "You can only invite friends"})
 				continue
 			}
-			msg.Sender = username
-			s.sendTo(msg.Recipient, msg)
+			s.sendTo(msg.Recipient, NexusMessage{
+				Type:      "call_invite",
+				Sender:    username,
+				Recipient: msg.Recipient,
+				ChannelID: msg.ChannelID,
+			})
 
 		case "remote_register":
 			if username == "" {
@@ -1982,8 +2300,24 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			s.RemoteCodesMu.Lock()
+			if cur, taken := s.RemoteCodes[code]; taken && cur.Username != username && time.Since(cur.CreatedAt) <= remoteCodeTTL {
+				// Someone else's live code. Overwriting it would let anyone
+				// hijack a host's pairing code and receive their viewer.
+				s.RemoteCodesMu.Unlock()
+				client.Send(NexusMessage{Type: "remote_error", Error: "That code is in use — start sharing again for a new one"})
+				continue
+			}
+			// One live code per host: a fresh share replaces the old one.
+			for k, v := range s.RemoteCodes {
+				if v.Username == username {
+					delete(s.RemoteCodes, k)
+				}
+			}
 			s.RemoteCodes[code] = remoteCodeEntry{Username: username, CreatedAt: time.Now()}
 			s.RemoteCodesMu.Unlock()
+			// A new share starts with no viewers: whoever was paired with a
+			// previous one has to look the new code up.
+			s.remoteBindings().dropHost(username)
 			log.Printf("[remote] %s registered remote control code", username)
 			client.Send(NexusMessage{Type: "remote_registered", Body: code})
 
@@ -1991,14 +2325,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			s.RemoteCodesMu.Lock()
-			for k, v := range s.RemoteCodes {
-				if v.Username == username {
-					log.Printf("[remote] %s unregistered remote control code", username)
-					delete(s.RemoteCodes, k)
-				}
-			}
-			s.RemoteCodesMu.Unlock()
+			// Bindings are kept: the host's client sends remote_end to its
+			// viewer right after this, and that still has to get through.
+			s.deleteRemoteCodesOf(username)
 
 		case "remote_lookup":
 			if username == "" {
@@ -2017,28 +2346,48 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if ok && time.Since(entry.CreatedAt) > remoteCodeTTL {
 				ok = false
 			}
-			log.Printf("[remote] %s looked up a remote control code -> found=%v host=%s (map has %d entries)", username, ok, entry.Username, len(s.RemoteCodes))
+			log.Printf("[remote] %s looked up a remote control code -> found=%v", username, ok)
 			if ok {
+				// Knowing the code is what entitles this viewer to signal
+				// the host; record that so the relay below can check it.
+				s.remoteBindings().bind(entry.Username, username)
 				client.Send(NexusMessage{Type: "remote_lookup_result", Status: "ok", Body: entry.Username})
 			} else {
 				client.Send(NexusMessage{Type: "remote_lookup_result", Status: "error", Error: "Invalid code — make sure the host is still sharing"})
 			}
 
 		case "remote_offer", "remote_answer", "remote_ice", "remote_input", "remote_end":
-			if username == "" {
+			if username == "" || msg.Recipient == "" {
 				continue
 			}
-			msg.Sender = username
-			if msg.Type == "remote_end" {
-				s.RemoteCodesMu.Lock()
-				for k, v := range s.RemoteCodes {
-					if v.Username == username || v.Username == msg.Recipient {
-						delete(s.RemoteCodes, k)
-					}
+			bindings := s.remoteBindings()
+			host, bound := bindings.pairOf(username, msg.Recipient)
+			if !bound {
+				// No remote_lookup with the right code ever paired these two:
+				// relay nothing. A host may still end its own share.
+				if msg.Type == "remote_end" {
+					s.deleteRemoteCodesOf(username)
 				}
-				s.RemoteCodesMu.Unlock()
+				if msg.Type == "remote_offer" {
+					client.Send(NexusMessage{Type: "remote_error", Error: "No remote session with " + msg.Recipient + " — enter their code first"})
+				}
+				continue
 			}
-			if !s.sendTo(msg.Recipient, msg) && msg.Type == "remote_offer" {
+			if msg.Type == "remote_end" {
+				// Either side may tear down its own pairing. The share it was
+				// made for is single-use, so the host's code goes with it.
+				bindings.unbind(host, otherOf(host, username, msg.Recipient))
+				s.deleteRemoteCodesOf(host)
+			}
+			relay := NexusMessage{
+				Type:      msg.Type,
+				Sender:    username,
+				Recipient: msg.Recipient,
+				Body:      msg.Body,
+				SDP:       msg.SDP,
+				Candidate: msg.Candidate,
+			}
+			if !s.sendTo(msg.Recipient, relay) && msg.Type == "remote_offer" {
 				client.Send(NexusMessage{Type: "remote_error", Error: msg.Recipient + " is not online"})
 			}
 
@@ -2367,6 +2716,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			}
 			id64, parseErr := strconv.ParseInt(msg.MsgID, 10, 64)
 			if parseErr != nil {
+				continue
+			}
+			// Message ids are sequential across every channel, so membership
+			// of the named channel proves nothing about the message: check it
+			// really lives there, or a member of any space could react to
+			// (and read back reactions on) messages in private ones.
+			var inChannel int
+			if err := s.DB.QueryRow(`SELECT 1 FROM channel_messages WHERE id = ? AND channel_id = ?`,
+				id64, msg.ChannelID).Scan(&inChannel); err != nil {
 				continue
 			}
 			// Toggle: if exists, remove; else insert. Same UX as DMs.

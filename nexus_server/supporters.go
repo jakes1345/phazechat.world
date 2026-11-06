@@ -59,7 +59,12 @@ func (s *NexusServer) supportRequestHandler(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	req.Username = strings.TrimSpace(req.Username)
+	// The badge goes to the signed-in account, never to a name typed into
+	// the form: otherwise anyone could file a request with a real donor's
+	// email and their own username and collect that donor's badge when the
+	// payment webhook arrives. Signed-out donors are matched by the email
+	// on their verified account instead (bmcGrantByEmail).
+	req.Username = s.sessionUsername(tokenFromRequest(r))
 	req.Name = strings.TrimSpace(req.Name)
 	req.Email = strings.TrimSpace(req.Email)
 	if req.Name == "" || req.Email == "" {
@@ -82,11 +87,6 @@ func (s *NexusServer) supportRequestHandler(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-
-	// Thank-you to the donor (best effort — never block the redirect on email).
-	go func(to, name string) {
-		_ = s.sendEmail(to, "Thanks for supporting Phaze 💜", emailSupporterThankYou(name))
-	}(req.Email, req.Name)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -186,11 +186,11 @@ func (s *NexusServer) adminSupporterActionHandler(w http.ResponseWriter, r *http
 
 // bmcWebhookHandler handles Buy Me a Coffee webhook events.
 // BMC sends a POST for every new donation/membership. We match by email:
-//   1. Check supporter_requests for a pending row with that email → grant it
-//   2. Check users table for a verified account with that email → grant directly
-//   3. No match → store in bmc_payments for manual resolution in the portal
+//  1. Check supporter_requests for a pending row with that email → grant it
+//  2. Check users table for a verified account with that email → grant directly
+//  3. No match → store in bmc_payments for manual resolution in the portal
 //
-// Set BMC_WEBHOOK_SECRET in Fly secrets to the token from your BMC dashboard.
+// Set BMC_WEBHOOK_SECRET as a Worker secret (cloudflare/README.md) to the token from your BMC dashboard.
 // BMC signs requests with HMAC-SHA256 in the X-BMC-Signature header.
 func (s *NexusServer) bmcWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -204,11 +204,18 @@ func (s *NexusServer) bmcWebhookHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Verify HMAC signature if secret is configured.
+	// Every webhook must carry a valid HMAC signature. Without one, anyone
+	// could POST a fake payment and grant themselves the supporter badge.
 	// BMC sends the signature in X-BMC-Signature or X-Signature-Hmac-Sha256,
 	// possibly prefixed with "sha256=". The dashboard shows the secret as a
 	// hex string; BMC signs using the decoded raw bytes, not the ASCII hex.
-	if secret := strings.TrimSpace(os.Getenv("BMC_WEBHOOK_SECRET")); secret != "" {
+	secret := strings.TrimSpace(os.Getenv("BMC_WEBHOOK_SECRET"))
+	if secret == "" {
+		log.Printf("[bmc] webhook rejected: BMC_WEBHOOK_SECRET is not set")
+		http.Error(w, "webhook not configured", http.StatusServiceUnavailable)
+		return
+	}
+	{
 		sig := r.Header.Get("X-BMC-Signature")
 		if sig == "" {
 			sig = r.Header.Get("X-Signature-Hmac-Sha256")
@@ -226,10 +233,8 @@ func (s *NexusServer) bmcWebhookHandler(w http.ResponseWriter, r *http.Request) 
 				break
 			}
 		}
-		if sig == "" {
-			log.Printf("[bmc] no signature header — accepting (test mode?)")
-		} else if !valid {
-			log.Printf("[bmc] signature mismatch — rejecting")
+		if !valid {
+			log.Printf("[bmc] missing or invalid signature — rejecting")
 			http.Error(w, "invalid signature", http.StatusUnauthorized)
 			return
 		}
@@ -239,11 +244,11 @@ func (s *NexusServer) bmcWebhookHandler(w http.ResponseWriter, r *http.Request) 
 	var payload struct {
 		Type string `json:"type"`
 		Data struct {
-			SupporterName  string          `json:"supporter_name"`
-			SupporterEmail string          `json:"supporter_email"`
-			Amount         json.Number     `json:"amount"`
-			Message        string          `json:"message"`
-			SupportNote    string          `json:"support_note"`
+			SupporterName  string      `json:"supporter_name"`
+			SupporterEmail string      `json:"supporter_email"`
+			Amount         json.Number `json:"amount"`
+			Message        string      `json:"message"`
+			SupportNote    string      `json:"support_note"`
 		} `json:"data"`
 		// Flat variants (older BMC webhook versions).
 		SupporterName  string      `json:"supporter_name"`
@@ -287,6 +292,12 @@ func (s *NexusServer) bmcWebhookHandler(w http.ResponseWriter, r *http.Request) 
 	log.Printf("[bmc] payment from %s <%s> amount=%s", name, email, amount)
 
 	matched := s.bmcGrantByEmail(email, name)
+
+	// Thank the donor once the payment is confirmed (best effort). Sending
+	// it from the unauthenticated request form let anyone mail any address.
+	go func(to, name string) {
+		_ = s.sendEmail(to, "Thanks for supporting Phaze 💜", emailSupporterThankYou(name))
+	}(email, name)
 
 	// Store for audit trail regardless of match outcome.
 	matchedUser := ""

@@ -5,6 +5,7 @@ import {
   encodePublicKeyB64,
   encryptForPeer,
   generateKeyPair,
+  isEncryptedBody,
 } from './e2ee'
 
 describe('e2ee', () => {
@@ -37,5 +38,31 @@ describe('e2ee', () => {
     expect(decodePublicKeyField('not-valid-base64!!!')).toBeNull()
     expect(decodePublicKeyField([])).toBeNull()
     expect(decodePublicKeyField(Array.from({ length: 31 }, (_, i) => i))).toBeNull()
+  })
+
+  it('decryptFromPeer returns null for ciphertext it cannot open', () => {
+    const alice = generateKeyPair()
+    const bob = generateKeyPair()
+    const eve = generateKeyPair()
+    const cipher = encryptForPeer('secret', bob.publicKey, alice.secretKey)
+    expect(decryptFromPeer(cipher, eve.publicKey, bob.secretKey)).toBeNull()
+    expect(decryptFromPeer('E2EE:zz', alice.publicKey, bob.secretKey)).toBeNull()
+    expect(decryptFromPeer('E2EE:abc', alice.publicKey, bob.secretKey)).toBeNull()
+    expect(decryptFromPeer('E2EE:' + '00'.repeat(30), alice.publicKey, bob.secretKey)).toBeNull()
+  })
+
+  it('both sides of a conversation open each other\'s messages with the shared key', () => {
+    const alice = generateKeyPair()
+    const bob = generateKeyPair()
+    const fromAlice = encryptForPeer('mine', bob.publicKey, alice.secretKey)
+    // Alice re-reading her own sent message from server history.
+    expect(decryptFromPeer(fromAlice, bob.publicKey, alice.secretKey)).toBe('mine')
+  })
+
+  it('isEncryptedBody only matches the E2EE: prefix', () => {
+    expect(isEncryptedBody('E2EE:00')).toBe(true)
+    expect(isEncryptedBody('hello')).toBe(false)
+    expect(isEncryptedBody('')).toBe(false)
+    expect(isEncryptedBody(undefined)).toBe(false)
   })
 })

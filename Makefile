@@ -29,9 +29,16 @@ web-build: ## Production build of web/ (requires npm)
 	@echo "[Phaze] Building web client..."
 	cd web && npm ci && npm run build
 
+# The desktop app embeds web/dist, so the build has to name the server's
+# WebSocket. HTTP calls go through the app's built-in proxy, which targets
+# https://phazechat.world unless PHAZE_SERVER is set when the app runs.
+# Local server: make desktop DESKTOP_NEXUS_WS=ws://127.0.0.1:8080/ws, then
+# run the app with PHAZE_SERVER=http://127.0.0.1:8080.
+DESKTOP_NEXUS_WS ?= wss://phazechat.world/ws
+
 desktop: ## Build Phaze desktop app via Wails → desktop/build/bin/Phaze
 	@echo "[Phaze] Building desktop client..."
-	cd web && npm ci && VITE_BASE=/ npm run build
+	cd web && npm ci && VITE_BASE=/ VITE_NEXUS_WS=$(DESKTOP_NEXUS_WS) npm run build
 	rm -rf desktop/dist && cp -r web/dist desktop/dist
 	cd desktop && ~/go/bin/wails build -tags webkit2_41
 	@echo "[Phaze] Desktop binary → desktop/build/bin/Phaze"

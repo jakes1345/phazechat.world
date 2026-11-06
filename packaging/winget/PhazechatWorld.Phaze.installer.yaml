@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 PackageIdentifier: PhazechatWorld.Phaze
-PackageVersion: 1.5.0
+PackageVersion: 1.6.4
 InstallerLocale: en-US
 InstallerType: nullsoft
 InstallModes:
@@ -12,7 +12,9 @@ InstallerSwitches:
 UpgradeBehavior: install
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/jakes1345/skype7-reborn/releases/download/v1.5.0/Phaze-windows-setup.exe
-    InstallerSha256: <run: sha256sum Phaze-windows-setup.exe after the CI build>
+    InstallerUrl: https://github.com/jakes1345/phazechat.world/releases/download/v1.6.4/Phaze-windows-setup.exe
+    # SHA-256 of Phaze-windows-setup.exe: copy it from the release's checksums.txt
+    # (the Release workflow publishes one), or run sha256sum on the download.
+    InstallerSha256: <from checksums.txt in the v1.6.4 release>
 ManifestType: installer
 ManifestVersion: 1.6.0

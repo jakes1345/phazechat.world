@@ -1,203 +1,223 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phaze Features — Encrypted Chat, Video, Voice, Spaces & Livestreams</title>
-    <meta name="description" content="Explore Phaze features: end-to-end encrypted messaging, HD video and voice calls, group spaces, livestreams, file sharing, stories, and more. Free forever.">
-    <meta name="theme-color" content="#00AFF0">
-    <link rel="canonical" href="https://phazechat.world/features">
-    <link rel="icon" type="image/svg+xml" href="/web/favicon.svg">
-    <link rel="icon" type="image/png" sizes="32x32" href="/web/favicon-32.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="/web/icon-192.png">
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Phaze Features — Chat, Video, Voice, Spaces & Livestreams">
-    <meta property="og:description" content="End-to-end encrypted messaging, HD video calls, group spaces, livestreams, and more. Free forever.">
-    <meta property="og:url" content="https://phazechat.world/features">
-    <meta property="og:image" content="https://phazechat.world/web/icon-512.png">
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Phaze Features">
-    <meta name="twitter:description" content="Encrypted chat, video, voice, spaces, livestreams. Free forever.">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --brand: #00AFF0;
-            --brand-dark: #0095CC;
-            --text-dark: #0a0a0a;
-            --text-light: #6b6b75;
-            --bg-light: #fafafa;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text-dark); background: #fff; line-height: 1.6; }
-        a { color: var(--brand); text-decoration: none; }
-        .container { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
-
-        .navbar { background: #fff; border-bottom: 1px solid #e8e8e8; height: 60px; display: flex; align-items: center; }
-        .navbar .container { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-        .nav-brand { font-size: 1.4rem; font-weight: 700; color: var(--brand); display: flex; align-items: center; gap: 8px; }
-        .nav-links { display: flex; list-style: none; height: 100%; }
-        .nav-links a { display: flex; align-items: center; height: 100%; padding: 0 18px; color: var(--text-dark); font-size: 0.9rem; border-bottom: 3px solid transparent; transition: all 0.2s; }
-        .nav-links a:hover, .nav-links a.active { color: var(--brand); border-bottom-color: var(--brand); }
-        .nav-right { display: flex; align-items: center; gap: 16px; }
-        .nav-get-btn { background: var(--brand); color: #fff !important; padding: 8px 24px; border-radius: 4px; font-weight: 600; }
-        @media (max-width: 768px) { .nav-links { display: none; } }
-
-        .hero { background: linear-gradient(160deg, #0095CC 0%, #00AFF0 100%); color: #fff; padding: 60px 0; text-align: center; }
-        .hero h1 { font-size: 2.5rem; font-weight: 300; }
-
-        .feature-grid { padding: 80px 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 60px; }
-        .feature-item { display: flex; gap: 24px; }
-        .feature-icon { font-size: 3rem; color: var(--brand); flex-shrink: 0; }
-        .feature-text h3 { font-size: 1.4rem; margin-bottom: 12px; }
-        .feature-text p { color: var(--text-light); }
-
-        .cta-section { background: var(--bg-light); padding: 60px 0; text-align: center; }
-        .btn { display: inline-block; background: var(--brand); color: #fff; padding: 12px 30px; border-radius: 4px; font-weight: 700; margin-top: 20px; }
-
-        .footer { background: #1a1a1a; color: #999; padding: 40px 0; text-align: center; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features: Encrypted DMs, Calls, Spaces & Classic Themes | Phaze</title>
+<meta name="description" content="Every Phaze feature and where it works: encrypted DMs, group chats, Jitsi calls, Spaces, live streams, Skype import and six classic era themes.">
+<link rel="canonical" href="https://phazechat.world/features">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0077B3">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Phaze">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Features: Encrypted DMs, Calls, Spaces & Classic Themes | Phaze">
+<meta property="og:description" content="Every Phaze feature and where it works: encrypted DMs, group chats, Jitsi calls, Spaces, live streams, Skype import and six classic era themes.">
+<meta property="og:url" content="https://phazechat.world/features">
+<meta property="og:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@PhazeChatWorld">
+<meta name="twitter:title" content="Features: Encrypted DMs, Calls, Spaces & Classic Themes | Phaze">
+<meta name="twitter:description" content="Every Phaze feature and where it works: encrypted DMs, group chats, Jitsi calls, Spaces, live streams, Skype import and six classic era themes.">
+<meta name="twitter:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta name="twitter:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<link rel="icon" href="/public/site/img/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/public/site/img/favicon-32.png">
+<link rel="apple-touch-icon" href="/public/site/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="/public/site/site.css?v=20261106">
+<script src="/public/site/site.js?v=20261106" defer></script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "BreadcrumbList",
+   "itemListElement": [
+    {
+     "@type": "ListItem",
+     "position": 1,
+     "name": "Home",
+     "item": "https://phazechat.world/"
+    },
+    {
+     "@type": "ListItem",
+     "position": 2,
+     "name": "Features",
+     "item": "https://phazechat.world/features"
+    }
+   ]
+  }
+ ]
+}
+</script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="nav-brand">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="15" fill="#00AFF0"/><text x="16" y="22" text-anchor="middle" fill="white" font-size="16" font-weight="700" font-family="sans-serif">P</text></svg>
-                Phaze
-            </a>
-            <ul class="nav-links">
-                <li><a href="/">Home</a></li>
-                <li><a href="/features" class="active">Features</a></li>
-                <li><a href="/download">Download</a></li>
-                <li><a href="/rates">Rates</a></li>
-                <li><a href="/about">About</a></li>
-            </ul>
-            <div class="nav-right">
-                <a href="/download" class="nav-get-btn">Get Phaze</a>
-            </div>
-        </div>
-    </nav>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+    <nav aria-label="Main"><ul class="nav-links"><li><a href="/features" aria-current="page">Features</a></li><li><a href="/skype-alternative">Skype alternative</a></li><li><a href="/download">Download</a></li><li><a href="/security">Security</a></li><li><a href="/rates">Pricing</a></li><li><a href="/support">Support</a></li></ul></nav>
+    <div class="nav-actions">
+      <a class="btn btn-secondary" href="/web/">Sign in</a>
+      <a class="btn btn-primary" href="/web/">Open Phaze</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-menu"/></svg></button>
+    </div>
+  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu" data-open="false">
+  <nav aria-label="Mobile"><ul><li><a href="/">Home<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/features" aria-current="page">Features<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/skype-alternative">Skype alternative<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/download">Download<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/security">Security<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/rates">Pricing<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/support">Support<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/about">About<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li></ul></nav>
+  <a class="btn btn-secondary btn-lg" href="/web/">Sign in</a>
+  <a class="btn btn-primary btn-lg" href="/web/">Open Phaze in your browser</a>
+</div>
+<main id="main">
 
-    <section class="hero">
-        <div class="container">
-            <h1>What's actually <strong>in</strong> Phaze</h1>
-            <p style="color: rgba(255,255,255,0.85); margin-top: 12px; font-size: 1.05rem;">No empty marketing. Just the features we actually ship today.</p>
-        </div>
-    </section>
+<section class="page-hero">
+  <div class="container">
+    <span class="eyebrow">Features</span>
+    <h1>Everything in Phaze, and exactly where it works.</h1>
+    <p class="lead">Every feature on this page ships today. Where something only works on one platform, or only with a particular theme, the badge under it says so.</p>
+    <div class="callout" style="margin-top:28px;max-width:760px"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-palette"/></svg><p><strong>Themes decide features.</strong> In the web app, each era theme shows the features classic Skype had at the time. The default, <strong>Phaze 5</strong>, covers everyday chat and calls. Switch to <strong>Phaze 6+</strong> in Settings &rarr; Appearance for Spaces, reactions, read receipts, live streams and remote sessions.</p></div>
+  </div>
+</section>
+<section class="section" id="messaging">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">Messaging</span><h2 class="h-section">Chat that behaves the way you expect.</h2><p class="lead">One-to-one DMs, group chats and the small things that make a conversation feel alive.</p></div>
+    <div class="grid grid-3 reveal">
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-lock"/></svg></span><h3>Encrypted direct messages</h3><p>DMs are encrypted on your device with NaCl box (X25519 and XSalsa20-Poly1305) once your app and your friend&rsquo;s have exchanged keys. The lock in the message box shows it&rsquo;s on. Anything sent before that goes as plain text.</p><div class="meta"><span class="badge ok">End-to-end encrypted</span><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-chat"/></svg></span><h3>Group chats</h3><p>Start a group from your contacts. The creator can add and remove people and rename the chat. The chat header tells everyone that groups are not end-to-end encrypted.</p><div class="meta"><span class="badge warn">Not end-to-end encrypted</span><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-smile"/></svg></span><h3>Edits, deletes, reactions, receipts</h3><p>Fix a typo or take a message back, and see when your friend is typing. Reactions, read receipts and pinned messages appear with the Phaze 6+ theme.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-file"/></svg></span><h3>Files up to 25&nbsp;MB</h3><p>Send photos, audio, video, PDFs and archives. The message that carries the link is encrypted in a DM, but the file itself is stored on the server unencrypted under a random, unguessable name.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-mic"/></svg></span><h3>Voice messages</h3><p>Tap the mic button to record a quick voice note when typing won&rsquo;t do, and play it back right in the conversation.</p><div class="meta"><span class="badge">Web</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-image"/></svg></span><h3>Stories</h3><p>Share a photo or short video that disappears after 24 hours. Friends see it in the row of story rings at the top of their chat list.</p><div class="meta"><span class="badge brand">Phaze 5 &amp; 6+ themes</span><span class="badge warn">Not end-to-end encrypted</span></div></article>
+    </div>
+  </div>
+</section>
+<section class="section section-soft" id="contacts">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">Contacts &amp; presence</span><h2 class="h-section">The contact list is the product.</h2><p class="lead">This is the part of classic Skype people miss most, so it&rsquo;s the part Phaze takes most seriously.</p></div>
+    <div class="grid grid-3 reveal">
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-users"/></svg></span><h3>Friends, groups and blocking</h3><p>Send and accept friend requests, sort people into contact groups, and block anyone you don&rsquo;t want to hear from.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-broadcast"/></svg></span><h3>Presence and mood messages</h3><p>Online, away, do not disturb or invisible, with a mood message under your name, shown next to everyone in your list.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-import"/></svg></span><h3>Skype import</h3><p>Upload the <code>.zip</code> export from Skype (up to 100&nbsp;MB). Phaze imports the text of your conversations and lists your old contacts so you can find or invite them. <a href="/skype-alternative#import">How it works</a>.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+    </div>
+  </div>
+</section>
+<section class="section" id="calls">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">Calls &amp; screens</span><h2 class="h-section">Talk, show, and share.</h2><p class="lead">Calls ring every device you&rsquo;re signed in on. Here&rsquo;s how each kind of session actually connects.</p></div>
+    <div class="grid grid-3 reveal">
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-phone"/></svg></span><h3>Voice and video calls</h3><p>Calls between friends open a room on the public Jitsi Meet service (<code>meet.jit.si</code>). On Android the call opens in the Jitsi Meet call screen. Jitsi&rsquo;s servers carry the audio and video, so calls are not covered by Phaze&rsquo;s end-to-end encryption.</p><div class="meta"><span class="badge warn">Not end-to-end encrypted</span><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-monitor"/></svg></span><h3>Screen sharing in calls</h3><p>Share your screen during a web call using the Jitsi call controls. Screen sharing isn&rsquo;t available in the Android app.</p><div class="meta"><span class="badge">Web</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-broadcast"/></svg></span><h3>Live streams</h3><p>Broadcast your camera or screen to other signed-in Phaze users. Video goes over direct WebRTC connections, relayed through Phaze&rsquo;s TURN server when a direct path isn&rsquo;t possible.</p><div class="meta"><span class="badge">Web</span><span class="badge brand">Phaze 6+ theme</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-pointer"/></svg></span><h3>Remote screen sessions</h3><p>Share your screen with one person using a 6-digit code. They see a live pointer overlay and you can swap files over the connection. It&rsquo;s for showing and guiding: they can&rsquo;t control your mouse or keyboard.</p><div class="meta"><span class="badge">Web</span><span class="badge brand">Phaze 6+ theme</span></div></article>
+    </div>
+  </div>
+</section>
+<section class="section section-soft" id="spaces">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">Spaces</span><h2 class="h-section">Community servers for your group.</h2><p class="lead">Spaces are for friend groups, clubs and communities that outgrow a group chat.</p></div>
+    <div class="grid grid-3 reveal">
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-hash"/></svg></span><h3>Text channels</h3><p>Organise a Space into channels, with pinned messages, reactions and edits. Channel messages are deleted after 30 days by default, and are readable by the server.</p><div class="meta"><span class="badge">Web</span><span class="badge brand">Phaze 6+ theme</span><span class="badge warn">Not end-to-end encrypted</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-mic"/></svg></span><h3>Voice channels</h3><p>Drop into a voice channel and talk. Like calls, voice channels run in a Jitsi Meet room.</p><div class="meta"><span class="badge">Web</span><span class="badge brand">Phaze 6+ theme</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-palette"/></svg></span><h3>Shared whiteboard</h3><p>Sketch out a plan together on a whiteboard everyone in the channel can draw on.</p><div class="meta"><span class="badge">Web</span><span class="badge brand">Phaze 6+ theme</span></div></article>
+    </div>
+  </div>
+</section>
+<section class="section" id="security">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">Accounts &amp; security</span><h2 class="h-section">Locked down by default.</h2><p class="lead">Your account is protected even if someone learns your password.</p></div>
+    <div class="grid grid-3 reveal">
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-shield"/></svg></span><h3>Verified sign-up</h3><p>You sign up with a username, password and email address, confirmed with a code. No phone number. Disposable email addresses are refused.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-key"/></svg></span><h3>Two-factor and device approval</h3><p>Turn on two-factor codes from any authenticator app. Every new device has to be approved from one that&rsquo;s already signed in, or with a code sent to your email.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-qr"/></svg></span><h3>QR sign-in and sessions</h3><p>Sign in on a new screen by scanning a QR code. See every active session and sign out the ones you don&rsquo;t recognise.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-lock"/></svg></span><h3>Key backup with a PIN</h3><p>Your encryption keys can be backed up encrypted with a recovery PIN of 8+ characters (PBKDF2-SHA256, 600,000 iterations, AES-256-GCM). Restore them on a new device to keep reading your encrypted history.</p><div class="meta"><span class="badge">Web</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-download"/></svg></span><h3>Export or delete your data</h3><p>Download a JSON copy of your account data, or delete your account, from Settings at any time.</p><div class="meta"><span class="badge">Web</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-bell"/></svg></span><h3>Push notifications</h3><p>Get messages while the app is closed: web push in the browser, and Firebase Cloud Messaging on Android.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span></div></article>
+    </div>
+  </div>
+</section>
+<section class="section section-soft" id="everywhere">
+  <div class="container">
+    <div class="section-head reveal"><span class="eyebrow">Look &amp; platforms</span><h2 class="h-section">Classic on the outside, open underneath.</h2><p class="lead">Pick the era you remember, then use Phaze wherever you are.</p></div>
+    <div class="grid grid-3 reveal">
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-palette"/></svg></span><h3>Six era themes</h3><p>Phaze 1 to Phaze 6+ are modelled on classic Skype releases from 2007 to 2018: XP Luna, Vista Aero, 2010, Metro, 2014 Aero blue and 2018 Fluent. <a href="/skype-alternative#themes">See them side by side</a>.</p><div class="meta"><span class="badge">Web</span><span class="badge">Desktop</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-smile"/></svg></span><h3>Emoticons</h3><p>A full set of emoticons drawn for Phaze, with the classic text shortcuts like <code>:)</code> and <code>(y)</code>.</p><div class="meta"><span class="badge">Web</span><span class="badge">Desktop</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-globe"/></svg></span><h3>Web, Android and desktop</h3><p>One account everywhere. The web app works in any modern browser, Android installs from an APK, and Windows and Linux desktop apps are in beta. <a href="/download">Downloads</a>.</p><div class="meta"><span class="badge">Web</span><span class="badge">Android</span><span class="badge">Desktop</span></div></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-server"/></svg></span><h3>Self-hostable</h3><p>Run your own Phaze server from the published Docker image. Your community, your hardware, your rules.</p></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-code"/></svg></span><h3>Open source</h3><p>The server, web app, Android app and desktop app are all MIT-licensed on GitHub. Read the code, file a bug, or send a fix.</p></article>
+<article class="card"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-heart"/></svg></span><h3>Free, with no ads</h3><p>No subscriptions, no ads, no data sold. Inviting a friend earns cosmetic rewards; nothing is for sale. <a href="/rates">Pricing</a>.</p></article>
+    </div>
+  </div>
+</section>
 
-    <section class="container">
-        <div class="feature-grid">
-            <div class="feature-item">
-                <span class="feature-icon">🔒</span>
-                <div class="feature-text">
-                    <h3>End-to-end encrypted DMs</h3>
-                    <p>Every direct message is encrypted on your device with NaCl (Curve25519 + XSalsa20-Poly1305). The server stores the ciphertext but cannot read it.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">📞</span>
-                <div class="feature-text">
-                    <h3>Voice &amp; video calls</h3>
-                    <p>WebRTC calls that work behind symmetric NAT and corporate firewalls. Today that runs through a Jitsi Meet room rather than a direct connection — see the Privacy Policy for what that means, we're working on changing it.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🎙️</span>
-                <div class="feature-text">
-                    <h3>Voice messages</h3>
-                    <p>Tap to record on the web client, send a quick voice note when typing won't cut it. Inline playback right in the chat.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">💾</span>
-                <div class="feature-text">
-                    <h3>Cross-device history</h3>
-                    <p>Sign in on a new browser or device and your encrypted chat history follows you — protected by a Recovery PIN only you know.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">✨</span>
-                <div class="feature-text">
-                    <h3>Modern chat UX</h3>
-                    <p>Reactions, message edits, deletes, @mentions with autocomplete, pinned messages, in-chat search, ⌘K command palette, slash commands.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">📎</span>
-                <div class="feature-text">
-                    <h3>File &amp; image sharing</h3>
-                    <p>Send images, audio, video, PDFs, archives — up to 25MB each. URLs are encrypted in the message body so only the recipient can fetch.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🌗</span>
-                <div class="feature-text">
-                    <h3>Dark mode &amp; multi-platform</h3>
-                    <p>First-class light and dark themes. Web, Windows, macOS, Linux, and Android — sign in on every device with one Recovery PIN.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🖥</span>
-                <div class="feature-text">
-                    <h3>Screen sharing</h3>
-                    <p>Share your screen in any call or voice channel. Present, collaborate, or just show your friends what you're working on.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🌐</span>
-                <div class="feature-text">
-                    <h3>Spaces</h3>
-                    <p>Public or private community servers with text and voice channels. @mentions, search, pinned messages, inline editing — like Discord but encrypted.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">📸</span>
-                <div class="feature-text">
-                    <h3>Stories</h3>
-                    <p>Share photos and short videos that disappear after 24 hours. Your friends see them in a ring at the top of the chat list.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🔴</span>
-                <div class="feature-text">
-                    <h3>Livestreaming</h3>
-                    <p>Go live with your camera or share your screen to anyone on Phaze. Viewers join with one click — no accounts required to watch.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🖱️</span>
-                <div class="feature-text">
-                    <h3>Remote control</h3>
-                    <p>Share your screen and let a friend take control — encrypted, peer-to-peer, built right in. Like TeamViewer but no extra app needed.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🛠️</span>
-                <div class="feature-text">
-                    <h3>Self-hostable</h3>
-                    <p>Don't trust phazechat.world? Run your own Nexus server with one Docker command. Your community, your servers, your rules.</p>
-                </div>
-            </div>
-            <div class="feature-item">
-                <span class="feature-icon">🚫</span>
-                <div class="feature-text">
-                    <h3>No ads, no tracking</h3>
-                    <p>No third-party analytics, no behavioral profiling, no data sold to anyone. You can delete your account and export every byte we have on you.</p>
-                </div>
-            </div>
-        </div>
-    </section>
+<section class="section">
+  <div class="container">
+    <div class="cta reveal">
+      <h2>See it for yourself.</h2>
+      <p>The web app runs right in your browser. Nothing to install.</p>
+      <div class="hero-actions">
+        <a class="btn btn-light btn-lg" href="/web/">Open Phaze <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a>
+        <a class="btn btn-outline-light btn-lg" href="/download">All downloads</a>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <section class="cta-section">
-        <div class="container">
-            <h2>Ready to start talking?</h2>
-            <a href="/download" class="btn">Get Phaze — Web, Android, Desktop</a>
-        </div>
-    </section>
-
-    <footer class="footer">
-        <div class="container">
-            <p>© 2024–2026 Phaze. Not affiliated with Microsoft.</p>
-        </div>
-    </footer>
+</main>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+        <p>A free, open-source messenger in the classic style. Built for people who miss how chat used to feel.</p>
+      </div>
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="/web/">Open the web app</a></li>
+          <li><a href="/features">Features</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href="/rates">Pricing</a></li>
+          <li><a href="/status">Service status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Switching</h2>
+        <ul>
+          <li><a href="/skype-alternative">Skype alternative</a></li>
+          <li><a href="/skype-alternative#import">Import a Skype export</a></li>
+          <li><a href="/#compare">Compare apps</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/support">Support</a></li>
+          <li><a href="/security">Security</a></li>
+          <li><a href="https://github.com/jakes1345/phazechat.world" rel="noopener">Source code</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Legal</h2>
+        <ul>
+          <li><a href="/privacy">Privacy policy</a></li>
+          <li><a href="/terms">Terms of service</a></li>
+          <li><a href="/legal">Legal notices</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; 2024&ndash;2026 Phaze. An independent project, not affiliated with Microsoft or Skype.</span>
+      <span><a href="https://x.com/PhazeChatWorld" rel="noopener">X</a> &middot; <a href="https://instagram.com/phazechat.world" rel="noopener">Instagram</a> &middot; <a href="https://github.com/jakes1345/phazechat.world" rel="noopener">GitHub</a></span>
+    </div>
+  </div>
+</footer>
 </body>
 </html>

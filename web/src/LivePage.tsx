@@ -216,10 +216,16 @@ export default function LivePage({ me, send, subscribe, turn }: Props) {
     setWatching(null)
   }
 
-  // Tear everything down on unmount.
+  // The unmount cleanup below runs with the first render's values, so it
+  // reads the live state through refs.
+  const broadcastingRef = useRef(broadcasting)
+  useEffect(() => { broadcastingRef.current = broadcasting }, [broadcasting])
+
+  // Tear everything down on unmount, so the stream doesn't stay listed and
+  // viewers don't hang on "Connecting…" after you leave the page.
   useEffect(() => () => {
-    if (broadcasting) send({ type: 'stream_stop' })
-    if (watching) send({ type: 'stream_leave', recipient: watching })
+    if (broadcastingRef.current) send({ type: 'stream_stop' })
+    if (watchingRef.current) send({ type: 'stream_leave', recipient: watchingRef.current })
     viewersRef.current.forEach((v) => v.pc.close())
     viewersRef.current.clear()
     viewerPCRef.current?.close()

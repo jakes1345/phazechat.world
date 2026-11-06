@@ -1,607 +1,429 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phaze — Encrypted Chat, Calls & Spaces. Free.</title>
-  <meta name="description" content="Phaze is free messaging with end-to-end encrypted chat, HD voice and video calls, group Spaces, and stories. No phone number required." />
-  <meta name="theme-color" content="#00AFF0" />
-
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Phaze" />
-  <meta property="og:title" content="Phaze — Chat, Calls &amp; Spaces. Free." />
-  <meta property="og:description" content="Privacy-first messaging. End-to-end encrypted. No phone number, no ads, no BS." />
-  <meta property="og:url" content="https://phazechat.world/" />
-  <meta property="og:image" content="https://phazechat.world/icon-512.png" />
-
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Phaze — Chat, Calls &amp; Spaces. Free." />
-  <meta name="twitter:description" content="Privacy-first messaging. End-to-end encrypted. Free forever." />
-  <meta name="twitter:image" content="https://phazechat.world/icon-512.png" />
-  <meta name="twitter:site" content="@PhazeChatWorld" />
-
-  <link rel="canonical" href="https://phazechat.world/" />
-  <meta name="robots" content="index, follow" />
-
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" />
-
-  <script type="application/ld+json">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phaze: Free Skype Alternative with Classic Chat & Encrypted DMs</title>
+<meta name="description" content="Skype is gone. Phaze is a free, classic-style messenger with contacts, presence, calls and end-to-end encrypted DMs. Import your Skype export. Web, Android, Windows and Linux.">
+<link rel="canonical" href="https://phazechat.world/">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0077B3">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Phaze">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Phaze: Free Skype Alternative with Classic Chat & Encrypted DMs">
+<meta property="og:description" content="Skype is gone. Phaze is a free, classic-style messenger with contacts, presence, calls and end-to-end encrypted DMs. Import your Skype export. Web, Android, Windows and Linux.">
+<meta property="og:url" content="https://phazechat.world/">
+<meta property="og:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@PhazeChatWorld">
+<meta name="twitter:title" content="Phaze: Free Skype Alternative with Classic Chat & Encrypted DMs">
+<meta name="twitter:description" content="Skype is gone. Phaze is a free, classic-style messenger with contacts, presence, calls and end-to-end encrypted DMs. Import your Skype export. Web, Android, Windows and Linux.">
+<meta name="twitter:image" content="https://phazechat.world/public/site/img/og-default.png">
+<meta name="twitter:image:alt" content="Phaze: a classic-style messenger with contacts, presence, calls and encrypted DMs">
+<link rel="icon" href="/public/site/img/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/public/site/img/favicon-32.png">
+<link rel="apple-touch-icon" href="/public/site/img/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+<link rel="stylesheet" href="/public/site/site.css?v=20261106">
+<link rel="preload" as="image" type="image/webp" imagesrcset="/public/site/img/app-chat-960.webp 960w, /public/site/img/app-chat-1600.webp 1600w" imagesizes="(max-width: 1100px) 100vw, 1080px" fetchpriority="high">
+<script src="/public/site/site.js?v=20261106" defer></script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
   {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "Phaze",
-    "url": "https://phazechat.world/",
-    "applicationCategory": "CommunicationApplication",
-    "operatingSystem": "Web, Windows, macOS, Linux, Android",
-    "description": "Free messaging platform with end-to-end encrypted chat, voice and video calls, group Spaces, and stories.",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+   "@type": "Organization",
+   "@id": "https://phazechat.world/#org",
+   "name": "Phaze",
+   "url": "https://phazechat.world/",
+   "logo": "https://phazechat.world/public/site/img/icon-512.png",
+   "sameAs": [
+    "https://github.com/jakes1345/phazechat.world",
+    "https://x.com/PhazeChatWorld",
+    "https://instagram.com/phazechat.world"
+   ]
+  },
+  {
+   "@type": "WebSite",
+   "@id": "https://phazechat.world/#website",
+   "name": "Phaze",
+   "url": "https://phazechat.world/",
+   "publisher": {
+    "@id": "https://phazechat.world/#org"
+   },
+   "inLanguage": "en"
+  },
+  {
+   "@type": "SoftwareApplication",
+   "name": "Phaze",
+   "url": "https://phazechat.world/",
+   "applicationCategory": "CommunicationApplication",
+   "operatingSystem": "Web, Android, Windows, Linux",
+   "description": "Free classic-style messenger with contacts, presence, voice and video calls, group chats and end-to-end encrypted direct messages. Imports Skype chat exports.",
+   "image": "https://phazechat.world/public/site/img/og-default.png",
+   "downloadUrl": "https://phazechat.world/download",
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "publisher": {
+    "@id": "https://phazechat.world/#org"
+   }
+  },
+  {
+   "@type": "FAQPage",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "Is Phaze free?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Messages, calls, file sharing, Spaces and the Skype import cost nothing, and there are no ads. If you want to help with server costs you can chip in through Buy Me a Coffee; supporters get a badge on their profile and nothing else changes."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can I import my Skype chats and contacts?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes, if you have the .zip export you downloaded from Skype. In Phaze, open Settings &rarr; Chat History Import and upload it (up to 100&nbsp;MB). Phaze imports the text of your conversations, shows it in your chat with each friend, and lists your Skype contacts. Anyone who is already on Phaze gets an Add friend button; for everyone else you can copy an invite link. Photos and files can&rsquo;t be brought over."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is there an iPhone or iPad app?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Not a native one. Phaze runs in Safari: open phazechat.world/web, tap Share &rarr; Add to Home Screen, and it opens full-screen like an app. The same works on a Mac."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Are calls end-to-end encrypted?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No, and we&rsquo;d rather say so up front. Voice and video calls open a room on the public Jitsi Meet service (meet.jit.si). The connection is encrypted in transit, but Jitsi&rsquo;s servers handle the audio and video, so calls are not covered by Phaze&rsquo;s end-to-end encryption. One-to-one DMs are. See exactly what is and isn&rsquo;t encrypted."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Do I need a phone number?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. You sign up with a username, a password and an email address, which you confirm with a code we send you. Phaze never asks for your phone number or your address book."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can I call landlines and mobile numbers, like Skype Credit?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. Phaze calls are between Phaze users only. There is no paid calling to the phone network."
+     }
+    }
+   ]
   }
-  </script>
-
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --brand:      #00AFF0;
-      --brand-dark: #0095CC;
-      --brand-deep: #0079A8;
-      --bg:         #ffffff;
-      --bg2:        #F2F7FB;
-      --bg3:        #E6EFF5;
-      --text:       #1B2A33;
-      --muted:      #5A7080;
-      --border:     #D0DCEA;
-      --success:    #019A00;
-      --danger:     #D32F2F;
-      --radius:     12px;
-      --font:       'Inter', system-ui, -apple-system, sans-serif;
-    }
-
-    html { scroll-behavior: smooth; }
-    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; overflow-x: hidden; }
-
-    /* ── NAV ─────────────────────────────────────── */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 48px; height: 58px;
-      background: rgba(255,255,255,0.96);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--border);
-    }
-    .nav-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
-    .nav-logo img { width: 30px; height: 30px; border-radius: 7px; }
-    .nav-logo span { font-size: 1.15rem; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
-    .nav-links { display: flex; align-items: center; gap: 28px; }
-    .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.88rem; font-weight: 500; transition: color .15s; }
-    .nav-links a:hover { color: var(--text); }
-    .nav-cta { display: flex; gap: 10px; align-items: center; }
-
-    .btn {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 9px 20px; border-radius: 8px; font-weight: 600;
-      font-size: 0.88rem; text-decoration: none; cursor: pointer;
-      transition: all .15s; border: none; font-family: var(--font);
-    }
-    .btn-primary { background: var(--brand); color: #fff; }
-    .btn-primary:hover { background: var(--brand-dark); transform: translateY(-1px); }
-    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
-    .btn-outline:hover { background: var(--bg2); }
-    .btn-lg { font-size: 1rem; padding: 12px 28px; border-radius: 9px; }
-
-    /* ── HERO ────────────────────────────────────── */
-    .hero {
-      min-height: 100vh;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      text-align: center; padding: 120px 24px 80px;
-      background: linear-gradient(180deg, #EAF5FC 0%, #ffffff 60%);
-      position: relative; overflow: hidden;
-    }
-    .hero-eyebrow {
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 5px 14px; border-radius: 100px;
-      background: rgba(0,175,240,0.10); border: 1px solid rgba(0,175,240,0.25);
-      font-size: 0.78rem; font-weight: 600; color: var(--brand-dark);
-      margin-bottom: 28px; letter-spacing: 0.02em;
-      animation: fadeUp .5s ease both;
-    }
-    .hero-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: blink 2s infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
-
-    .hero h1 {
-      font-size: clamp(2.4rem, 6vw, 4.8rem);
-      font-weight: 900; line-height: 1.08; letter-spacing: -2px;
-      color: var(--text); margin-bottom: 22px;
-      animation: fadeUp .6s ease .1s both;
-    }
-    .hero h1 span { color: var(--brand-dark); }
-    .hero-sub {
-      font-size: clamp(1rem, 2vw, 1.2rem); color: var(--muted);
-      max-width: 560px; margin-bottom: 44px; line-height: 1.7;
-      animation: fadeUp .6s ease .2s both;
-    }
-    .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; animation: fadeUp .6s ease .3s both; }
-    .hero-img-wrap {
-      margin-top: 64px; width: 100%; max-width: 980px;
-      border-radius: 16px; overflow: hidden;
-      border: 1px solid var(--border);
-      box-shadow: 0 24px 80px rgba(0,149,204,0.14), 0 2px 0 rgba(0,0,0,0.04);
-      animation: fadeUp .7s ease .4s both; position: relative;
-    }
-    .hero-img-wrap img { width: 100%; display: block; }
-    .hero-img-overlay { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 65%, #ffffff 100%); }
-
-    @keyframes fadeUp { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:translateY(0)} }
-
-    /* ── STATS ───────────────────────────────────── */
-    .stats {
-      display: flex; justify-content: center; gap: 56px; flex-wrap: wrap;
-      padding: 44px 24px; background: var(--bg);
-      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
-    }
-    .stat { text-align: center; }
-    .stat-n { font-size: 2rem; font-weight: 900; color: var(--brand-dark); letter-spacing: -1px; }
-    .stat-l { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
-
-    /* ── SECTIONS ────────────────────────────────── */
-    .section { padding: 88px 24px; max-width: 1200px; margin: 0 auto; }
-    .section-tag {
-      display: inline-block; font-size: 0.72rem; font-weight: 700;
-      letter-spacing: 2px; text-transform: uppercase;
-      color: var(--brand-dark); margin-bottom: 14px;
-    }
-    .section-title { font-size: clamp(1.7rem, 3.5vw, 2.8rem); font-weight: 900; letter-spacing: -1px; line-height: 1.12; margin-bottom: 14px; }
-    .section-sub { color: var(--muted); max-width: 500px; margin-bottom: 52px; font-size: 1rem; line-height: 1.7; }
-
-    /* ── FEATURES ────────────────────────────────── */
-    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
-    .feature-card {
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 24px;
-      transition: transform .2s, box-shadow .2s, border-color .2s;
-    }
-    .feature-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,149,204,0.10); border-color: rgba(0,175,240,0.35); }
-    .feature-icon {
-      width: 44px; height: 44px; border-radius: 10px;
-      background: rgba(0,175,240,0.10); border: 1px solid rgba(0,175,240,0.18);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.3rem; margin-bottom: 14px;
-    }
-    .feature-title { font-size: 1rem; font-weight: 700; margin-bottom: 7px; }
-    .feature-desc { color: var(--muted); font-size: 0.88rem; line-height: 1.65; }
-
-    /* ── PRIVACY ─────────────────────────────────── */
-    .section-alt { background: var(--bg2); }
-    .privacy-wrap { max-width: 1200px; margin: 0 auto; padding: 88px 24px; }
-    .privacy-split { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
-    @media (max-width: 768px) { .privacy-split { grid-template-columns: 1fr; } }
-    .privacy-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
-    .privacy-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.93rem; }
-    .privacy-list .ck { color: var(--success); font-weight: 700; margin-top: 1px; }
-    .privacy-visual { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 10px; }
-    .p-row {
-      display: flex; align-items: center; gap: 12px;
-      background: var(--bg2); border: 1px solid var(--border);
-      border-radius: 8px; padding: 12px 16px; font-size: 0.86rem;
-    }
-    .p-row-icon { font-size: 1.1rem; }
-    .p-row-label { font-weight: 600; }
-    .p-row-val { margin-left: auto; color: var(--success); font-weight: 700; font-size: 0.8rem; }
-    .p-row-val.no { color: var(--danger); }
-
-    /* ── SKYPE IMPORT ────────────────────────────── */
-    .import-panel {
-      background: var(--bg); border: 1px solid var(--border); border-radius: 16px;
-      padding: 52px; display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
-    }
-    @media (max-width: 640px) { .import-panel { grid-template-columns: 1fr; padding: 32px 24px; } }
-    .import-steps { list-style: none; display: flex; flex-direction: column; gap: 14px; }
-    .import-steps li { display: flex; gap: 14px; align-items: flex-start; font-size: 0.92rem; line-height: 1.6; }
-    .step-num {
-      background: var(--brand); color: #fff; font-weight: 800; font-size: 0.75rem;
-      width: 22px; height: 22px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
-    }
-
-    /* ── COMPARE ─────────────────────────────────── */
-    .compare-wrap { overflow-x: auto; margin-top: 44px; border-radius: var(--radius); border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; background: var(--bg); }
-    th { padding: 14px 22px; font-size: 0.78rem; font-weight: 700; color: var(--muted); text-align: left; background: var(--bg2); letter-spacing: 0.5px; }
-    td { padding: 13px 22px; border-top: 1px solid var(--border); font-size: 0.88rem; }
-    .phaze-col { color: var(--brand-dark); font-weight: 700; }
-    .check { color: var(--success); }
-    .cross { color: var(--danger); }
-    .partial { color: #E6920A; }
-
-    /* ── PLATFORMS ───────────────────────────────── */
-    .platforms { text-align: center; padding: 88px 24px; background: var(--bg2); }
-    .platform-cards { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 44px; }
-    .platform-card {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 24px 32px;
-      text-align: center; min-width: 150px;
-      transition: transform .2s, border-color .2s, box-shadow .2s; cursor: default; text-decoration: none; color: inherit;
-    }
-    .platform-card:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,175,240,0.12); }
-    .platform-icon { font-size: 2.2rem; margin-bottom: 10px; }
-    .platform-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 3px; }
-    .platform-sub { color: var(--muted); font-size: 0.78rem; }
-    .platform-card.disabled { cursor: default; opacity: 0.55; }
-    .platform-card.disabled:hover { border-color: var(--border); transform: none; box-shadow: none; }
-
-    /* ── CTA ─────────────────────────────────────── */
-    .cta-section {
-      text-align: center; padding: 100px 24px;
-      background: linear-gradient(160deg, #0095CC 0%, #00AFF0 100%);
-    }
-    .cta-section h2 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); font-weight: 900; letter-spacing: -1px; color: #fff; margin-bottom: 14px; }
-    .cta-section p { color: rgba(255,255,255,0.82); max-width: 440px; margin: 0 auto 44px; font-size: 1rem; }
-    .cta-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-    .btn-white { background: #fff; color: var(--brand-dark); font-weight: 700; }
-    .btn-white:hover { background: #f0f8fc; transform: translateY(-1px); }
-    .btn-ghost { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); }
-    .btn-ghost:hover { background: rgba(255,255,255,0.12); }
-
-    /* ── FOOTER ──────────────────────────────────── */
-    footer { background: #1B2A33; border-top: 1px solid rgba(255,255,255,0.06); padding: 52px 48px 32px; }
-    .footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; }
-    @media (max-width: 768px) { .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; } }
-    .footer-brand p { color: rgba(255,255,255,0.45); font-size: 0.85rem; margin-top: 11px; max-width: 250px; line-height: 1.7; }
-    .footer-logo span { color: #fff; }
-    .footer-col h4 { font-size: 0.72rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 14px; }
-    .footer-col a { display: block; color: rgba(255,255,255,0.55); text-decoration: none; font-size: 0.85rem; margin-bottom: 9px; transition: color .15s; }
-    .footer-col a:hover { color: #fff; }
-    .footer-bottom { max-width: 1200px; margin: 36px auto 0; padding-top: 22px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; color: rgba(255,255,255,0.35); }
-    .footer-social { display: flex; gap: 16px; }
-    .footer-social a { color: rgba(255,255,255,0.4); text-decoration: none; transition: color .15s; }
-    .footer-social a:hover { color: #fff; }
-
-    /* ── SCROLL ANIMATIONS ───────────────────────── */
-    .reveal { opacity: 1; transform: translateY(0); }
-    .reveal.will-animate { opacity: 0; transform: translateY(24px); transition: opacity .55s ease, transform .55s ease; }
-    .reveal.will-animate.visible { opacity: 1; transform: translateY(0); }
-
-    /* ── RESPONSIVE ──────────────────────────────── */
-    @media (max-width: 768px) {
-      nav { padding: 0 20px; }
-      .nav-links { display: none; }
-      .hero { padding: 100px 20px 60px; }
-      .stats { gap: 28px; }
-      .section { padding: 64px 20px; }
-      .privacy-wrap { padding: 64px 20px; }
-    }
-  </style>
+ ]
+}
+</script>
 </head>
 <body>
-
-<!-- NAV -->
-<nav>
-  <a class="nav-logo" href="/">
-    <img src="/icon-192.png" alt="Phaze" />
-    <span>Phaze</span>
-  </a>
-  <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#privacy">Privacy</a>
-    <a href="#compare">Compare</a>
-    <a href="#download">Download</a>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-nav">
+  <div class="container">
+    <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+    <nav aria-label="Main"><ul class="nav-links"><li><a href="/features">Features</a></li><li><a href="/skype-alternative">Skype alternative</a></li><li><a href="/download">Download</a></li><li><a href="/security">Security</a></li><li><a href="/rates">Pricing</a></li><li><a href="/support">Support</a></li></ul></nav>
+    <div class="nav-actions">
+      <a class="btn btn-secondary" href="/web/">Sign in</a>
+      <a class="btn btn-primary" href="/web/">Open Phaze</a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-menu"/></svg></button>
+    </div>
   </div>
-  <div class="nav-cta">
-    <a class="btn btn-outline" href="/web">Sign in</a>
-    <a class="btn btn-primary" href="/web">Get started free</a>
-  </div>
-</nav>
-
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-eyebrow">
-    <span class="hero-dot"></span>
-    Servers up · Free forever · No phone number needed
-  </div>
-  <h1>Chat the way<br/><span>it used to feel.</span></h1>
-  <p class="hero-sub">
-    Real DMs, voice and video calls, group Spaces, and end-to-end encryption. No ads, no data selling, no Microsoft account. Just messaging that works.
-  </p>
-  <div class="hero-actions">
-    <a class="btn btn-primary btn-lg" href="/web" id="hero-open">Open Phaze free →</a>
-    <a class="btn btn-outline btn-lg" href="#features">See what's inside</a>
-  </div>
-  <div class="hero-img-wrap reveal">
-    <img src="/public/hero.png" alt="Phaze chat app" loading="lazy" />
-    <div class="hero-img-overlay"></div>
-  </div>
-</section>
-
-<!-- STATS -->
-<div class="stats">
-  <div class="stat">
-    <div class="stat-n">E2EE</div>
-    <div class="stat-l">Messages encrypted on your device</div>
-  </div>
-  <div class="stat">
-    <div class="stat-n">$0</div>
-    <div class="stat-l">Free, not "free until we need money"</div>
-  </div>
-  <div class="stat">
-    <div class="stat-n">1 zip</div>
-    <div class="stat-l">Drop in your old chat export, done</div>
-  </div>
-  <div class="stat">
-    <div class="stat-n">0 ads</div>
-    <div class="stat-l">No tracking, no profiling, no BS</div>
-  </div>
+</header>
+<div class="mobile-menu" id="mobile-menu" data-open="false">
+  <nav aria-label="Mobile"><ul><li><a href="/" aria-current="page">Home<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/features">Features<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/skype-alternative">Skype alternative<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/download">Download<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/security">Security<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/rates">Pricing<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/support">Support<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li><li><a href="/about">About<svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></li></ul></nav>
+  <a class="btn btn-secondary btn-lg" href="/web/">Sign in</a>
+  <a class="btn btn-primary btn-lg" href="/web/">Open Phaze in your browser</a>
 </div>
+<main id="main">
 
-<!-- FEATURES -->
-<section id="features" class="section">
-  <div class="reveal">
-    <span class="section-tag">What's inside</span>
-    <h2 class="section-title">Everything you need.<br/>Nothing you don't.</h2>
-    <p class="section-sub">DMs, calls, group chat, file sharing, and a classic interface that doesn't require a tutorial.</p>
-  </div>
-  <div class="features-grid reveal">
-    <div class="feature-card">
-      <div class="feature-icon">🔒</div>
-      <div class="feature-title">End-to-End Encrypted DMs</div>
-      <div class="feature-desc">Messages are encrypted on your device before they leave. We genuinely cannot read them — not "we pinky promise not to."</div>
+<section class="hero">
+  <div class="container">
+    <a class="pill" href="/skype-alternative"><span class="tag">New home</span> Skype shut down on May 5, 2025. <strong>Bring your chats to Phaze</strong></a>
+    <h1 class="h-display">The <span class="grad">Skype alternative</span> that still feels like Skype.</h1>
+    <p class="lead">Phaze is a free messenger with the contact list, presence and mood messages you remember, plus calls, group chats and end-to-end encrypted DMs. Import your old Skype export and pick up where you left off.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-lg" href="/web/">Open Phaze in your browser <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a>
+      <a class="btn btn-secondary btn-lg" href="#import"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-import"/></svg> How the Skype import works</a>
     </div>
-    <div class="feature-card">
-      <div class="feature-icon">📹</div>
-      <div class="feature-title">Voice &amp; Video Calls</div>
-      <div class="feature-desc">Call anyone in one tap. Works in your browser, the desktop app, or on Android. HD quality, no install required on either end.</div>
+    <div class="hero-meta">
+      <span><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg> Free, no ads</span>
+      <span><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg> No phone number</span>
+      <span><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg> Web, Android, Windows &amp; Linux</span>
+      <span><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg> Open source</span>
     </div>
-    <div class="feature-card">
-      <div class="feature-icon">🏠</div>
-      <div class="feature-title">Group Spaces</div>
-      <div class="feature-desc">Text channels, voice rooms, invite links. Good for friend groups, communities, teams — whatever you need.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📖</div>
-      <div class="feature-title">Stories</div>
-      <div class="feature-desc">Post photos or short clips that disappear after 24 hours. Your people see them, then they're gone.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🔑</div>
-      <div class="feature-title">Key Backup &amp; Recovery</div>
-      <div class="feature-desc">Set a Recovery PIN and your encrypted keys are backed up. Switch to a new device and your whole history comes back. We never see the PIN.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📱</div>
-      <div class="feature-title">Quick Device Login</div>
-      <div class="feature-desc">Already signed in on your phone? Scan the QR code on your laptop and you're in. No password needed.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🔔</div>
-      <div class="feature-title">Push Notifications</div>
-      <div class="feature-desc">Get notified when someone messages you — even when the app is closed. Works on Android and web.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🛡️</div>
-      <div class="feature-title">Two-Factor Auth</div>
-      <div class="feature-desc">Enable 2FA in one tap. Works with any TOTP app — Google Authenticator, Authy, whatever you already use.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">📂</div>
-      <div class="feature-title">Files &amp; Voice Messages</div>
-      <div class="feature-desc">Send files, photos, or hold to record a quick voice message. Up to 25 MB per file.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🖥️</div>
-      <div class="feature-title">Screen Share</div>
-      <div class="feature-desc">Share your screen mid-call. Works on web, desktop, and Android. Nothing to install.</div>
-    </div>
-    <div class="feature-card">
-      <div class="feature-icon">🍪</div>
-      <div class="feature-title">Sessions You Can Trust</div>
-      <div class="feature-desc">Login tokens live in HttpOnly cookies, not localStorage. Scripts injected by attackers can't grab your session. Most apps skip this.</div>
+    <div class="hero-shot">
+      <div class="window">
+        <div class="window-bar"><i></i><i></i><i></i><span>phazechat.world/web</span></div>
+        <picture>
+          <source type="image/webp" srcset="/public/site/img/app-chat-960.webp 960w, /public/site/img/app-chat-1600.webp 1600w" sizes="(max-width: 1100px) 100vw, 1080px">
+          <img src="/public/site/img/app-chat-1600.png" width="1600" height="1000" alt="The Phaze web app in the default Phaze 5 theme: a contact list with presence on the left and an encrypted conversation on the right" fetchpriority="high" decoding="async">
+        </picture>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- PRIVACY -->
-<div class="section-alt">
-  <div class="privacy-wrap">
-    <div class="privacy-split">
-      <div class="reveal">
-        <span class="section-tag">Privacy</span>
-        <h2 class="section-title">We can't read<br/>your messages.<br/>That's the point.</h2>
-        <p style="color:var(--muted);margin-bottom:28px;font-size:0.97rem;line-height:1.75;">Phaze encrypts your DMs on your device. Even if someone breached our server, your messages are unreadable. Not a marketing claim — it's just how the math works.</p>
-        <ul class="privacy-list">
-          <li><span class="ck">✓</span><span>NaCl Box encryption — keys never leave your device</span></li>
-          <li><span class="ck">✓</span><span>PBKDF2-SHA256 + AES-256-GCM for key backups</span></li>
-          <li><span class="ck">✓</span><span>No tracking, no ads, no profiling</span></li>
-          <li><span class="ck">✓</span><span>Open source — verify it yourself on GitHub</span></li>
-          <li><span class="ck">✓</span><span>GDPR compliant — export or delete your data anytime</span></li>
-          <li><span class="ck">✓</span><span>HttpOnly cookie sessions — XSS can't steal your login</span></li>
+<section class="section" id="import">
+  <div class="container split">
+    <div class="reveal">
+      <span class="eyebrow"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-import"/></svg> Skype import</span>
+      <h2 class="h-section">Bring your Skype history with you.</h2>
+      <p class="lead" style="margin-top:14px">If you downloaded your Skype export before the service closed, that <code>.zip</code> still has years of conversations in it. Phaze can read it.</p>
+      <ol class="steps">
+        <li><strong>Find your export</strong>The <code>.zip</code> file Skype gave you from <code>go.skype.com/export</code>, usually still in Downloads.</li>
+        <li><strong>Upload it in Phaze</strong>Open Settings &rarr; Chat History Import and choose the file. Exports up to 100&nbsp;MB are accepted.</li>
+        <li><strong>Reconnect with people</strong>Phaze lists your Skype contacts. Friends already on Phaze get an Add friend button; for the rest, copy your invite link.</li>
+      </ol>
+      <div class="hero-actions" style="justify-content:flex-start">
+        <a class="btn btn-primary" href="/web/">Create your account <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a>
+        <a class="btn btn-secondary" href="/skype-alternative">Read the switching guide</a>
+      </div>
+    </div>
+    <div class="panel reveal" aria-label="What the Skype import brings over">
+      <h3>What comes across</h3>
+      <div class="drop">
+        <span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-file"/></svg></span>
+        <strong>skype-export.zip</strong>
+        <span class="small">messages.json inside your Skype export</span>
+      </div>
+      <ul class="checks">
+        <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><strong>Text messages</strong>, shown in your chat with each friend once you&rsquo;ve added them</span></li>
+        <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><strong>Your Skype contacts</strong>, matched to Phaze accounts where one exists</span></li>
+        <li class="no"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span><strong>Photos and files</strong>: Skype&rsquo;s file links no longer work, so they can&rsquo;t be fetched</span></li>
+      </ul>
+      <p class="small muted" style="margin-top:16px">Imported history is stored on Phaze&rsquo;s server and is not end-to-end encrypted.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-soft" id="features">
+  <div class="container">
+    <div class="section-head reveal">
+      <span class="eyebrow">What&rsquo;s inside</span>
+      <h2 class="h-section">Everything a messenger should do. Nothing it shouldn&rsquo;t.</h2>
+      <p class="lead">No feeds, no ads, no tutorial. Just your people, their status, and a chat window.</p>
+    </div>
+    <div class="grid grid-3 reveal">
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-lock"/></svg></span>
+<h3>End-to-end encrypted DMs</h3>
+<p>Once your app and your friend&rsquo;s have swapped keys, every DM is encrypted on your device with NaCl box. A lock in the message box shows when it&rsquo;s on.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-users"/></svg></span>
+<h3>A real contact list</h3>
+<p>Friend requests, contact groups, blocking, and presence you can read at a glance: online, away, do not disturb. Plus the mood message under your name.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-phone"/></svg></span>
+<h3>Voice &amp; video calls</h3>
+<p>Call any friend from the chat header. Calls ring every device you&rsquo;re signed in on and open in a Jitsi Meet room, on the web and on Android.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-palette"/></svg></span>
+<h3>Six era themes</h3>
+<p>Phaze 1 through Phaze 6+ are modelled on how classic Skype looked from 2007 to 2018. The default, Phaze 5, is the 2014 Aero-blue look.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-chat"/></svg></span>
+<h3>Group chats</h3>
+<p>Start a group from your contact list. The creator can add people, remove them and rename the chat. Group chats are not end-to-end encrypted, and the app says so.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-file"/></svg></span>
+<h3>Files &amp; voice messages</h3>
+<p>Send photos, documents and archives up to 25&nbsp;MB, or record a quick voice message on the web.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-hash"/></svg></span>
+<h3>Spaces</h3>
+<p>Community servers with text channels, voice channels and a shared whiteboard. Available with the Phaze 6+ theme on the web.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-shield"/></svg></span>
+<h3>Serious account security</h3>
+<p>Email verification, optional two-factor codes, approval for every new device, and a list of active sessions you can revoke.</p>
+</article>
+<article class="card">
+<span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-key"/></svg></span>
+<h3>Keep your keys</h3>
+<p>Back up your encryption keys behind a PIN only you know, so a new phone or browser can still read your encrypted history.</p>
+</article>
+    </div>
+    <p class="reveal" style="margin-top:28px"><a href="/features">See every feature and where it works <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a></p>
+  </div>
+</section>
+
+<section class="section" id="privacy">
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="eyebrow"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-lock"/></svg> Privacy</span>
+      <h2 class="h-section">Encryption, with the fine print printed large.</h2>
+      <p class="lead">Lots of apps say &ldquo;encrypted&rdquo; and leave it there. Here is exactly what Phaze can and can&rsquo;t read.</p>
+    </div>
+    <div class="grid grid-2 reveal">
+      <div class="card">
+        <span class="badge ok"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-lock"/></svg> End-to-end encrypted</span>
+        <ul class="checks">
+          <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><strong>One-to-one DMs</strong> once both apps have exchanged keys. The server stores and relays only ciphertext.</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><strong>Your key backup</strong>, encrypted on your device with a key derived from your PIN before it&rsquo;s uploaded.</span></li>
+          <li><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><strong>Key changes are caught</strong>: the web app pins each contact&rsquo;s key and warns you if it ever changes.</span></li>
         </ul>
       </div>
-      <div class="privacy-visual reveal">
-        <div class="p-row"><span class="p-row-icon">🔒</span><span class="p-row-label">Message encryption</span><span class="p-row-val">NaCl E2EE</span></div>
-        <div class="p-row"><span class="p-row-icon">👁️</span><span class="p-row-label">We can read your DMs</span><span class="p-row-val no">NEVER</span></div>
-        <div class="p-row"><span class="p-row-icon">📊</span><span class="p-row-label">Data sold to third parties</span><span class="p-row-val no">NO</span></div>
-        <div class="p-row"><span class="p-row-icon">🎯</span><span class="p-row-label">Ad targeting</span><span class="p-row-val no">NONE</span></div>
-        <div class="p-row"><span class="p-row-icon">🔑</span><span class="p-row-label">2FA support</span><span class="p-row-val">TOTP</span></div>
-        <div class="p-row"><span class="p-row-icon">📜</span><span class="p-row-label">Data export (GDPR Art.20)</span><span class="p-row-val">YES</span></div>
-        <div class="p-row"><span class="p-row-icon">⚙️</span><span class="p-row-label">Open source</span><span class="p-row-val">YES</span></div>
-        <div class="p-row"><span class="p-row-icon">🍪</span><span class="p-row-label">Session token in localStorage</span><span class="p-row-val no">NEVER</span></div>
+      <div class="card">
+        <span class="badge warn"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-info"/></svg> Not end-to-end encrypted</span>
+        <ul class="checks">
+          <li class="no"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span><strong>DMs sent before keys are exchanged</strong>. No lock icon means the message goes as plain text.</span></li>
+          <li class="no"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span><strong>Group chats, Spaces, stories</strong> and imported Skype history.</span></li>
+          <li class="no"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span><strong>Calls</strong>, which run on Jitsi Meet, and <strong>attachment files</strong> themselves.</span></li>
+          <li class="no"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span><strong>Metadata</strong>: the server knows who talks to whom, and when.</span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="reveal" style="text-align:center;margin-top:28px"><a href="/security">How Phaze&rsquo;s encryption works <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a> &nbsp;&middot;&nbsp; <a href="/privacy">Privacy policy</a></p>
+  </div>
+</section>
+
+<section class="section section-soft" id="compare">
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="eyebrow">Compare</span>
+      <h2 class="h-section">Where Skype users ended up, honestly compared.</h2>
+      <p class="lead">Every app here is good at something. Phaze is for people who want the classic Skype experience back without handing over a phone number.</p>
+    </div>
+<div class="table-wrap reveal"><table class="compare">
+<caption class="sr-only">Feature comparison between Phaze and other chat apps</caption>
+<thead><tr><th scope="col">Feature</th><th scope="col" class="us">Phaze</th><th scope="col">Skype<br><span class="small muted">retired 2025</span></th><th scope="col">Teams (free)</th><th scope="col">WhatsApp</th><th scope="col">Signal</th><th scope="col">Telegram</th><th scope="col">Discord</th></tr></thead>
+<tbody>
+<tr><th scope="row">One-to-one chats end-to-end encrypted</th><td class="us"><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>DMs, once keys swap</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Opt-in private chats</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Secret chats only</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td></tr>
+<tr><th scope="row">Group chats end-to-end encrypted</th><td class="us"><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td></tr>
+<tr><th scope="row">Calls end-to-end encrypted</th><td class="us"><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span><span class="sr-only">No: </span>Runs on Jitsi</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Private chats only</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Opt-in, 1:1</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>1:1 calls</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td></tr>
+<tr><th scope="row">Sign up without a phone number</th><td class="us"><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><span class="sr-only">Yes: </span>Email</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td></tr>
+<tr><th scope="row">Imports Skype chat history</th><td class="us"><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><span class="sr-only">Yes: </span>From your export</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span><span class="sr-only">No: </span>Service retired</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><span class="sr-only">Yes: </span>Sign in with Skype</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td></tr>
+<tr><th scope="row">Classic Skype-style interface</th><td class="us"><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><span class="sr-only">Yes: </span>Six era themes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td></tr>
+<tr><th scope="row">Community servers &amp; channels</th><td class="us"><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><span class="sr-only">Yes: </span>Spaces</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Communities</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Communities</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td></tr>
+<tr><th scope="row">Stories</th><td class="us"><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td></tr>
+<tr><th scope="row">No ads or sponsored content</th><td class="us"><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Ads in Updates</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Sponsored messages</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Sponsored Quests</span></span></td></tr>
+<tr><th scope="row">Open source</th><td class="us"><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span><span class="sr-only">Yes: </span>MIT</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td><td><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg><span class="sr-only">Yes</span></span></td><td><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg><span><span class="sr-only">Partly: </span>Apps only</span></span></td><td><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg><span class="sr-only">No</span></span></td></tr>
+</tbody></table></div>
+    <div class="legend"><span><span class="mark y"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-check"/></svg></span> Yes</span><span><span class="mark p"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-partial"/></svg></span> Partly or with conditions</span><span><span class="mark n"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-x"/></svg></span> No</span></div>
+    <p class="footnote">Based on each service&rsquo;s public documentation as of November 2026. Features change; if something here is out of date, <a href="https://github.com/jakes1345/phazechat.world/issues">tell us on GitHub</a>.</p>
+  </div>
+</section>
+
+<section class="section" id="download">
+  <div class="container">
+    <div class="section-head center reveal">
+      <span class="eyebrow">Platforms</span>
+      <h2 class="h-section">One account, on the devices you already have.</h2>
+      <p class="lead">The web app is always the newest version and works everywhere, including Mac, iPhone and iPad.</p>
+    </div>
+    <div class="grid grid-4 reveal">
+      <a class="card tile primary" href="/web/"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-globe"/></svg></span><span class="name">Web app <span class="badge brand">Recommended</span></span><span class="sub">Any modern browser. Install it from the browser menu or add it to your home screen.</span><span class="go">Open Phaze <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></span></a>
+      <a class="card tile" href="/download#android"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-android"/></svg></span><span class="name">Android</span><span class="sub">Android 8.0 or later. Installed from a direct APK download.</span><span class="go">Get the APK <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></span></a>
+      <a class="card tile" href="/download#windows"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-windows"/></svg></span><span class="name">Windows <span class="badge">Beta</span></span><span class="sub">Windows 10 and 11, 64-bit. A desktop window around the web app.</span><span class="go">Download <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></span></a>
+      <a class="card tile" href="/download#linux"><span class="ic"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-linux"/></svg></span><span class="name">Linux <span class="badge">Beta</span></span><span class="sub">A single x86-64 binary. Needs GTK 3 and WebKitGTK.</span><span class="go">Download <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></span></a>
+    </div>
+  </div>
+</section>
+
+<section class="section section-soft" id="faq">
+  <div class="container narrow">
+    <div class="section-head center reveal">
+      <span class="eyebrow">FAQ</span>
+      <h2 class="h-section">Questions people ask first</h2>
+    </div>
+<div class="faq">
+<details><summary><h3>Is Phaze free?</h3></summary><div class="answer"><p>Yes. Messages, calls, file sharing, Spaces and the Skype import cost nothing, and there are no ads. If you want to help with server costs you can <a href="/rates#support">chip in through Buy Me a Coffee</a>; supporters get a badge on their profile and nothing else changes.</p></div></details>
+<details><summary><h3>Can I import my Skype chats and contacts?</h3></summary><div class="answer"><p>Yes, if you have the <code>.zip</code> export you downloaded from Skype. In Phaze, open <strong>Settings &rarr; Chat History Import</strong> and upload it (up to 100&nbsp;MB). Phaze imports the text of your conversations, shows it in your chat with each friend, and lists your Skype contacts. Anyone who is already on Phaze gets an <em>Add friend</em> button; for everyone else you can copy an invite link. Photos and files can&rsquo;t be brought over.</p></div></details>
+<details><summary><h3>Is there an iPhone or iPad app?</h3></summary><div class="answer"><p>Not a native one. Phaze runs in Safari: open <a href="/web/">phazechat.world/web</a>, tap <strong>Share &rarr; Add to Home Screen</strong>, and it opens full-screen like an app. The same works on a Mac.</p></div></details>
+<details><summary><h3>Are calls end-to-end encrypted?</h3></summary><div class="answer"><p>No, and we&rsquo;d rather say so up front. Voice and video calls open a room on the public Jitsi Meet service (<code>meet.jit.si</code>). The connection is encrypted in transit, but Jitsi&rsquo;s servers handle the audio and video, so calls are not covered by Phaze&rsquo;s end-to-end encryption. One-to-one DMs are. <a href="/security">See exactly what is and isn&rsquo;t encrypted</a>.</p></div></details>
+<details><summary><h3>Do I need a phone number?</h3></summary><div class="answer"><p>No. You sign up with a username, a password and an email address, which you confirm with a code we send you. Phaze never asks for your phone number or your address book.</p></div></details>
+<details><summary><h3>Can I call landlines and mobile numbers, like Skype Credit?</h3></summary><div class="answer"><p>No. Phaze calls are between Phaze users only. There is no paid calling to the phone network.</p></div></details>
+</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="cta reveal">
+      <h2>Your contact list is waiting.</h2>
+      <p>Pick a username, confirm your email, and you&rsquo;re in. No phone number, no card, no download needed.</p>
+      <div class="hero-actions">
+        <a class="btn btn-light btn-lg" href="/web/">Open Phaze free <svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-arrow"/></svg></a>
+        <a class="btn btn-outline-light btn-lg" href="https://github.com/jakes1345/phazechat.world"><svg class="icon" aria-hidden="true"><use href="/public/site/icons.svg#i-github"/></svg> View the source</a>
       </div>
     </div>
   </div>
-</div>
-
-<!-- SWITCHING -->
-<section id="skype-switch" style="padding:0 24px 88px;max-width:1200px;margin:0 auto;">
-  <div class="import-panel reveal">
-    <div>
-      <span class="section-tag">Switching over</span>
-      <h2 class="section-title" style="font-size:clamp(1.5rem,3vw,2.2rem);">No migration.<br/>Just show up.</h2>
-      <p style="color:var(--muted);font-size:0.95rem;margin-bottom:28px;line-height:1.75;">There's no export/import step because there's nothing to wait on — an account takes about 30 seconds, and getting your people over is just sending them a link.</p>
-      <ol class="import-steps">
-        <li><span class="step-num">1</span><span>Pick a username and password. No phone number, no email required.</span></li>
-        <li><span class="step-num">2</span><span>Add the friends you already have — search their username or share your invite link.</span></li>
-        <li><span class="step-num">3</span><span>Start talking. DMs, calls, and group Spaces all work the moment you're both signed in.</span></li>
-      </ol>
-      <a class="btn btn-primary btn-lg" href="/web" style="margin-top:28px;display:inline-flex;">Switch to Phaze free →</a>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div class="p-row"><span class="p-row-icon">⏱️</span><span class="p-row-label">Time to first message</span><span class="p-row-val">~30 seconds</span></div>
-      <div class="p-row"><span class="p-row-icon">👥</span><span class="p-row-label">Bringing friends over</span><span class="p-row-val">Share a link</span></div>
-      <div class="p-row"><span class="p-row-icon">🔒</span><span class="p-row-label">Encryption</span><span class="p-row-val">Real E2EE</span></div>
-      <div class="p-row"><span class="p-row-icon">💰</span><span class="p-row-label">Price</span><span class="p-row-val">Free forever</span></div>
-      <div class="p-row"><span class="p-row-icon">📱</span><span class="p-row-label">Platforms</span><span class="p-row-val">Web · Desktop · Android</span></div>
-    </div>
-  </div>
 </section>
 
-<!-- COMPARE -->
-<div class="section-alt">
-  <section id="compare" style="padding:88px 24px;max-width:1200px;margin:0 auto;">
-    <div class="reveal" style="text-align:center;margin-bottom:0;">
-      <span class="section-tag">Comparison</span>
-      <h2 class="section-title">We're not the only option.<br/>Here's the honest breakdown.</h2>
-      <p class="section-sub" style="margin:0 auto;">A lot of good apps out there. Here's where each one actually lands.</p>
+</main>
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-about">
+        <a class="brand" href="/"><img src="/public/site/img/logo-64.png" width="32" height="32" alt=""> Phaze</a>
+        <p>A free, open-source messenger in the classic style. Built for people who miss how chat used to feel.</p>
+      </div>
+      <div>
+        <h2>Product</h2>
+        <ul>
+          <li><a href="/web/">Open the web app</a></li>
+          <li><a href="/features">Features</a></li>
+          <li><a href="/download">Download</a></li>
+          <li><a href="/rates">Pricing</a></li>
+          <li><a href="/status">Service status</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Switching</h2>
+        <ul>
+          <li><a href="/skype-alternative">Skype alternative</a></li>
+          <li><a href="/skype-alternative#import">Import a Skype export</a></li>
+          <li><a href="/#compare">Compare apps</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/support">Support</a></li>
+          <li><a href="/security">Security</a></li>
+          <li><a href="https://github.com/jakes1345/phazechat.world" rel="noopener">Source code</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Legal</h2>
+        <ul>
+          <li><a href="/privacy">Privacy policy</a></li>
+          <li><a href="/terms">Terms of service</a></li>
+          <li><a href="/legal">Legal notices</a></li>
+        </ul>
+      </div>
     </div>
-    <div class="compare-wrap reveal">
-      <table>
-        <thead>
-          <tr>
-            <th>Feature</th>
-            <th style="color:var(--brand-dark)">Phaze</th>
-            <th>WhatsApp</th>
-            <th>Discord</th>
-            <th>Telegram</th>
-            <th>Signal</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>E2EE by default</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="partial">~</td><td class="check">✓</td></tr>
-          <tr><td>No ads ever</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="check">✓</td><td class="check">✓</td></tr>
-          <tr><td>Group Spaces / Servers</td><td class="phaze-col check">✓</td><td class="partial">~</td><td class="check">✓</td><td class="check">✓</td><td class="cross">✗</td></tr>
-          <tr><td>Voice &amp; Video calls</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td><td class="check">✓</td></tr>
-          <tr><td>Stories</td><td class="phaze-col check">✓</td><td class="check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td></tr>
-          <tr><td>Phone number NOT required</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="check">✓</td><td class="cross">✗</td><td class="cross">✗</td></tr>
-          <tr><td>Open source</td><td class="phaze-col check">✓</td><td class="cross">✗</td><td class="cross">✗</td><td class="partial">~</td><td class="check">✓</td></tr>
-          <tr><td>Owned by Meta/VC</td><td class="phaze-col check" style="color:var(--success);font-weight:700;">No</td><td class="cross">Yes (Meta)</td><td class="cross">Yes (VC)</td><td class="check">No</td><td class="check">No</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-</div>
-
-<!-- PLATFORMS -->
-<section id="download" class="platforms">
-  <div class="reveal">
-    <span class="section-tag">Platforms</span>
-    <h2 class="section-title">Use it everywhere</h2>
-    <p style="color:var(--muted);max-width:440px;margin:0 auto;font-size:0.97rem;">Same account across all your devices. Pick up right where you left off.</p>
-  </div>
-  <div class="platform-cards reveal">
-    <a class="platform-card" href="/web" id="dl-web">
-      <div class="platform-icon">🌐</div>
-      <div class="platform-name">Web App</div>
-      <div class="platform-sub">No install needed</div>
-    </a>
-    <a class="platform-card" href="https://github.com/jakes1345/phazechat.world/releases/latest" id="dl-windows">
-      <div class="platform-icon">🪟</div>
-      <div class="platform-name">Windows</div>
-      <div class="platform-sub">Desktop app</div>
-    </a>
-    <div class="platform-card disabled" id="dl-macos" title="No macOS build yet — vote for it on GitHub">
-      <div class="platform-icon">🍎</div>
-      <div class="platform-name">macOS</div>
-      <div class="platform-sub">Coming soon</div>
-    </div>
-    <a class="platform-card" href="/download" id="dl-linux">
-      <div class="platform-icon">🐧</div>
-      <div class="platform-name">Linux</div>
-      <div class="platform-sub">.deb · APT repo</div>
-    </a>
-    <a class="platform-card" href="https://play.google.com/store/apps/details?id=world.phazechat.app" id="dl-android" target="_blank" rel="noopener">
-      <div class="platform-icon">🤖</div>
-      <div class="platform-name">Android</div>
-      <div class="platform-sub">Google Play</div>
-    </a>
-  </div>
-</section>
-
-<!-- CTA -->
-<section class="cta-section">
-  <div class="reveal">
-    <h2>Try it. Takes 2 minutes.</h2>
-    <p>Free, open source, running right now. No phone number, no credit card. If you hate it, you've lost nothing.</p>
-    <div class="cta-actions">
-      <a class="btn btn-lg btn-white" href="/web" id="cta-start">Open Phaze free →</a>
-      <a class="btn btn-lg btn-ghost" href="https://github.com/jakes1345/phazechat.world" id="cta-github">View source on GitHub</a>
-    </div>
-  </div>
-</section>
-
-<!-- FOOTER -->
-<footer>
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <a class="nav-logo footer-logo" href="/" style="text-decoration:none;">
-        <img src="/icon-192.png" alt="Phaze" style="width:28px;height:28px;border-radius:7px;" />
-        <span style="font-size:1.05rem;font-weight:800;">Phaze</span>
-      </a>
-      <p>Free, open source messaging. No ads, no tracking, no drama.</p>
-    </div>
-    <div class="footer-col">
-      <h4>Product</h4>
-      <a href="/web">Web App</a>
-      <a href="#features">Features</a>
-      <a href="#download">Download</a>
-      <a href="#compare">Compare</a>
-    </div>
-    <div class="footer-col">
-      <h4>Legal</h4>
-      <a href="/privacy">Privacy Policy</a>
-      <a href="/terms">Terms of Service</a>
-      <a href="/privacy">Security</a>
-    </div>
-    <div class="footer-col">
-      <h4>Community</h4>
-      <a href="https://github.com/jakes1345/phazechat.world" target="_blank" rel="noopener">GitHub</a>
-      <a href="https://x.com/PhazeChatWorld" target="_blank" rel="noopener">X / Twitter</a>
-      <a href="https://instagram.com/phazechat.world" target="_blank" rel="noopener">Instagram</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <span>© 2026 Phaze. All rights reserved.</span>
-    <div class="footer-social">
-      <a href="https://x.com/PhazeChatWorld" target="_blank" rel="noopener" aria-label="Phaze on X">𝕏</a>
-      <a href="https://instagram.com/phazechat.world" target="_blank" rel="noopener" aria-label="Phaze on Instagram">📷</a>
-      <a href="https://github.com/jakes1345/phazechat.world" target="_blank" rel="noopener" aria-label="Phaze on GitHub">⌨️</a>
+    <div class="footer-bottom">
+      <span>&copy; 2024&ndash;2026 Phaze. An independent project, not affiliated with Microsoft or Skype.</span>
+      <span><a href="https://x.com/PhazeChatWorld" rel="noopener">X</a> &middot; <a href="https://instagram.com/phazechat.world" rel="noopener">Instagram</a> &middot; <a href="https://github.com/jakes1345/phazechat.world" rel="noopener">GitHub</a></span>
     </div>
   </div>
 </footer>
-
-<script>
-  const revealEls = document.querySelectorAll('.reveal')
-  revealEls.forEach(el => el.classList.add('will-animate'))
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target) } })
-  }, { threshold: 0.07, rootMargin: '0px 0px -20px 0px' })
-  // Always go through the observer rather than checking getBoundingClientRect
-  // synchronously — on direct navigation to a #hash the browser's anchor
-  // scroll can land before or after this runs, and the observer's first
-  // callback reports the true current intersection state either way.
-  revealEls.forEach(el => observer.observe(el))
-
-  const sections = document.querySelectorAll('section[id]')
-  const navLinks = document.querySelectorAll('.nav-links a')
-  window.addEventListener('scroll', () => {
-    let cur = ''
-    sections.forEach(s => { if (window.scrollY >= s.offsetTop - 120) cur = s.id })
-    navLinks.forEach(a => { a.style.color = a.getAttribute('href') === `#${cur}` ? 'var(--text)' : '' })
-  }, { passive: true })
-</script>
-
 </body>
 </html>

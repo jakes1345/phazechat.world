@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -68,6 +71,12 @@ func (s *NexusServer) storiesCreateHandler(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "media_url required", http.StatusBadRequest)
 		return
 	}
+	// Stories show media from our own uploads only; an external URL would
+	// be loaded by every viewer (a tracking pixel).
+	if storyUploadKey(body.MediaURL) == "" {
+		http.Error(w, "media_url must be a Phaze upload", http.StatusBadRequest)
+		return
+	}
 	if body.MediaKind != "image" && body.MediaKind != "video" {
 		http.Error(w, "media_kind must be image or video", http.StatusBadRequest)
 		return
@@ -99,7 +108,7 @@ func (s *NexusServer) storiesFeedHandler(w http.ResponseWriter, r *http.Request)
 		`SELECT id, author, media_url, media_kind, COALESCE(caption,''),
 		        CAST(created_at AS TEXT), CAST(expires_at AS TEXT)
 		   FROM stories
-		  WHERE expires_at > CURRENT_TIMESTAMP
+		  WHERE datetime(expires_at) > CURRENT_TIMESTAMP
 		  ORDER BY author, id DESC LIMIT 500`)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
@@ -152,7 +161,9 @@ func (s *NexusServer) storiesItemHandler(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "bad id", http.StatusBadRequest)
 			return
 		}
-		var body struct{ Body string `json:"body"` }
+		var body struct {
+			Body string `json:"body"`
+		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err != nil {
 			http.Error(w, "bad json", http.StatusBadRequest)
 			return
@@ -190,8 +201,8 @@ func (s *NexusServer) storiesItemHandler(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "bad id", http.StatusBadRequest)
 			return
 		}
-		var author string
-		if err := s.DB.QueryRow(`SELECT author FROM stories WHERE id = ?`, id).Scan(&author); err != nil {
+		var author, mediaURL string
+		if err := s.DB.QueryRow(`SELECT author, media_url FROM stories WHERE id = ?`, id).Scan(&author, &mediaURL); err != nil {
 			http.NotFound(w, r)
 			return
 		}
@@ -201,6 +212,7 @@ func (s *NexusServer) storiesItemHandler(w http.ResponseWriter, r *http.Request)
 		}
 		s.DB.Exec(`DELETE FROM stories WHERE id = ?`, id)
 		s.DB.Exec(`DELETE FROM story_views WHERE story_id = ?`, id)
+		s.deleteStoryMedia(r.Context(), mediaURL)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"ok":true}`))
 		return
@@ -218,7 +230,7 @@ func (s *NexusServer) storiesItemHandler(w http.ResponseWriter, r *http.Request)
 			        CAST(s.created_at AS TEXT), CAST(s.expires_at AS TEXT),
 			        COALESCE((SELECT COUNT(*) FROM story_views v WHERE v.story_id = s.id), 0)
 			   FROM stories s
-			  WHERE s.author = ? AND s.expires_at > CURRENT_TIMESTAMP
+			  WHERE s.author = ? AND datetime(s.expires_at) > CURRENT_TIMESTAMP
 			  ORDER BY s.id ASC`, author)
 		if err != nil {
 			http.Error(w, "db error", http.StatusInternalServerError)
@@ -247,16 +259,65 @@ func (s *NexusServer) storiesExpireSweeper() {
 	defer t.Stop()
 	for {
 		<-t.C
-		res, err := s.DB.Exec(`DELETE FROM stories WHERE expires_at <= CURRENT_TIMESTAMP`)
-		if err != nil {
-			log.Printf("[stories] sweep: %v", err)
-			continue
+		s.expireStories(context.Background())
+	}
+}
+
+// expireStories deletes stories past their 24 hours, their views, and their
+// media files. expires_at is stored as RFC3339 text ("…T…Z"), which doesn't
+// compare correctly against CURRENT_TIMESTAMP ("… …") as a string, so it is
+// compared through datetime().
+func (s *NexusServer) expireStories(ctx context.Context) int {
+	rows, err := s.DB.Query(`SELECT id, media_url FROM stories WHERE datetime(expires_at) <= CURRENT_TIMESTAMP`)
+	if err != nil {
+		log.Printf("[stories] sweep: %v", err)
+		return 0
+	}
+	type expired struct {
+		id  int64
+		url string
+	}
+	var gone []expired
+	for rows.Next() {
+		var e expired
+		if rows.Scan(&e.id, &e.url) == nil {
+			gone = append(gone, e)
 		}
-		n, _ := res.RowsAffected()
-		if n > 0 {
-			s.DB.Exec(`DELETE FROM story_views WHERE story_id NOT IN (SELECT id FROM stories)`)
-			log.Printf("[stories] expired %d stories", n)
-		}
+	}
+	rows.Close()
+	for _, e := range gone {
+		s.DB.Exec(`DELETE FROM stories WHERE id = ?`, e.id)
+		s.DB.Exec(`DELETE FROM story_views WHERE story_id = ?`, e.id)
+		s.deleteStoryMedia(ctx, e.url)
+	}
+	if len(gone) > 0 {
+		log.Printf("[stories] expired %d stories", len(gone))
+	}
+	return len(gone)
+}
+
+// storyUploadKey returns the blob key for a /uploads/<name> URL, or "" when
+// the URL isn't one of our uploads.
+func storyUploadKey(mediaURL string) string {
+	name, ok := strings.CutPrefix(mediaURL, "/uploads/")
+	if !ok || name == "" || name != filepath.Base(name) || strings.HasPrefix(name, ".") {
+		return ""
+	}
+	if ctype, _ := uploadContentType(strings.ToLower(filepath.Ext(name))); ctype == "" {
+		return ""
+	}
+	return "uploads/" + name
+}
+
+// deleteStoryMedia removes a story's uploaded file, so the media doesn't
+// outlive the story.
+func (s *NexusServer) deleteStoryMedia(ctx context.Context, mediaURL string) {
+	key := storyUploadKey(mediaURL)
+	if key == "" {
+		return
+	}
+	if err := blobs().Delete(ctx, key); err != nil && !errors.Is(err, errBlobNotFound) {
+		log.Printf("[stories] delete media %s: %v", key, err)
 	}
 }
 

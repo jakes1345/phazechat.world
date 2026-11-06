@@ -28,7 +28,14 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
   const [mode, setMode] = useState<Mode>('idle')
   const [code, setCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
-  const [peer, setPeer] = useState<string | null>(null)
+  const [peer, setPeerState] = useState<string | null>(null)
+  // Mirrors `peer` synchronously, so signalling that arrives before the next
+  // render is checked against the current peer rather than a stale one.
+  const peerRef = useRef<string | null>(null)
+  const setPeer = useCallback((p: string | null) => {
+    peerRef.current = p
+    setPeerState(p)
+  }, [])
   const [err, setErr] = useState('')
   const [connected, setConnected] = useState(false)
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
@@ -143,7 +150,23 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
           break
         }
         case 'remote_offer': {
+          // Only a host that is actively sharing takes offers.
           if (mode !== 'hosting' || !m.sender) break
+          // A new viewer replaces any previous one: close the old peer
+          // connection (without its state handlers firing) so it can't keep
+          // receiving the screen alongside the new one.
+          const prev = pcRef.current
+          if (prev) {
+            prev.onconnectionstatechange = null
+            prev.onicecandidate = null
+            prev.ondatachannel = null
+            prev.close()
+            pcRef.current = null
+            inputChannelRef.current = null
+            fileChannelRef.current = null
+            setConnected(false)
+            setCursorPos(null)
+          }
           setPeer(m.sender)
           const pc = new RTCPeerConnection({ iceServers: iceServers() })
           pcRef.current = pc
@@ -189,16 +212,19 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
         }
         case 'remote_answer': {
           if (mode !== 'viewing' || !pcRef.current) break
+          if (peerRef.current && m.sender !== peerRef.current) break
           void pcRef.current.setRemoteDescription({ type: 'answer', sdp: m.sdp })
           setConnected(true)
           break
         }
         case 'remote_ice': {
           if (!pcRef.current || !m.candidate) break
+          if (peerRef.current && m.sender !== peerRef.current) break
           void pcRef.current.addIceCandidate(JSON.parse(m.candidate)).catch(() => {})
           break
         }
         case 'remote_end': {
+          if (peerRef.current && m.sender && m.sender !== peerRef.current) break
           tearDown()
           setMode('idle')
           setPeer(null)
@@ -212,7 +238,7 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
       }
     })
     return unsub
-  }, [subscribe, mode, peer, handleIncomingFile, tearDown, send])
+  }, [subscribe, mode, peer, handleIncomingFile, tearDown, send, setPeer])
 
   const startHosting = async () => {
     setErr('')
@@ -255,12 +281,18 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
     setJoinCode('')
   }
 
+  // End the session when the panel closes. Runs on unmount only: with
+  // `peer` as a dependency it ran on every peer change, so accepting a
+  // viewer tore down the connection just made for them and stopped the
+  // shared screen. sendRef keeps the latest send without re-running it.
+  const sendRef = useRef(send)
+  useEffect(() => { sendRef.current = send }, [send])
   useEffect(() => {
     return () => {
-      if (peer) send({ type: 'remote_end', recipient: peer })
+      if (peerRef.current) sendRef.current({ type: 'remote_end', recipient: peerRef.current })
       tearDown()
     }
-  }, [peer, send, tearDown])
+  }, [tearDown])
 
   const sendInputEvent = (payload: string) => {
     if (inputChannelRef.current && inputChannelRef.current.readyState === 'open') {
@@ -313,13 +345,13 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
       <div className="rc-modal">
         <button type="button" className="rc-close" onClick={onClose}>✕</button>
         <h2 className="rc-title">Remote Control</h2>
-        <p className="rc-sub">Share your screen with remote input — like TeamViewer, but encrypted and built into Phaze.</p>
+        <p className="rc-sub">Share your screen with a friend, point at things together and send files. Works in the browser.</p>
 
         {mode === 'idle' && (
           <div className="rc-options">
             <div className="rc-card">
               <h3>Share your screen</h3>
-              <p>Let someone view and control your screen. You'll get a 6-digit code to share.</p>
+              <p>Let someone see your screen and point at things. You'll get a 6-digit code to share.</p>
               <button type="button" className="rc-btn primary" onClick={() => void startHosting()}>🖥 Start sharing</button>
             </div>
             <div className="rc-card">

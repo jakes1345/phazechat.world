@@ -10,7 +10,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -60,3 +60,43 @@ jobs:
           name: playwright-report
           path: web/playwright-report/
           retention-days: 7
+
+  # Builds the production image (no push) when a PR touches anything that
+  # goes into it, so a broken Dockerfile shows up before the Cloudflare
+  # deploy (which builds the same image) does.
+  docker-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check whether the image inputs changed
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if git diff --name-only "$BASE_SHA...$HEAD_SHA" \
+              | grep -qE '^(nexus_server/|web/|nova_bot/|VERSION$|\.dockerignore$|\.github/workflows/ci\.yml$)'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No image inputs changed; skipping the Docker build."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.changes.outputs.build == 'true'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build nexus_server/Dockerfile
+        if: steps.changes.outputs.build == 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: nexus_server/Dockerfile
+          platforms: linux/amd64
+          push: false
+          cache-from: type=gha

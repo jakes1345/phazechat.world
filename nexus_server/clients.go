@@ -1,5 +1,10 @@
 package main
 
+import (
+	"sync"
+	"time"
+)
+
 // Connection registry helpers.
 //
 // A user may hold several live connections at once — browser tabs, the desktop
@@ -204,16 +209,214 @@ func (s *NexusServer) ringingClients(username string) []*Client {
 	return s.clientsOf(username)
 }
 
-// pendingCallerLocked finds the connection of `caller` that has an outgoing
-// call waiting to be answered. Caller must hold s.Mu.
+// detachClient unregisters one connection and cleans up everything that hung
+// off it: an in-progress call (the partner is told and the call row closed),
+// and — when it was the user's last connection — presence, voice rooms and
+// live streams.
 //
-// The pending room is recorded on the exact connection that dialled, so a
-// second tab belonging to the same person doesn't get mistaken for the caller.
-func (s *NexusServer) pendingCallerLocked(caller string) *Client {
-	for _, c := range s.Clients[caller] {
-		if c.PendingCallRoom != "" || c.PendingCallID != 0 {
-			return c
+// State is read and cleared under s.Mu, but every network write and DB call
+// happens after the lock is released: Send can block for the full write
+// deadline on a slow peer, and holding the registry lock across that (or
+// across a DB round-trip) stalls every other connection on the server.
+//
+// Returns how many connections the user still has open.
+func (s *NexusServer) detachClient(username string, client *Client) int {
+	if username == "" || client == nil {
+		return 0
+	}
+	s.Mu.Lock()
+	remaining := s.removeClientLocked(username, client)
+
+	var (
+		notify    []*Client // the other side's connections to tell
+		logRow    int64
+		answered  bool
+		started   time.Time
+		logCaller string
+		logCallee string
+	)
+	if callPartner := client.CallPartner; callPartner != "" {
+		// The peer's call lives on one specific connection of theirs, not
+		// on all of them — find that one.
+		if partner := s.callPeerLocked(callPartner, username); partner != nil {
+			partner.InCall = false
+			partner.CallPartner = ""
+			notify = []*Client{partner}
+			// The call row lives on whichever side placed the call.
+			if client.PendingCallID != 0 {
+				logCaller, logCallee = username, callPartner
+				logRow, answered, started = clearOutgoingCallLocked(client)
+			} else if partner.PendingCallID != 0 {
+				logCaller, logCallee = callPartner, username
+				logRow, answered, started = clearOutgoingCallLocked(partner)
+			}
+		}
+	} else if callee := pendingCalleeOf(client); callee != "" && client.PendingCallRoom != "" {
+		// Hung up by disconnecting while still ringing: stop the callee's
+		// devices ringing for a call nobody can answer any more.
+		notify = append(notify, s.Clients[callee]...)
+		logCaller, logCallee = username, callee
+		logRow, answered, started = clearOutgoingCallLocked(client)
+	}
+	client.InCall = false
+	client.CallPartner = ""
+	clearPendingCallee(client)
+	s.Mu.Unlock()
+
+	for _, c := range notify {
+		c.Send(NexusMessage{Type: "call_end", Sender: username})
+	}
+	if logRow != 0 {
+		kind, ans, duration := s.finalizeCall(logRow, answered, started)
+		status := "missed"
+		if ans {
+			status = "answered"
+		}
+		// Only the surviving side is still connected to receive this live.
+		m := NexusMessage{Type: "call_log", Sender: logCaller, Recipient: logCallee, Body: kind, Status: status, Ts: started.UnixMilli(), Duration: duration}
+		for _, c := range notify {
+			c.Send(m)
 		}
 	}
-	return nil
+
+	if remaining == 0 {
+		s.broadcastPresence(username, "Offline")
+		s.voiceRoomEvictUser(username)
+		s.streamEvictUser(username)
+	}
+	return remaining
+}
+
+// reauthConnection is called before a socket that may already be signed in
+// is registered under `newUser` (auth, session_auth, qr_login_check).
+//
+// Registering again without this appended the same *Client a second time —
+// duplicate deliveries and a ghost entry that kept the user "online" after
+// the socket closed — and a socket re-authed as someone else stayed in the
+// first user's list, so it kept receiving their messages.
+//
+// Returns true when the socket is already registered as newUser: the caller
+// should just confirm success and not register it again. When it was signed
+// in as someone else, it is detached from that account first.
+func (s *NexusServer) reauthConnection(client *Client, current, newUser string) (alreadyThisUser bool) {
+	if current == "" {
+		return false
+	}
+	if current == newUser {
+		return true
+	}
+	s.detachClient(current, client)
+	return false
+}
+
+// userExists reports whether an account with this name exists.
+func (s *NexusServer) userExists(username string) bool {
+	if username == "" {
+		return false
+	}
+	var one int
+	return s.DB.QueryRow(`SELECT 1 FROM users WHERE username = ?`, username).Scan(&one) == nil
+}
+
+// dmParticipants returns who sent and who received a stored DM.
+func (s *NexusServer) dmParticipants(msgID string) (sender, recipient string, ok bool) {
+	err := s.DB.QueryRow(`SELECT sender, recipient FROM dm_messages WHERE msg_id = ?`, msgID).Scan(&sender, &recipient)
+	return sender, recipient, err == nil
+}
+
+// ── Remote screen sessions ────────────────────────────────────────────────
+//
+// A viewer earns the right to signal a host by looking up the host's 6-digit
+// code (remote_lookup). That pairing is recorded here, and remote_offer /
+// answer / ice / input / end are only relayed between a host and a viewer
+// that were paired this way — otherwise anyone could push an offer at any
+// user who happens to be sharing.
+
+// remoteBindingTTL bounds how long a pairing outlives its last use. Sessions
+// end with remote_end or a new share, so this only mops up abandoned ones.
+const remoteBindingTTL = 12 * time.Hour
+
+type remotePair struct{ host, viewer string }
+
+type remoteBindingSet struct {
+	mu    sync.Mutex
+	pairs map[remotePair]time.Time
+}
+
+// Keyed by server so the side-by-side servers in tests stay independent.
+// (Kept out of NexusServer itself, whose definition lives in main.go.)
+var remoteBindingsByServer sync.Map // *NexusServer -> *remoteBindingSet
+
+func (s *NexusServer) remoteBindings() *remoteBindingSet {
+	v, _ := remoteBindingsByServer.LoadOrStore(s, &remoteBindingSet{pairs: map[remotePair]time.Time{}})
+	return v.(*remoteBindingSet)
+}
+
+func (b *remoteBindingSet) bind(host, viewer string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	for p, at := range b.pairs {
+		if now.Sub(at) > remoteBindingTTL {
+			delete(b.pairs, p)
+		}
+	}
+	b.pairs[remotePair{host, viewer}] = now
+}
+
+// pairOf reports whether a and b are paired in either direction, and which
+// of them is the host.
+func (b *remoteBindingSet) pairOf(a, c string) (host string, ok bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	for _, p := range []remotePair{{a, c}, {c, a}} {
+		if at, found := b.pairs[p]; found {
+			if now.Sub(at) > remoteBindingTTL {
+				delete(b.pairs, p)
+				continue
+			}
+			b.pairs[p] = now
+			return p.host, true
+		}
+	}
+	return "", false
+}
+
+func (b *remoteBindingSet) unbind(host, viewer string) {
+	b.mu.Lock()
+	delete(b.pairs, remotePair{host, viewer})
+	b.mu.Unlock()
+}
+
+// dropHost forgets every viewer paired with this host.
+func (b *remoteBindingSet) dropHost(host string) {
+	b.mu.Lock()
+	for p := range b.pairs {
+		if p.host == host {
+			delete(b.pairs, p)
+		}
+	}
+	b.mu.Unlock()
+}
+
+// otherOf returns whichever of a and b isn't `one`.
+func otherOf(one, a, b string) string {
+	if a == one {
+		return b
+	}
+	return a
+}
+
+// deleteRemoteCodesOf removes every pairing code the user registered. Only
+// ever called with the code owner's own name (or the host of a pairing being
+// torn down), never on a third party's say-so.
+func (s *NexusServer) deleteRemoteCodesOf(username string) {
+	s.RemoteCodesMu.Lock()
+	for k, v := range s.RemoteCodes {
+		if v.Username == username {
+			delete(s.RemoteCodes, k)
+		}
+	}
+	s.RemoteCodesMu.Unlock()
 }

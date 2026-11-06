@@ -18,8 +18,8 @@ fun localProp(key: String, fallback: String = "") =
     (localProps[key] as? String)?.takeIf { it.isNotBlank() } ?: fallback
 
 // ─── Version ──────────────────────────────────────────────────────────────────
-val appVersionCode = 33
-val appVersionName = "1.6.5"
+val appVersionCode = 34
+val appVersionName = "1.6.6"
 
 android {
     namespace = "world.phazechat.app"

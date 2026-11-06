@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 const supportSystemPrompt = `You are Phaze Helper, the in-app support bot for Phaze (https://phazechat.world) — a real-time chat platform with DMs, group spaces, voice/video calls, livestreams, and end-to-end encryption.
@@ -48,7 +50,7 @@ Always respond in plain text. Do not use markdown headers or excessive formattin
 If users ask how to support Phaze, mention they can donate at the "Buy Phaze a coffee" link in the footer. Don't volunteer this unless asked.`
 
 type supportMessage struct {
-	Role    string `json:"role"`    // "user" or "assistant"
+	Role    string `json:"role"` // "user" or "assistant"
 	Content string `json:"content"`
 }
 
@@ -129,7 +131,7 @@ func (s *NexusServer) supportChatHandler(w http.ResponseWriter, r *http.Request)
 	if reply == "" {
 		if lastErr != nil {
 			log.Printf("[support] all providers failed: %v", lastErr)
-			http.Error(w, "support bot unavailable: "+lastErr.Error(), http.StatusBadGateway)
+			http.Error(w, "support bot unavailable, please try again later", http.StatusBadGateway)
 		} else {
 			http.Error(w, "support bot returned empty reply", http.StatusBadGateway)
 		}
@@ -174,12 +176,14 @@ func callGemini(apiKey, system string, msgs []supportMessage) (string, error) {
 		GenerationConfig:  genCfg{MaxOutputTokens: 600, Temperature: 0.4},
 	}
 	buf, _ := json.Marshal(payload)
-	url := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey
-	req, err := http.NewRequest("POST", url, bytes.NewReader(buf))
+	// The key goes in a header, not the query string: Go includes the full
+	// URL in transport errors, which would put the key in logs.
+	req, err := http.NewRequest("POST", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", bytes.NewReader(buf))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
 	client := &http.Client{Timeout: 25 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -262,29 +266,47 @@ func (s *NexusServer) supportEscalateHandler(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "bad json", http.StatusBadRequest)
 		return
 	}
-	// Caller identity: prefer authenticated session, fall back to provided name.
+	// Caller identity comes from the session. A name typed by a signed-out
+	// visitor is shown to staff as unverified, so nobody can raise an alert
+	// that looks like it came from another user.
 	if u := s.sessionUsername(tokenFromRequest(r)); u != "" {
 		body.Username = u
-	}
-	if body.Username == "" {
-		body.Username = "Anonymous visitor"
+	} else {
+		name := strings.TrimSpace(body.Username)
+		if len(name) > 40 {
+			name = name[:40]
+		}
+		if name == "" {
+			body.Username = "Anonymous visitor"
+		} else {
+			body.Username = name + " (not signed in)"
+		}
 	}
 	note := strings.TrimSpace(body.Note)
 	if note == "" {
 		note = "(no description)"
 	}
+	if len(note) > 1000 {
+		note = note[:1000]
+	}
 
-	// Find online staff (helper or higher).
+	// Find online staff (helper or higher). Snapshot the sessions under the
+	// lock and look roles up after releasing it, so the DB queries don't
+	// hold up every connect and disconnect.
 	s.Mu.RLock()
-	staffOnline := []*Client{}
+	online := make(map[string][]*Client, len(s.Clients))
 	for username, conns := range s.Clients {
+		online[username] = append([]*Client(nil), conns...)
+	}
+	s.Mu.RUnlock()
+	staffOnline := []*Client{}
+	for username, conns := range online {
 		if roleRank(s.userRole(username)) >= roleRank("helper") {
 			// Every session they have open, so the alert reaches them
 			// wherever they happen to be looking.
 			staffOnline = append(staffOnline, conns...)
 		}
 	}
-	s.Mu.RUnlock()
 
 	for _, c := range staffOnline {
 		c.Send(NexusMessage{
@@ -303,7 +325,21 @@ func (s *NexusServer) supportEscalateHandler(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *NexusServer) initSupportRoutes() {
-	http.HandleFunc("/api/v1/support/chat", rateLimit(s.supportChatHandler))
-	http.HandleFunc("/api/v1/support/escalate", rateLimit(s.supportEscalateHandler))
+	http.HandleFunc("/api/v1/support/chat", rateLimit(supportLimit(s.supportChatHandler)))
+	http.HandleFunc("/api/v1/support/escalate", rateLimit(supportLimit(s.supportEscalateHandler)))
 }
 
+// supportLimiter caps the support assistant per IP. The chat endpoint is
+// open to signed-out visitors and every call spends LLM quota, so the
+// global 10 req/s limit is far too loose for it.
+var supportLimiter = newIPLimiter(rate.Limit(12.0/60.0), 12) // 12 per minute, burst 12
+
+func supportLimit(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !supportLimiter.allow(clientIP(r)) {
+			http.Error(w, "too many support requests, please wait a minute", http.StatusTooManyRequests)
+			return
+		}
+		next(w, r)
+	}
+}

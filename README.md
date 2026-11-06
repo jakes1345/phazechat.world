@@ -18,7 +18,8 @@ The hosted version is at [phazechat.world](https://phazechat.world). This repo h
 | `infra/coturn/` | Dockerfile and Fly config for a coturn TURN server. |
 | `packaging/` | Draft Debian, Flatpak and winget manifests. Not used by CI yet. |
 | `docs/` | Design notes, audits and research. Written for development, not as user documentation. |
-| `Makefile`, `fly.toml`, `VERSION` | Build targets, Fly.io config, and the version stamped into the server binary. |
+| `Makefile`, `VERSION` | Build targets and the version stamped into the server binary. |
+| `cloudflare/` | Cloudflare Worker and Container config that runs the hosted server, plus the Fly data import script. |
 
 ## Features
 
@@ -74,13 +75,14 @@ How it works:
 1. Each install generates its own keypair on first run. The web client keeps it in `localStorage`; Android keeps it in app-private SharedPreferences.
 2. Public keys are never stored on the server. When you open a chat, your client sends a `key_request` and the contact's client replies with its public key. The server only forwards these between friends.
 3. Each message gets a random 24-byte nonce. The body goes over the wire as `E2EE:` followed by hex-encoded nonce and ciphertext. The server stores and relays that string as-is.
-4. The web client pins each contact's key fingerprint (first 8 bytes of SHA-256 of the key) the first time it sees it. If the key later changes, it refuses the new key and shows a warning. Android doesn't pin keys yet.
+4. Both clients pin each contact's key fingerprint (first 8 bytes of SHA-256 of the key) the first time they see it and keep pinned keys across restarts, so messages to an offline contact stay encrypted. If a contact's key changes (they reinstalled or used another device), the client keeps the pinned key and asks before trusting the new one.
+5. Without a key for the contact (first contact while they're offline), the client asks before sending a message unencrypted.
 
-Key backup is optional. Your keypair is encrypted on the device with a key derived from a PIN (PBKDF2-SHA256, 200,000 iterations, AES-256-GCM) and only the ciphertext, salt and iteration count are uploaded. Restoring the backup on a new device lets you keep the same identity, which matters because a new keypair looks like a key change to contacts using the web client.
+Key backup is optional. Your keypair is encrypted on the device with a key derived from a recovery PIN of at least 8 characters (PBKDF2-SHA256, 600,000 iterations, AES-256-GCM) and only the ciphertext, salt and iteration count are uploaded. On the web, Settings → Backup & Devices restores it on a new device, and a browser that had to create a new identity is reminded that a backup exists. Restoring lets you keep the same identity, which matters because a new keypair looks like a key change to contacts using the web client. The PIN is the only thing protecting the backup from the server, so use a long one.
 
 What isn't encrypted end to end:
 
-- A DM sent before your client has the contact's key. Both clients fall back to plaintext in that case. On the web, the message box shows a lock icon once encryption is active.
+- A DM you choose to send before your client has the contact's key (the app asks first). On the web, the message box shows a lock icon once encryption is active.
 - Attachments. The file itself is uploaded unencrypted under a random name. Only the message carrying its URL is encrypted.
 - Group chats, Spaces channels, Stories and imported Skype history.
 - Calls (see above).
@@ -174,7 +176,7 @@ Some variable names start with `Phaze_` in mixed case rather than `PHAZE_`. That
 | `PHAZE_WEB_DIR` | `web` | Directory holding the built web client, served at `/web/`. |
 | `PHAZE_ASSET_ROOT` | auto | Working directory containing `templates/` and `public/`. Only needed when the binary can't find them itself. |
 | `Phaze_ALLOWED_ORIGINS` | unset | Comma-separated browser origins allowed to open a WebSocket. When unset, any origin is allowed and the server logs a warning. |
-| `PHAZE_TRUST_PROXY_HEADER` | unset | Header holding the real client IP, for example `Fly-Client-IP`. Without it, rate limits and stored IPs see the proxy's address. |
+| `PHAZE_TRUST_PROXY_HEADER` | unset | Header holding the real client IP, for example `X-Phaze-Client-IP` behind the Cloudflare Worker. Without it, rate limits and stored IPs see the proxy's address. |
 | `PHAZE_DEVICE_VERIFICATION` | on | Set to `0` to turn off new-device approval. |
 | `PHAZE_CHANNEL_RETENTION_DAYS` | `30` | How long Spaces channel messages are kept. |
 
@@ -230,7 +232,7 @@ The server tries Resend, then Brevo, then SMTP, using whichever is configured fi
 
 ### Backups
 
-The container entrypoint (`nexus_server/entrypoint.sh`) runs the server under [Litestream](https://litestream.io) when `BUCKET_NAME` or `LITESTREAM_BUCKET` is set. It restores the database from the bucket on boot and then streams every change to it. The replica settings in `litestream.yml` read `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. On Fly, `fly storage create` sets all of these for you.
+The container entrypoint (`nexus_server/entrypoint.sh`) runs the server under [Litestream](https://litestream.io) when `BUCKET_NAME` or `LITESTREAM_BUCKET` is set. It restores the database from the bucket on boot and then streams every change to it. The replica settings in `litestream.yml` read `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. On Cloudflare these point at the R2 bucket; see [`cloudflare/README.md`](cloudflare/README.md).
 
 ### Optional integrations
 
@@ -260,6 +262,10 @@ docker run -p 8080:8080 -v nexus_data:/data \
   phaze-nexus
 ```
 
+Or `cd nexus_server && docker compose up -d --build`, which does the same with a named volume and listens on `127.0.0.1:8080`.
+
+The container runs as an unprivileged user (uid 10001) and keeps everything it writes under `/data`: the database, chat uploads (`PHAZE_UPLOAD_DIR=/data/uploads`) and avatars. A new named volume gets the right owner automatically. A volume created by an older image, which ran as root, needs a one-time `chown`; the entrypoint stops with the exact command if `/data` isn't writable. For a bind mount, `chown -R 10001:10001` the host directory. The image has a `HEALTHCHECK` on `/health` and is built for `linux/amd64` and `linux/arm64`.
+
 CI also publishes this image to GitHub Container Registry on every push to `master` and on version tags (`.github/workflows/docker.yml`), as `ghcr.io/jakes1345/phazechat.world-nexus`.
 
 Put it behind a reverse proxy that terminates TLS and passes WebSocket upgrades through on `/ws`. Set `PHAZE_TRUST_PROXY_HEADER` to whatever header your proxy uses for the client IP. `/health` returns the server's status for health checks, and `/status` is a public status page.
@@ -269,32 +275,23 @@ Put it behind a reverse proxy that terminates TLS and passes WebSocket upgrades 
 For calls and streams to work across strict NATs you need a TURN server. There are two options in the repo:
 
 - `scripts/phaze_turnserver.conf` is a coturn config for a VPS. Replace `static-auth-secret` and use the same value for `PHAZE_TURN_SECRET`.
-- `infra/coturn/` deploys coturn as its own Fly app (`phaze-turn`). Run `fly launch --copy-config --no-deploy` in that directory, set the secret with `fly secrets set TURN_SECRET=...`, then `fly deploy`. `TURN_REALM` and the optional `PUBLIC_IP` go in the environment too. As configured, only relay ports 49160 and 49161 are open; widen `min-port`/`max-port` in `entrypoint.sh` and add matching services in `fly.toml` if you need more.
+- `infra/coturn/` is a coturn image (`Dockerfile` + `entrypoint.sh`) for any host with public UDP ports. Its `fly.toml` deploys it as its own Fly app (`phaze-turn`). Run `fly launch --copy-config --no-deploy` in that directory, set the secret with `fly secrets set TURN_SECRET=...`, then `fly deploy`. `TURN_REALM` and the optional `PUBLIC_IP` go in the environment too. As configured, only relay ports 49160 and 49161 are open; widen `min-port`/`max-port` in `entrypoint.sh` and add matching services in `fly.toml` if you need more.
 
 Then set `PHAZE_TURN_URL=turn:<your-turn-host>:3478` and `PHAZE_TURN_SECRET` on the Nexus server.
 
-## Deploying to Fly.io
+TURN can't run on Cloudflare Containers (they only take HTTP traffic, no UDP), so the hosted instance needs one of these separately; see [`cloudflare/README.md`](cloudflare/README.md#calls-turn).
 
-The hosted instance runs on Fly.io from `fly.toml` at the repo root. The app is named `skype7-reborn` (an older name), with one shared-CPU machine, 512 MB of RAM, and a volume called `nexus_data` mounted at `/data`. Change `app` in `fly.toml` if you're deploying your own copy.
+## Deploying to Cloudflare
 
-First deploy:
+The hosted instance runs as a Cloudflare Container behind a Worker (`cloudflare/`). The container's disk is wiped on restart, so the database replicates to an R2 bucket with Litestream and uploads and avatars are stored in the same bucket.
 
-```bash
-fly volumes create nexus_data
-fly secrets set PHAZE_TRUST_PROXY_HEADER=Fly-Client-IP \
-  Phaze_ALLOWED_ORIGINS=https://your.domain
-fly deploy
-```
-
-`fly.toml` already sets `PORT`, `DB_PATH=/data/nexus.db` and `PHAZE_UPLOAD_DIR=/data/uploads`. Add TURN, email and push settings as secrets. For backups, `fly storage create` makes a Tigris bucket and sets the variables Litestream needs.
-
-After that, `.github/workflows/fly-deploy.yml` redeploys on every push to `master` that touches `nexus_server/`, `web/` or `fly.toml`. It needs a `FLY_API_TOKEN` repository secret.
+`.github/workflows/cloudflare-deploy.yml` deploys after the `Phaze CI` workflow passes on a push to `master`, using exactly the commit CI tested; it can also be run by hand. Pull requests that change the image get a Docker build check in CI. Account setup, the secrets it needs and the one-time import of the old Fly data are in [`cloudflare/README.md`](cloudflare/README.md).
 
 ## Releases
 
 `VERSION` holds the version stamped into the server binary. The Android version lives in `android/app/build.gradle.kts` (`appVersionName` and `appVersionCode`) and is bumped by hand.
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`. It creates a GitHub release and attaches a signed Android APK and AAB, a Windows NSIS installer and a Linux amd64 binary. The Android job expects `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASS` as repository secrets.
+To release, bump `VERSION`, commit, and push a tag `v<VERSION>` (for example `v1.6.5`). `.github/workflows/release.yml` fails straight away if the tag doesn't match `VERSION`. It creates a GitHub release and attaches `Phaze.apk` and `Phaze.aab` (signed Android), `Phaze-windows-setup.exe` (NSIS installer), `Phaze_linux_amd64.tar.gz` (the Linux binary) and `checksums.txt` (SHA-256 of each). The download page and the server's update manifest look for exactly these names. The desktop builds point the embedded web client at `wss://phazechat.world/ws`. The Android job expects `GOOGLE_SERVICES_JSON`, `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASS`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASS` as repository secrets.
 
 ## License
 

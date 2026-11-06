@@ -3,19 +3,22 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	"image/png"
 	"io"
+	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 )
 
 const maxAvatarBytes = 2 << 20 // 2 MB
 
 // validateAvatar checks size and sniffs the real content type — the file
 // extension is never trusted. Returns nil only for PNG/JPEG within the cap.
+// maxAvatarSide bounds avatar width and height (16 megapixels at most).
+const maxAvatarSide = 4096
+
 func validateAvatar(data []byte) error {
 	if len(data) == 0 {
 		return errors.New("empty upload")
@@ -58,23 +61,30 @@ func (s *NexusServer) avatarUploadHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Check the declared size before decoding: a 2 MB PNG can claim
+	// 50000x50000 pixels and make image.Decode allocate gigabytes.
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		http.Error(w, "could not read image", http.StatusBadRequest)
+		return
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxAvatarSide || cfg.Height > maxAvatarSide {
+		http.Error(w, fmt.Sprintf("avatar must be at most %dx%d pixels", maxAvatarSide, maxAvatarSide), http.StatusBadRequest)
+		return
+	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		http.Error(w, "could not read image", http.StatusBadRequest)
 		return
 	}
 
-	if err := os.MkdirAll("avatars", 0o755); err != nil {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
-	out, err := os.Create(filepath.Join("avatars", username+".png"))
-	if err != nil {
-		http.Error(w, "storage error", http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-	if err := png.Encode(out, img); err != nil {
+	if err := blobs().Put(r.Context(), "avatars/"+username+".png", &buf, int64(buf.Len()), "image/png"); err != nil {
+		log.Printf("[avatar] store %s: %v", username, err)
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}

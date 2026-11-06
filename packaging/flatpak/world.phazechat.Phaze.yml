@@ -25,6 +25,10 @@ build-options:
     GOFLAGS: -mod=vendor
     HOME: /run/build/Phaze
     CGO_ENABLED: '1'
+    # The desktop app embeds the web client, so build it for a "/" base and
+    # point it at the real server (same values as .github/workflows/release.yml).
+    VITE_BASE: /
+    VITE_NEXUS_WS: wss://phazechat.world/ws
 
 modules:
   - name: Phaze
@@ -48,8 +52,8 @@ modules:
 
     sources:
       - type: git
-        url: https://github.com/jakes1345/skype7-reborn.git
-        tag: v1.5.0
+        url: https://github.com/jakes1345/phazechat.world.git
+        tag: v1.6.4
         commit: placeholder-run-generate-sources-sh
 
       # Generated offline Go module cache — run packaging/flatpak/generate-sources.sh
