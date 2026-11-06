@@ -81,14 +81,14 @@ jobs:
         with:
           packages: platform-tools
 
-      - name: Write google-services.json from secret
-        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
-
       - name: Write local.properties (SDK path)
         run: echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
+      # The Firebase config (google-services.json) only feeds push-notification
+      # resources, not the code, so this check skips that one task rather than
+      # depend on the release secret. Release builds still need the real file.
       - name: Compile, shrink and unit-test the release build
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew :app:testReleaseUnitTest :app:minifyReleaseWithR8 --no-daemon
+          ./gradlew :app:testReleaseUnitTest :app:minifyReleaseWithR8 -x :app:processReleaseGoogleServices --no-daemon
