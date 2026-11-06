@@ -74,6 +74,91 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 	wsDeviceCookie := deviceIDFromRequest(r)
 	wsUserAgent := r.UserAgent()
 
+	// A password sign-in on this socket that's held for new-device approval.
+	// device_verify finishes it with the emailed code, on this socket only:
+	// the held session token never leaves the server.
+	var held struct {
+		username    string
+		token       string
+		deviceInfo  string
+		challengeID int64
+	}
+
+	// completePasswordSignIn registers this socket as user and sends the
+	// sign-in burst (auth_result with a session token, presence, offline
+	// messages, friends, requests, conversations). Shared by "auth" and
+	// "device_verify". sessTok is an already-issued session to hand out, or
+	// "" to issue a new one.
+	completePasswordSignIn := func(user, sessTok, deviceInfo string) {
+		metrics.authSuccess.Add(1)
+		authTracker.recordSuccess(client.IP, user) // clear fail counters
+		held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+		if s.reauthConnection(client, username, user) {
+			// Already signed in as this user on this socket.
+			client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username, QRToken: sessTok})
+			return
+		}
+		username = user
+		s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
+		s.autoJoinGlobalSpace(username)
+		if sessTok == "" {
+			sessTok, _ = s.issueSessionToken(username, deviceInfo)
+		}
+		// Register alongside any sessions the user already has open
+		// instead of evicting them. Signing in on a second tab, the
+		// desktop app or a phone used to close the previous connection
+		// and send it "kicked", which the web client treats as a full
+		// sign-out — so opening a second tab logged the first one out.
+		s.Mu.Lock()
+		client.Username = username
+		client.Status = "Online"
+		s.addClientLocked(username, client)
+		s.Mu.Unlock()
+		log.Printf("User %s authenticated", username)
+
+		client.Send(NexusMessage{
+			Type:       "auth_result",
+			Status:     "ok",
+			Sender:     username,
+			QRToken:    sessTok,
+			TurnConfig: s.generateMediaToken(username),
+		})
+
+		s.announcePresence(username)
+		s.deliverOfflineMessages(username, client)
+
+		pending := s.getPendingRequests(username)
+		if len(pending) > 0 {
+			client.Send(NexusMessage{Type: "pending_requests", Results: pending})
+		}
+
+		for _, cm := range s.userConversations(username) {
+			cm.Type = "convo_info"
+			client.Send(cm)
+		}
+		if groups := s.getContactGroups(username); len(groups) > 0 {
+			client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
+		}
+
+		friends := s.getFriends(username)
+		for _, f := range friends {
+			status := "Offline"
+			s.Mu.RLock()
+			if conns := s.Clients[f]; len(conns) > 0 {
+				// Status is mirrored across a user's connections, so any
+				// of them reports the same value.
+				status = publicStatus(conns[0].Status)
+			}
+			s.Mu.RUnlock()
+			var lastSec int64
+			s.DB.QueryRow(`SELECT COALESCE(MAX(strftime('%s', created_at)), 0) FROM dm_messages
+				WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)`,
+				username, f, f, username).Scan(&lastSec)
+			client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
+		}
+		s.sendReferralPerks(client, username, s.getFriends(username))
+	}
+
 	// Cookie pre-auth: web clients set an HttpOnly cookie at login time.
 	// The browser sends it automatically with every WS upgrade request, so
 	// we can authenticate the connection without a session_auth message —
@@ -414,13 +499,17 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				// in again from this device then goes straight through.
 				challengeID, _ := s.createDeviceChallenge(msg.Sender, deviceID, pendingTok, label, client.IP)
 				log.Printf("[device] %s: WS sign-in from new device %q held for approval", msg.Sender, label)
+				// Remember it on this socket so device_verify can finish
+				// the sign-in with the emailed code. A newer held sign-in
+				// replaces an older one.
+				held.username, held.token, held.deviceInfo, held.challengeID = msg.Sender, pendingTok, msg.DeviceInfo, challengeID
 				// Both clients show Error for any auth_result that isn't
 				// ok/totp_required. Failure counters are deliberately left
 				// alone until the sign-in actually completes.
 				client.Send(NexusMessage{
 					Type:        "auth_result",
 					Status:      "device_verification_required",
-					Error:       "New device: approve this sign-in from a device where you're already signed in to Phaze (or sign in here with a link code from it), then sign in again.",
+					Error:       "New device: enter the code we emailed you, or approve this sign-in from a device where you're already signed in to Phaze (or sign in here with a link code from it), then sign in again.",
 					Body:        label,
 					ChallengeID: challengeID,
 				})
@@ -436,70 +525,91 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				s.touchDevice(msg.Sender, deviceID, client.IP)
 			}
 
-			metrics.authSuccess.Add(1)
-			authTracker.recordSuccess(client.IP, msg.Sender) // clear fail counters
-			if s.reauthConnection(client, username, msg.Sender) {
-				// Already signed in as this user on this socket.
-				client.Send(NexusMessage{Type: "auth_result", Status: "ok", Sender: username})
+			completePasswordSignIn(msg.Sender, "", msg.DeviceInfo)
+
+		// ── Finish a held sign-in with the emailed code ──
+		// Only the socket that got device_verification_required can do
+		// this, and only for the challenge it was given: the code is checked
+		// against that held session, so a code from any other sign-in
+		// (another account's included) never matches. Same checks and
+		// attempt caps as /api/v1/auth/verify-device.
+		case "device_verify":
+			if held.token == "" ||
+				(msg.Sender != "" && msg.Sender != held.username) ||
+				(msg.ChallengeID != 0 && msg.ChallengeID != held.challengeID) {
+				client.Send(NexusMessage{
+					Type:   "auth_result",
+					Status: "device_verification_failed",
+					Error:  "No sign-in is waiting for a code here. Sign in again.",
+				})
 				continue
 			}
-			username = msg.Sender
-			s.DB.Exec("UPDATE users SET last_ip = ?, last_login_at = CURRENT_TIMESTAMP WHERE username = ?", client.IP, username)
-			s.autoJoinGlobalSpace(username)
-			sessTok, _ := s.issueSessionToken(username, msg.DeviceInfo)
-			// Register alongside any sessions the user already has open
-			// instead of evicting them. Signing in on a second tab, the
-			// desktop app or a phone used to close the previous connection
-			// and send it "kicked", which the web client treats as a full
-			// sign-out — so opening a second tab logged the first one out.
-			s.Mu.Lock()
-			client.Username = username
-			client.Status = "Online"
-			s.addClientLocked(username, client)
-			s.Mu.Unlock()
-			log.Printf("User %s authenticated", username)
-
-			client.Send(NexusMessage{
-				Type:       "auth_result",
-				Status:     "ok",
-				Sender:     username,
-				QRToken:    sessTok,
-				TurnConfig: s.generateMediaToken(username),
-			})
-
-			s.announcePresence(username)
-			s.deliverOfflineMessages(username, client)
-
-			pending := s.getPendingRequests(username)
-			if len(pending) > 0 {
-				client.Send(NexusMessage{Type: "pending_requests", Results: pending})
+			if authTracker.isIPThrottled(client.IP) {
+				metrics.authFailure.Add(1)
+				client.Send(NexusMessage{
+					Type:        "auth_result",
+					Status:      "device_verification_required",
+					Error:       "Too many attempts. Try again later.",
+					ChallengeID: held.challengeID,
+				})
+				time.Sleep(2 * time.Second)
+				continue
 			}
-
-			for _, cm := range s.userConversations(username) {
-				cm.Type = "convo_info"
-				client.Send(cm)
+			heldUser, stillPending := s.sessionState(held.token)
+			if heldUser != held.username {
+				// Denied from another session, revoked or expired.
+				held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+				client.Send(NexusMessage{
+					Type:   "auth_result",
+					Status: "device_verification_failed",
+					Error:  "This sign-in was denied or has expired. Sign in again.",
+				})
+				continue
 			}
-			if groups := s.getContactGroups(username); len(groups) > 0 {
-				client.Send(NexusMessage{Type: "contact_groups", ContactGroups: groups})
-			}
-
-			friends := s.getFriends(username)
-			for _, f := range friends {
-				status := "Offline"
-				s.Mu.RLock()
-				if conns := s.Clients[f]; len(conns) > 0 {
-					// Status is mirrored across a user's connections, so any
-					// of them reports the same value.
-					status = publicStatus(conns[0].Status)
+			if stillPending {
+				if strings.TrimSpace(msg.Body) == "" {
+					client.Send(NexusMessage{
+						Type:        "auth_result",
+						Status:      "device_verification_required",
+						Error:       "Enter the 6-digit code from the email.",
+						ChallengeID: held.challengeID,
+					})
+					continue
 				}
-				s.Mu.RUnlock()
-				var lastSec int64
-				s.DB.QueryRow(`SELECT COALESCE(MAX(strftime('%s', created_at)), 0) FROM dm_messages
-					WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)`,
-					username, f, f, username).Scan(&lastSec)
-				client.Send(NexusMessage{Type: "friend_status", Sender: f, Status: status, Ts: lastSec * 1000})
+				if _, err := s.verifyDeviceChallenge(held.token, msg.Body); err != nil {
+					metrics.authFailure.Add(1)
+					authTracker.recordFail(client.IP, held.username)
+					if err == errBadCode {
+						// Still guessable: keep the held sign-in.
+						client.Send(NexusMessage{
+							Type:        "auth_result",
+							Status:      "device_verification_required",
+							Error:       "Incorrect code",
+							ChallengeID: held.challengeID,
+						})
+						continue
+					}
+					// Expired, burned or throttled: this attempt is over.
+					s.revokeSession(held.token)
+					held.username, held.token, held.deviceInfo, held.challengeID = "", "", "", 0
+					client.Send(NexusMessage{
+						Type:   "auth_result",
+						Status: "device_verification_failed",
+						Error:  err.Error(),
+					})
+					continue
+				}
+				// Close the approve/deny prompt on the user's other sessions.
+				s.sendTo(held.username, NexusMessage{
+					Type:        "device_result",
+					Status:      "approved",
+					ChallengeID: held.challengeID,
+				})
 			}
-			s.sendReferralPerks(client, username, s.getFriends(username))
+			// Approved, either by this code or in-app from another session
+			// while this one waited: hand out the held session itself.
+			log.Printf("[device] %s: held WS sign-in completed", held.username)
+			completePasswordSignIn(held.username, held.token, held.deviceInfo)
 
 		case "session_auth":
 			if authTracker.isIPThrottled(client.IP) {
