@@ -2672,6 +2672,17 @@ func (s *NexusServer) fileDownloadHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// The APK in the image is only a fallback: once a GitHub release carries
+	// a signed APK, send people to that one so the website always offers the
+	// current app (the copy baked into the image goes stale).
+	if name == "Phaze.apk" {
+		if a, ok := currentUpdateManifest().Platforms["android"]; ok && strings.HasPrefix(a.URL, "https://github.com/") {
+			w.Header().Set("Cache-Control", "no-store")
+			http.Redirect(w, r, a.URL, http.StatusFound)
+			return
+		}
+	}
+
 	// Force octet-stream + attachment for every binary so mobile browsers
 	// (Samsung Internet, Chrome Android) save to Downloads instead of
 	// handing off to the package installer or a file viewer.
@@ -3981,6 +3992,23 @@ func refreshUpdateManifest(repo string) UpdateManifest {
 }
 
 func (s *NexusServer) versionHandler(w http.ResponseWriter, r *http.Request) {
+	manifest := currentUpdateManifest()
+
+	// Backwards-compat shim: older clients only look at `version` and `url`.
+	// New clients use `platforms` + `release_notes`.
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	out := struct {
+		UpdateManifest
+		// Legacy fields:
+		URL string `json:"url"`
+	}{UpdateManifest: manifest, URL: manifest.ReleaseURL}
+	json.NewEncoder(w).Encode(out)
+}
+
+// currentUpdateManifest returns the latest-release manifest, refreshed from
+// GitHub at most every updateTTL.
+func currentUpdateManifest() UpdateManifest {
 	repo := strings.TrimSpace(os.Getenv("PHAZE_RELEASE_REPO"))
 	if repo == "" {
 		// This fallback pointed at a repo that has never existed, so every
@@ -4002,17 +4030,7 @@ func (s *NexusServer) versionHandler(w http.ResponseWriter, r *http.Request) {
 		updates.expires = time.Now().Add(updateTTL)
 		updates.mu.Unlock()
 	}
-
-	// Backwards-compat shim: older clients only look at `version` and `url`.
-	// New clients use `platforms` + `release_notes`.
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=60")
-	out := struct {
-		UpdateManifest
-		// Legacy fields:
-		URL string `json:"url"`
-	}{UpdateManifest: manifest, URL: manifest.ReleaseURL}
-	json.NewEncoder(w).Encode(out)
+	return manifest
 }
 
 func (s *NexusServer) statsHandler(w http.ResponseWriter, r *http.Request) {
