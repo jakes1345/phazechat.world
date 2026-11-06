@@ -1066,6 +1066,8 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         JitsiCalls.unregister(getApplication(), conferenceEndReceiver)
+        // Without this the socket (and its reconnect loop) outlives the VM.
+        nexus.disconnect()
         super.onCleared()
     }
 
