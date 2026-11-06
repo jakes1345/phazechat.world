@@ -108,7 +108,7 @@
       <h2 id="keys">Keys &amp; backups</h2>
       <p>Because keys live on your device, a new phone or browser would normally mean a new identity, and older messages encrypted to the old key couldn&rsquo;t be read there. Key backup solves this and is optional:</p>
       <ul>
-        <li>Your keypair is encrypted on your device with a key derived from a PIN you choose, using PBKDF2-SHA256 with 200,000 iterations and AES-256-GCM.</li>
+        <li>Your keypair is encrypted on your device with a key derived from a recovery PIN you choose (at least 8 characters), using PBKDF2-SHA256 with 600,000 iterations and AES-256-GCM. The PIN is the only thing protecting the backup from the server, so a long one matters.</li>
         <li>Only the ciphertext, the salt and the iteration count are uploaded. The server never sees your PIN or your private key.</li>
         <li>Restoring the backup on a new device keeps the same identity, so contacts using the web app don&rsquo;t see a key-change warning.</li>
       </ul>

@@ -118,7 +118,7 @@
         <li><strong>Direct messages</strong> are stored on our server so your history follows you between devices. When both apps have exchanged keys, a DM is encrypted on your device with NaCl box (X25519, XSalsa20-Poly1305) and we store only the ciphertext. A DM sent before that, shown without a lock icon in the web app, is stored as plain text. We also store who sent each message, to whom and when. Deleting a DM erases its content; a record that a message existed remains.</li>
         <li><strong>Group chats, Spaces channel messages and stories</strong> are stored in readable form. They are not end-to-end encrypted, and the server and its administrators can read them.</li>
         <li><strong>Attachments</strong> are uploaded and stored unencrypted under a random file name. Anyone with the link can download the file. Attachments are not automatically deleted.</li>
-        <li><strong>Stories</strong> are hidden and their database record removed 24 hours after posting, or when you delete them. The photo or video file itself currently stays in storage.</li>
+        <li><strong>Stories</strong> are removed 24 hours after posting, or when you delete them, together with their photo or video file.</li>
         <li><strong>Imported Skype history</strong>: if you upload a Skype export, we store the text messages and contact names from it, readable, with your account.</li>
         <li><strong>Calls and voice channels</strong> run in a room on the public Jitsi Meet service (see section 5). We keep a call log of who called whom, the call type and when. We never record call audio or video.</li>
         <li><strong>Live streams and remote screen sessions</strong> connect browsers directly over WebRTC. When a direct connection isn&rsquo;t possible, encrypted media is relayed through our TURN server, which can&rsquo;t decrypt it.</li>
@@ -156,13 +156,13 @@
         <tbody>
           <tr><td>Account details, friends, settings</td><td>Until you delete your account</td></tr>
           <tr><td>Sign-up IP and most recent sign-in IP</td><td>For the life of your account</td></tr>
-          <tr><td>Approved-device records (label, last IP, last seen)</td><td>Indefinitely at present, including after account deletion unless you ask us to remove them</td></tr>
+          <tr><td>Approved-device records (label, last IP, last seen)</td><td>Until you delete your account</td></tr>
           <tr><td>Direct messages and their metadata</td><td>Until you or the other person deletes their account</td></tr>
-          <tr><td>Group chat messages</td><td>Not removed automatically, including when a member deletes their account</td></tr>
+          <tr><td>Group chat messages</td><td>Until the sender deletes their account</td></tr>
           <tr><td>Spaces channel messages</td><td>30 days after posting (the default setting)</td></tr>
-          <tr><td>Stories</td><td>Record removed after 24 hours; media file not yet deleted</td></tr>
+          <tr><td>Stories</td><td>24 hours, including the media file</td></tr>
           <tr><td>Attachments and avatars</td><td>Not automatically deleted</td></tr>
-          <tr><td>Imported Skype history</td><td>Indefinitely at present; email us to have it removed</td></tr>
+          <tr><td>Imported Skype history</td><td>Until you delete your account</td></tr>
           <tr><td>Session tokens, password-reset and QR sign-in tokens</td><td>Removed automatically once used, revoked or expired</td></tr>
           <tr><td>Accounts that never verify their email</td><td>Removed automatically</td></tr>
           <tr><td>Database backups</td><td>Continuous copies of the database; deleted data can remain in older backups until they are replaced</td></tr>
@@ -171,8 +171,8 @@
 
       <h2 id="rights">7. Your choices and rights</h2>
       <ul>
-        <li><strong>Delete your account</strong> in the app under Settings &rarr; Danger. This immediately removes your account, friends, direct messages, Space memberships and messages, stories, settings, push subscriptions, key backup, two-factor codes and sessions. Items marked above as not removed automatically (such as uploaded files, imported Skype history and device records) can be purged on request: email <a href="mailto:privacy@phazechat.world">privacy@phazechat.world</a>.</li>
-        <li><strong>Export your data</strong> from Settings, or through <code>/api/v1/export</code>. The export currently contains your profile, friends list and messages still waiting to be delivered. For a fuller copy of what we hold, email us.</li>
+        <li><strong>Delete your account</strong> in the app under Settings &rarr; Danger. This immediately removes your account, friends, direct messages, group and Space messages you sent, stories, imported Skype history, device records, call history, settings, push subscriptions, key backup, two-factor codes and sessions. Files you uploaded to chats aren&rsquo;t removed automatically; email <a href="mailto:privacy@phazechat.world">privacy@phazechat.world</a> to have them purged.</li>
+        <li><strong>Export your data</strong> from Settings, or through <code>/api/v1/export</code>. The export is a JSON file with everything the server stores about your account: profile, friends, blocks, settings, direct messages (encrypted ones as ciphertext), group and Space messages you sent, stories, call history, imported Skype data, devices and active sessions. Secrets such as your password hash and two-factor key are left out.</li>
         <li><strong>Correct your data</strong>: change your display name, mood and avatar in Settings, or email us.</li>
         <li><strong>Object or ask questions</strong>: email <a href="mailto:privacy@phazechat.world">privacy@phazechat.world</a>. We aim to answer within 30 days.</li>
       </ul>
