@@ -399,7 +399,10 @@ const remoteCodeTTL = 10 * time.Minute
 // didn't back up. Existing hashes still verify fine at whatever cost they
 // were created with; bcrypt stores its own cost in the hash string, so
 // raising this doesn't touch anyone's stored password.
-const bcryptCost = 12
+const productionBcryptCost = 12
+
+// bcryptCost is what new hashes use. Only tests lower it (bcrypt_test.go).
+var bcryptCost = productionBcryptCost
 
 // sweepRemoteCodes removes expired remote control codes every 2 minutes.
 func (s *NexusServer) sweepRemoteCodes() {
