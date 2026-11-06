@@ -1,6 +1,9 @@
 package main
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // Connection registry helpers.
 //
@@ -282,4 +285,101 @@ func (s *NexusServer) detachClient(username string, client *Client) int {
 		s.streamEvictUser(username)
 	}
 	return remaining
+}
+
+// ── Remote screen sessions ────────────────────────────────────────────────
+//
+// A viewer earns the right to signal a host by looking up the host's 6-digit
+// code (remote_lookup). That pairing is recorded here, and remote_offer /
+// answer / ice / input / end are only relayed between a host and a viewer
+// that were paired this way — otherwise anyone could push an offer at any
+// user who happens to be sharing.
+
+// remoteBindingTTL bounds how long a pairing outlives its last use. Sessions
+// end with remote_end or a new share, so this only mops up abandoned ones.
+const remoteBindingTTL = 12 * time.Hour
+
+type remotePair struct{ host, viewer string }
+
+type remoteBindingSet struct {
+	mu    sync.Mutex
+	pairs map[remotePair]time.Time
+}
+
+// Keyed by server so the side-by-side servers in tests stay independent.
+// (Kept out of NexusServer itself, whose definition lives in main.go.)
+var remoteBindingsByServer sync.Map // *NexusServer -> *remoteBindingSet
+
+func (s *NexusServer) remoteBindings() *remoteBindingSet {
+	v, _ := remoteBindingsByServer.LoadOrStore(s, &remoteBindingSet{pairs: map[remotePair]time.Time{}})
+	return v.(*remoteBindingSet)
+}
+
+func (b *remoteBindingSet) bind(host, viewer string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	for p, at := range b.pairs {
+		if now.Sub(at) > remoteBindingTTL {
+			delete(b.pairs, p)
+		}
+	}
+	b.pairs[remotePair{host, viewer}] = now
+}
+
+// pairOf reports whether a and b are paired in either direction, and which
+// of them is the host.
+func (b *remoteBindingSet) pairOf(a, c string) (host string, ok bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	for _, p := range []remotePair{{a, c}, {c, a}} {
+		if at, found := b.pairs[p]; found {
+			if now.Sub(at) > remoteBindingTTL {
+				delete(b.pairs, p)
+				continue
+			}
+			b.pairs[p] = now
+			return p.host, true
+		}
+	}
+	return "", false
+}
+
+func (b *remoteBindingSet) unbind(host, viewer string) {
+	b.mu.Lock()
+	delete(b.pairs, remotePair{host, viewer})
+	b.mu.Unlock()
+}
+
+// dropHost forgets every viewer paired with this host.
+func (b *remoteBindingSet) dropHost(host string) {
+	b.mu.Lock()
+	for p := range b.pairs {
+		if p.host == host {
+			delete(b.pairs, p)
+		}
+	}
+	b.mu.Unlock()
+}
+
+// otherOf returns whichever of a and b isn't `one`.
+func otherOf(one, a, b string) string {
+	if a == one {
+		return b
+	}
+	return a
+}
+
+// deleteRemoteCodesOf removes every pairing code the user registered. Only
+// ever called with the code owner's own name (or the host of a pairing being
+// torn down), never on a third party's say-so.
+func (s *NexusServer) deleteRemoteCodesOf(username string) {
+	s.RemoteCodesMu.Lock()
+	for k, v := range s.RemoteCodes {
+		if v.Username == username {
+			delete(s.RemoteCodes, k)
+		}
+	}
+	s.RemoteCodesMu.Unlock()
 }

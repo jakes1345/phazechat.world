@@ -2022,8 +2022,24 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 			s.RemoteCodesMu.Lock()
+			if cur, taken := s.RemoteCodes[code]; taken && cur.Username != username && time.Since(cur.CreatedAt) <= remoteCodeTTL {
+				// Someone else's live code. Overwriting it would let anyone
+				// hijack a host's pairing code and receive their viewer.
+				s.RemoteCodesMu.Unlock()
+				client.Send(NexusMessage{Type: "remote_error", Error: "That code is in use — start sharing again for a new one"})
+				continue
+			}
+			// One live code per host: a fresh share replaces the old one.
+			for k, v := range s.RemoteCodes {
+				if v.Username == username {
+					delete(s.RemoteCodes, k)
+				}
+			}
 			s.RemoteCodes[code] = remoteCodeEntry{Username: username, CreatedAt: time.Now()}
 			s.RemoteCodesMu.Unlock()
+			// A new share starts with no viewers: whoever was paired with a
+			// previous one has to look the new code up.
+			s.remoteBindings().dropHost(username)
 			log.Printf("[remote] %s registered remote control code", username)
 			client.Send(NexusMessage{Type: "remote_registered", Body: code})
 
@@ -2031,14 +2047,9 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" {
 				continue
 			}
-			s.RemoteCodesMu.Lock()
-			for k, v := range s.RemoteCodes {
-				if v.Username == username {
-					log.Printf("[remote] %s unregistered remote control code", username)
-					delete(s.RemoteCodes, k)
-				}
-			}
-			s.RemoteCodesMu.Unlock()
+			// Bindings are kept: the host's client sends remote_end to its
+			// viewer right after this, and that still has to get through.
+			s.deleteRemoteCodesOf(username)
 
 		case "remote_lookup":
 			if username == "" {
@@ -2057,28 +2068,48 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if ok && time.Since(entry.CreatedAt) > remoteCodeTTL {
 				ok = false
 			}
-			log.Printf("[remote] %s looked up a remote control code -> found=%v host=%s (map has %d entries)", username, ok, entry.Username, len(s.RemoteCodes))
+			log.Printf("[remote] %s looked up a remote control code -> found=%v", username, ok)
 			if ok {
+				// Knowing the code is what entitles this viewer to signal
+				// the host; record that so the relay below can check it.
+				s.remoteBindings().bind(entry.Username, username)
 				client.Send(NexusMessage{Type: "remote_lookup_result", Status: "ok", Body: entry.Username})
 			} else {
 				client.Send(NexusMessage{Type: "remote_lookup_result", Status: "error", Error: "Invalid code — make sure the host is still sharing"})
 			}
 
 		case "remote_offer", "remote_answer", "remote_ice", "remote_input", "remote_end":
-			if username == "" {
+			if username == "" || msg.Recipient == "" {
 				continue
 			}
-			msg.Sender = username
-			if msg.Type == "remote_end" {
-				s.RemoteCodesMu.Lock()
-				for k, v := range s.RemoteCodes {
-					if v.Username == username || v.Username == msg.Recipient {
-						delete(s.RemoteCodes, k)
-					}
+			bindings := s.remoteBindings()
+			host, bound := bindings.pairOf(username, msg.Recipient)
+			if !bound {
+				// No remote_lookup with the right code ever paired these two:
+				// relay nothing. A host may still end its own share.
+				if msg.Type == "remote_end" {
+					s.deleteRemoteCodesOf(username)
 				}
-				s.RemoteCodesMu.Unlock()
+				if msg.Type == "remote_offer" {
+					client.Send(NexusMessage{Type: "remote_error", Error: "No remote session with " + msg.Recipient + " — enter their code first"})
+				}
+				continue
 			}
-			if !s.sendTo(msg.Recipient, msg) && msg.Type == "remote_offer" {
+			if msg.Type == "remote_end" {
+				// Either side may tear down its own pairing. The share it was
+				// made for is single-use, so the host's code goes with it.
+				bindings.unbind(host, otherOf(host, username, msg.Recipient))
+				s.deleteRemoteCodesOf(host)
+			}
+			relay := NexusMessage{
+				Type:      msg.Type,
+				Sender:    username,
+				Recipient: msg.Recipient,
+				Body:      msg.Body,
+				SDP:       msg.SDP,
+				Candidate: msg.Candidate,
+			}
+			if !s.sendTo(msg.Recipient, relay) && msg.Type == "remote_offer" {
 				client.Send(NexusMessage{Type: "remote_error", Error: msg.Recipient + " is not online"})
 			}
 

@@ -28,7 +28,14 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
   const [mode, setMode] = useState<Mode>('idle')
   const [code, setCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
-  const [peer, setPeer] = useState<string | null>(null)
+  const [peer, setPeerState] = useState<string | null>(null)
+  // Mirrors `peer` synchronously, so signalling that arrives before the next
+  // render is checked against the current peer rather than a stale one.
+  const peerRef = useRef<string | null>(null)
+  const setPeer = useCallback((p: string | null) => {
+    peerRef.current = p
+    setPeerState(p)
+  }, [])
   const [err, setErr] = useState('')
   const [connected, setConnected] = useState(false)
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null)
@@ -143,7 +150,23 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
           break
         }
         case 'remote_offer': {
+          // Only a host that is actively sharing takes offers.
           if (mode !== 'hosting' || !m.sender) break
+          // A new viewer replaces any previous one: close the old peer
+          // connection (without its state handlers firing) so it can't keep
+          // receiving the screen alongside the new one.
+          const prev = pcRef.current
+          if (prev) {
+            prev.onconnectionstatechange = null
+            prev.onicecandidate = null
+            prev.ondatachannel = null
+            prev.close()
+            pcRef.current = null
+            inputChannelRef.current = null
+            fileChannelRef.current = null
+            setConnected(false)
+            setCursorPos(null)
+          }
           setPeer(m.sender)
           const pc = new RTCPeerConnection({ iceServers: iceServers() })
           pcRef.current = pc
@@ -189,16 +212,19 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
         }
         case 'remote_answer': {
           if (mode !== 'viewing' || !pcRef.current) break
+          if (peerRef.current && m.sender !== peerRef.current) break
           void pcRef.current.setRemoteDescription({ type: 'answer', sdp: m.sdp })
           setConnected(true)
           break
         }
         case 'remote_ice': {
           if (!pcRef.current || !m.candidate) break
+          if (peerRef.current && m.sender !== peerRef.current) break
           void pcRef.current.addIceCandidate(JSON.parse(m.candidate)).catch(() => {})
           break
         }
         case 'remote_end': {
+          if (peerRef.current && m.sender && m.sender !== peerRef.current) break
           tearDown()
           setMode('idle')
           setPeer(null)
@@ -212,7 +238,7 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
       }
     })
     return unsub
-  }, [subscribe, mode, peer, handleIncomingFile, tearDown, send])
+  }, [subscribe, mode, peer, handleIncomingFile, tearDown, send, setPeer])
 
   const startHosting = async () => {
     setErr('')
