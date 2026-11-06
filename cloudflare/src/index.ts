@@ -1,14 +1,20 @@
-import { Container, getContainer, type StopParams } from "@cloudflare/containers";
+import { Container, getContainer, type OutboundHandlerContext, type StopParams } from "@cloudflare/containers";
 import {
   COLD_START_TIMEOUT_MS,
   containerEnv,
-  missingStorageSettings,
+  hasStorageBinding,
   sleepAfter,
   withClientIP,
 } from "./config";
+import { S3_HOST, handleS3 } from "./s3";
+
+// Outbound interception (the container reaching R2 through the Worker)
+// needs this entrypoint exported.
+export { ContainerProxy } from "@cloudflare/containers";
 
 export interface Env {
   NEXUS: DurableObjectNamespace<PhazeNexus>;
+  BUCKET: R2Bucket;
   [binding: string]: unknown;
 }
 
@@ -17,8 +23,13 @@ export interface Env {
  * Container. There is exactly one instance: SQLite has a single writer, and
  * Litestream streams it to R2 so a restart or redeploy picks up where the
  * last instance stopped.
+ *
+ * The container reaches R2 at http://r2.phaze, which the Containers runtime
+ * routes to handleS3 (s3.ts) on this machine; that answers with the BUCKET
+ * binding, so there are no R2 API keys to create or rotate.
  */
 export class PhazeNexus extends Container<Env> {
+
   defaultPort = 8080;
   // /health answers once the database is open; Litestream restores first.
   pingEndpoint = "localhost/health";
@@ -68,15 +79,20 @@ export class PhazeNexus extends Container<Env> {
   }
 }
 
+// Assigned through the static setter (not a class field) so the package
+// registers the handler for this class.
+PhazeNexus.outboundByHost = {
+  [S3_HOST]: (request: Request, env: Env, _ctx: OutboundHandlerContext) => handleS3(request, env.BUCKET),
+};
+
 // One fixed name, so every request reaches the same instance.
 const INSTANCE = "phaze-nexus";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    const missing = missingStorageSettings(env);
-    if (missing.length > 0) {
+    if (!hasStorageBinding(env)) {
       // Refuse to start on an ephemeral disk with nowhere to save data.
-      console.error(`[phaze] not starting: missing ${missing.join(", ")}`);
+      console.error("[phaze] not starting: the BUCKET R2 binding is missing");
       return new Response(
         "Phaze is being set up and will be back shortly.\n",
         { status: 503, headers: { "Retry-After": "300", "Content-Type": "text/plain" } },

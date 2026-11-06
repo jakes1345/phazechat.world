@@ -19,6 +19,9 @@
       "instance_type": "basic"
     }
   ],
+  // The container's database and uploads. It reaches this bucket through the
+  // Worker (src/s3.ts), so no R2 API token is needed.
+  "r2_buckets": [{ "binding": "BUCKET", "bucket_name": "phazechat-data" }],
   "durable_objects": {
     "bindings": [{ "name": "NEXUS", "class_name": "PhazeNexus" }]
   },

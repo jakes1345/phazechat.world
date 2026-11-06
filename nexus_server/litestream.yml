@@ -2,12 +2,16 @@
 # every second. On Cloudflare Containers the disk is wiped on every restart,
 # so this replica (in R2) is the database's only durable copy.
 #
-# Required env vars at runtime (the Cloudflare Worker passes them through):
+# Required env vars at runtime:
 #   BUCKET_NAME             bucket name (LITESTREAM_BUCKET also accepted)
-#   AWS_ENDPOINT_URL_S3     e.g. https://<account>.r2.cloudflarestorage.com
+#   AWS_ENDPOINT_URL_S3     any S3-compatible endpoint
 #   AWS_REGION              "auto" for R2
 #   AWS_ACCESS_KEY_ID
 #   AWS_SECRET_ACCESS_KEY
+#
+# On Cloudflare the Worker sets all five: the endpoint is http://r2.phaze,
+# which the Worker answers from its R2 binding (cloudflare/src/s3.ts), so
+# the keys are placeholders and no R2 API token exists.
 #
 # Restore by hand:
 #   litestream restore -if-replica-exists -config /app/litestream.yml /data/nexus.db
@@ -26,6 +30,9 @@ dbs:
         region: ${AWS_REGION}
         access-key-id: ${AWS_ACCESS_KEY_ID}
         secret-access-key: ${AWS_SECRET_ACCESS_KEY}
+        # Path-style (/<bucket>/<key>): works with R2, MinIO and the
+        # Worker's virtual host alike.
+        force-path-style: true
         # Keep 7 days of WAL + a snapshot every 6h. Tunable.
         retention: 168h
         retention-check-interval: 1h
