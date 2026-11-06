@@ -1,0 +1,31 @@
+// Phaze on Cloudflare Containers.
+// Deployed by .github/workflows/cloudflare-deploy.yml on every push to master.
+// Settings and secrets are listed in cloudflare/README.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "phazechat",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-15",
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "PhazeNexus",
+      // Same image the repo has always shipped; built from the repo root.
+      "image": "../nexus_server/Dockerfile",
+      "image_build_context": "..",
+      // SQLite has one writer: never run two copies.
+      "max_instances": 1,
+      // 1/4 vCPU, 1 GiB memory.
+      "instance_type": "basic"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "NEXUS", "class_name": "PhazeNexus" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PhazeNexus"] }],
+  "vars": {
+    // How long the container stays up with no requests or socket traffic.
+    // Cold starts restore the database from R2, which takes a few seconds.
+    "SLEEP_AFTER": "30m"
+  }
+}

@@ -48,7 +48,7 @@ export default function RemoteControl({ send, subscribe, turn, onClose }: Props)
 
   const iceServers = (): RTCIceServer[] => {
     const t = turnRef.current
-    if (t) return [{ urls: t.url, username: t.username, credential: t.password }]
+    if (t) return [{ urls: [t.url, ...(t.urls ?? [])], username: t.username, credential: t.password }]
     return [{ urls: 'stun:stun.l.google.com:19302' }]
   }
 

@@ -7,9 +7,8 @@ import (
 	_ "image/jpeg"
 	"image/png"
 	"io"
+	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 )
 
 const maxAvatarBytes = 2 << 20 // 2 MB
@@ -64,17 +63,13 @@ func (s *NexusServer) avatarUploadHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := os.MkdirAll("avatars", 0o755); err != nil {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
-	out, err := os.Create(filepath.Join("avatars", username+".png"))
-	if err != nil {
-		http.Error(w, "storage error", http.StatusInternalServerError)
-		return
-	}
-	defer out.Close()
-	if err := png.Encode(out, img); err != nil {
+	if err := blobs().Put(r.Context(), "avatars/"+username+".png", &buf, int64(buf.Len()), "image/png"); err != nil {
+		log.Printf("[avatar] store %s: %v", username, err)
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}

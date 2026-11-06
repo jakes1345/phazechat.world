@@ -190,7 +190,7 @@ func (s *NexusServer) adminSupporterActionHandler(w http.ResponseWriter, r *http
 //   2. Check users table for a verified account with that email → grant directly
 //   3. No match → store in bmc_payments for manual resolution in the portal
 //
-// Set BMC_WEBHOOK_SECRET in Fly secrets to the token from your BMC dashboard.
+// Set BMC_WEBHOOK_SECRET as a Worker secret (cloudflare/README.md) to the token from your BMC dashboard.
 // BMC signs requests with HMAC-SHA256 in the X-BMC-Signature header.
 func (s *NexusServer) bmcWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

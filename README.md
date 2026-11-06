@@ -15,10 +15,10 @@ The hosted version is at [phazechat.world](https://phazechat.world). This repo h
 | `android/` | Native Android app in Kotlin and Jetpack Compose. Package `world.phazechat.app`, minSdk 26. |
 | `desktop/` | Wails v2 desktop app that embeds the web client build. |
 | `nova_bot/` | Optional bot account backed by Gemini. The container starts it only when `NOVA_PASSWORD` and `GEMINI_API_KEY` are set. |
-| `infra/coturn/` | Dockerfile and Fly config for a coturn TURN server. |
 | `packaging/` | Draft Debian, Flatpak and winget manifests. Not used by CI yet. |
 | `docs/` | Design notes, audits and research. Written for development, not as user documentation. |
-| `Makefile`, `fly.toml`, `VERSION` | Build targets, Fly.io config, and the version stamped into the server binary. |
+| `Makefile`, `VERSION` | Build targets and the version stamped into the server binary. |
+| `cloudflare/` | Cloudflare Worker and Container config that runs the hosted server. |
 
 ## Features
 
@@ -174,13 +174,20 @@ Some variable names start with `Phaze_` in mixed case rather than `PHAZE_`. That
 | `PHAZE_WEB_DIR` | `web` | Directory holding the built web client, served at `/web/`. |
 | `PHAZE_ASSET_ROOT` | auto | Working directory containing `templates/` and `public/`. Only needed when the binary can't find them itself. |
 | `Phaze_ALLOWED_ORIGINS` | unset | Comma-separated browser origins allowed to open a WebSocket. When unset, any origin is allowed and the server logs a warning. |
-| `PHAZE_TRUST_PROXY_HEADER` | unset | Header holding the real client IP, for example `Fly-Client-IP`. Without it, rate limits and stored IPs see the proxy's address. |
+| `PHAZE_TRUST_PROXY_HEADER` | unset | Header holding the real client IP, for example `X-Phaze-Client-IP` behind the Cloudflare Worker. Without it, rate limits and stored IPs see the proxy's address. |
 | `PHAZE_DEVICE_VERIFICATION` | on | Set to `0` to turn off new-device approval. |
 | `PHAZE_CHANNEL_RETENTION_DAYS` | `30` | How long Spaces channel messages are kept. |
 
 ### TURN
 
-The server hands TURN credentials to clients when they sign in. They're used by the WebRTC features that don't go through Jitsi: live streams and remote screen sessions on the web. Calls on both web and Android go through Jitsi. There are two ways to set it up.
+The server hands TURN credentials to clients when they sign in. They're used by the WebRTC features that don't go through Jitsi: live streams and remote screen sessions on the web. Calls on both web and Android go through Jitsi. There are three ways to set it up.
+
+Cloudflare Realtime TURN, which the hosted instance uses. The server fetches short-lived `turn.cloudflare.com` credentials and refreshes them in the background:
+
+| Variable | Purpose |
+|---|---|
+| `PHAZE_CF_TURN_KEY_ID` | Token ID of a TURN key (Dashboard > Realtime > TURN Server). |
+| `PHAZE_CF_TURN_API_TOKEN` | That key's API token. |
 
 Static credentials, for a hosted TURN provider:
 
@@ -198,7 +205,7 @@ Time-limited credentials, for your own coturn with `use-auth-secret`:
 | `PHAZE_TURN_SECRET` | Must match coturn's `static-auth-secret`. |
 | `PHAZE_TURN_SHORT_TERM` | `true` makes credentials last 10 minutes instead of 24 hours. |
 
-If both sets are present, static credentials win. With neither, clients fall back to a public STUN server and connections between some networks will fail.
+Cloudflare wins over the other two when it's set and reachable; between those two, static credentials win. With neither, clients fall back to a public STUN server and connections between some networks will fail.
 
 ### Email
 
@@ -230,7 +237,7 @@ The server tries Resend, then Brevo, then SMTP, using whichever is configured fi
 
 ### Backups
 
-The container entrypoint (`nexus_server/entrypoint.sh`) runs the server under [Litestream](https://litestream.io) when `BUCKET_NAME` or `LITESTREAM_BUCKET` is set. It restores the database from the bucket on boot and then streams every change to it. The replica settings in `litestream.yml` read `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. On Fly, `fly storage create` sets all of these for you.
+The container entrypoint (`nexus_server/entrypoint.sh`) runs the server under [Litestream](https://litestream.io) when `BUCKET_NAME` or `LITESTREAM_BUCKET` is set. It restores the database from the bucket on boot and then streams every change to it. The replica settings in `litestream.yml` read `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. On Cloudflare these point at the R2 bucket; see [`cloudflare/README.md`](cloudflare/README.md).
 
 ### Optional integrations
 
@@ -266,29 +273,13 @@ Put it behind a reverse proxy that terminates TLS and passes WebSocket upgrades 
 
 ### TURN server
 
-For calls and streams to work across strict NATs you need a TURN server. There are two options in the repo:
+The hosted instance uses Cloudflare's TURN service (see [TURN](#turn)), so there is nothing to run. To host your own instead, `scripts/phaze_turnserver.conf` is a coturn config for a VPS. Replace `static-auth-secret`, then set `PHAZE_TURN_URL=turn:<your-turn-host>:3478` and the same value as `PHAZE_TURN_SECRET` on the Nexus server.
 
-- `scripts/phaze_turnserver.conf` is a coturn config for a VPS. Replace `static-auth-secret` and use the same value for `PHAZE_TURN_SECRET`.
-- `infra/coturn/` deploys coturn as its own Fly app (`phaze-turn`). Run `fly launch --copy-config --no-deploy` in that directory, set the secret with `fly secrets set TURN_SECRET=...`, then `fly deploy`. `TURN_REALM` and the optional `PUBLIC_IP` go in the environment too. As configured, only relay ports 49160 and 49161 are open; widen `min-port`/`max-port` in `entrypoint.sh` and add matching services in `fly.toml` if you need more.
+## Deploying to Cloudflare
 
-Then set `PHAZE_TURN_URL=turn:<your-turn-host>:3478` and `PHAZE_TURN_SECRET` on the Nexus server.
+The hosted instance runs as a Cloudflare Container behind a Worker (`cloudflare/`). The container's disk is wiped on restart, so the database replicates to an R2 bucket with Litestream and uploads and avatars are stored in the same bucket.
 
-## Deploying to Fly.io
-
-The hosted instance runs on Fly.io from `fly.toml` at the repo root. The app is named `skype7-reborn` (an older name), with one shared-CPU machine, 512 MB of RAM, and a volume called `nexus_data` mounted at `/data`. Change `app` in `fly.toml` if you're deploying your own copy.
-
-First deploy:
-
-```bash
-fly volumes create nexus_data
-fly secrets set PHAZE_TRUST_PROXY_HEADER=Fly-Client-IP \
-  Phaze_ALLOWED_ORIGINS=https://your.domain
-fly deploy
-```
-
-`fly.toml` already sets `PORT`, `DB_PATH=/data/nexus.db` and `PHAZE_UPLOAD_DIR=/data/uploads`. Add TURN, email and push settings as secrets. For backups, `fly storage create` makes a Tigris bucket and sets the variables Litestream needs.
-
-After that, `.github/workflows/fly-deploy.yml` redeploys on every push to `master` that touches `nexus_server/`, `web/` or `fly.toml`. It needs a `FLY_API_TOKEN` repository secret.
+`.github/workflows/cloudflare-deploy.yml` deploys on every push to `master`. Account setup, the secrets it needs and how to start from an existing database are in [`cloudflare/README.md`](cloudflare/README.md).
 
 ## Releases
 
