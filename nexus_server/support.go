@@ -274,17 +274,16 @@ func (s *NexusServer) supportEscalateHandler(w http.ResponseWriter, r *http.Requ
 		note = "(no description)"
 	}
 
-	// Find online staff (helper or higher).
-	s.Mu.RLock()
+	// Find online staff (helper or higher). Roles come from the database, so
+	// look them up after letting go of the connection registry lock.
 	staffOnline := []*Client{}
-	for username, conns := range s.Clients {
+	for _, username := range s.onlineUsernames() {
 		if roleRank(s.userRole(username)) >= roleRank("helper") {
 			// Every session they have open, so the alert reaches them
 			// wherever they happen to be looking.
-			staffOnline = append(staffOnline, conns...)
+			staffOnline = append(staffOnline, s.clientsOf(username)...)
 		}
 	}
-	s.Mu.RUnlock()
 
 	for _, c := range staffOnline {
 		c.Send(NexusMessage{

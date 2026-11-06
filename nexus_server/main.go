@@ -4438,8 +4438,6 @@ func (s *NexusServer) sendSMS(to, body string) error {
 }
 
 func (s *NexusServer) broadcastProfileUpdate(username, displayName, mood string) {
-	s.Mu.RLock()
-	defer s.Mu.RUnlock()
 	msg := NexusMessage{
 		Type:        "profile_update",
 		Sender:      username,
