@@ -1776,6 +1776,36 @@ button.link-btn:hover,
   align-items: center;
 }
 
+/* Report dialog: one reason, then optional details. */
+.report-reasons {
+  border: 0;
+  padding: 0;
+  margin: 0.25rem 0 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.report-reasons legend {
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+.restore-card .report-reason {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.restore-card .report-reason input {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--brand);
+}
+.restore-card .error {
+  color: var(--danger);
+  margin: 0.5rem 0;
+}
+
 /* ── Scroll-to highlight flash ───────────────────────────────── */
 .highlight-flash .bubble {
   animation: pulseHi 1.5s ease-out;
