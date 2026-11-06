@@ -66,7 +66,9 @@ it sleeps. Set `SLEEP_AFTER` to e.g. `720h` to keep it effectively always on.
    Don't set `PHAZE_TRUST_PROXY_HEADER`; the Worker sets it.
 5. **GitHub secrets** (repo Settings > Secrets and variables > Actions):
    `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN` made from the
-   *Edit Cloudflare Workers* template under Account API tokens. Then run
+   *Edit Cloudflare Workers* template under Account API tokens. The deploy
+   also pushes the container image, so if the template's list doesn't
+   already have it, add *Account > Containers > Edit* before saving. Then run
    the *Deploy to Cloudflare* workflow (Actions tab > Run workflow), or push
    to `master`.
 6. **Domain.** Once the deploy is green and the `*.workers.dev` URL works:
