@@ -154,12 +154,28 @@ func (s *NexusServer) httpLoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var displayName, mood string
 	s.DB.QueryRow("SELECT COALESCE(display_name,''), COALESCE(mood,'') FROM users WHERE username=?", body.Username).Scan(&displayName, &mood)
-	json.NewEncoder(w).Encode(map[string]string{
+	out := map[string]string{
 		"status":       "ok",
 		"username":     body.Username,
 		"display_name": displayName,
 		"mood":         mood,
-	})
+	}
+	if fromDesktopProxy(r) {
+		out["token"] = tok
+	}
+	json.NewEncoder(w).Encode(out)
+}
+
+// desktopProxyHeader is set by the desktop app's built-in proxy
+// (desktop/proxy.go). The desktop webview keeps the session cookie on its
+// own origin, while its WebSocket goes straight to the server without it, so
+// it needs the token itself to authenticate the socket. Returning it only
+// ever hands the session to the caller who just proved the password (or the
+// device code), so the header being forgeable doesn't matter.
+const desktopProxyHeader = "X-Phaze-Desktop-Proxy"
+
+func fromDesktopProxy(r *http.Request) bool {
+	return r.Header.Get(desktopProxyHeader) == "1"
 }
 
 // httpVerifyDeviceHandler completes a sign-in that's waiting on new-device
@@ -215,7 +231,11 @@ func (s *NexusServer) httpVerifyDeviceHandler(w http.ResponseWriter, r *http.Req
 
 	authTracker.recordSuccess(ip, username)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "username": username})
+	out := map[string]string{"status": "ok", "username": username}
+	if fromDesktopProxy(r) {
+		out["token"] = tok
+	}
+	json.NewEncoder(w).Encode(out)
 }
 
 func (s *NexusServer) httpLogoutHandler(w http.ResponseWriter, r *http.Request) {

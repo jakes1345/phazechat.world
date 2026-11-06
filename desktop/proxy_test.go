@@ -12,6 +12,9 @@ func TestServerProxyForwardsAPIAndRewritesCookies(t *testing.T) {
 	var gotPath, gotOrigin string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath, gotOrigin = r.URL.RequestURI(), r.Header.Get("Origin")
+		if r.Header.Get("X-Phaze-Desktop-Proxy") != "1" {
+			t.Errorf("desktop proxy header missing")
+		}
 		http.SetCookie(w, &http.Cookie{Name: "phaze_session", Value: "tok", Domain: "phazechat.world", Path: "/", HttpOnly: true})
 		io.WriteString(w, "ok")
 	}))

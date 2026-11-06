@@ -1902,7 +1902,7 @@ export default function App() {
         return
       }
       const data = await res.json().catch(() => ({})) as {
-        status?: string; device_label?: string; code_sent?: boolean
+        status?: string; device_label?: string; code_sent?: boolean; token?: string
       }
       if (data.status === 'device_verification_required') {
         // The session cookie is set but inert until this is approved, so
@@ -1912,12 +1912,20 @@ export default function App() {
         setErr('')
         return
       }
-      // Cookie is set by the server (HttpOnly — never accessible to JS).
-      // Reconnect the WS so the server can pre-auth from the cookie.
+      // Browsers: the HttpOnly cookie authenticates the reconnected socket.
+      // Desktop app: its socket can't carry that cookie, so the server hands
+      // the token back and the socket signs in with it (session_auth).
+      adoptReturnedToken(data.token)
       setWsRetry((n) => n + 1)
     } catch {
       setErr('Network error — please try again')
     }
+  }
+
+  const adoptReturnedToken = (token: string | undefined) => {
+    if (!token) return
+    localStorage.setItem(SESSION_KEY, token)
+    setSessionToken(token)
   }
 
   // Completes a sign-in that's waiting on new-device approval. The session
@@ -1931,11 +1939,12 @@ export default function App() {
         credentials: 'include',
         body: JSON.stringify({ code: code.trim() }),
       })
-      const data = await res.json().catch(() => ({})) as { status?: string; error?: string }
+      const data = await res.json().catch(() => ({})) as { status?: string; error?: string; token?: string }
       if (!res.ok || data.status !== 'ok') {
         setErr(data.error || 'That code was not accepted')
         return
       }
+      adoptReturnedToken(data.token)
       setDeviceVerify(null)
       setDeviceCode('')
       setErr('')

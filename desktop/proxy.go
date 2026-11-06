@@ -42,6 +42,10 @@ func newServerProxy(target *url.URL) http.Handler {
 			// the request as coming from the server's own site.
 			pr.Out.Header.Del("Origin")
 			pr.Out.Header.Del("Referer")
+			// Lets the server return the session token in sign-in
+			// responses: the webview's direct WebSocket doesn't carry the
+			// cookie stored for this origin (nexus_server/auth_http.go).
+			pr.Out.Header.Set("X-Phaze-Desktop-Proxy", "1")
 		},
 		ModifyResponse: func(resp *http.Response) error {
 			cookies := resp.Header.Values("Set-Cookie")
