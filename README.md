@@ -18,7 +18,8 @@ The hosted version is at [phazechat.world](https://phazechat.world). This repo h
 | `infra/coturn/` | Dockerfile and Fly config for a coturn TURN server. |
 | `packaging/` | Draft Debian, Flatpak and winget manifests. Not used by CI yet. |
 | `docs/` | Design notes, audits and research. Written for development, not as user documentation. |
-| `Makefile`, `fly.toml`, `VERSION` | Build targets, Fly.io config, and the version stamped into the server binary. |
+| `Makefile`, `VERSION` | Build targets and the version stamped into the server binary. |
+| `cloudflare/` | Cloudflare Worker and Container config that runs the hosted server, plus the Fly data import script. |
 
 ## Features
 
@@ -174,7 +175,7 @@ Some variable names start with `Phaze_` in mixed case rather than `PHAZE_`. That
 | `PHAZE_WEB_DIR` | `web` | Directory holding the built web client, served at `/web/`. |
 | `PHAZE_ASSET_ROOT` | auto | Working directory containing `templates/` and `public/`. Only needed when the binary can't find them itself. |
 | `Phaze_ALLOWED_ORIGINS` | unset | Comma-separated browser origins allowed to open a WebSocket. When unset, any origin is allowed and the server logs a warning. |
-| `PHAZE_TRUST_PROXY_HEADER` | unset | Header holding the real client IP, for example `Fly-Client-IP`. Without it, rate limits and stored IPs see the proxy's address. |
+| `PHAZE_TRUST_PROXY_HEADER` | unset | Header holding the real client IP, for example `X-Phaze-Client-IP` behind the Cloudflare Worker. Without it, rate limits and stored IPs see the proxy's address. |
 | `PHAZE_DEVICE_VERIFICATION` | on | Set to `0` to turn off new-device approval. |
 | `PHAZE_CHANNEL_RETENTION_DAYS` | `30` | How long Spaces channel messages are kept. |
 
@@ -230,7 +231,7 @@ The server tries Resend, then Brevo, then SMTP, using whichever is configured fi
 
 ### Backups
 
-The container entrypoint (`nexus_server/entrypoint.sh`) runs the server under [Litestream](https://litestream.io) when `BUCKET_NAME` or `LITESTREAM_BUCKET` is set. It restores the database from the bucket on boot and then streams every change to it. The replica settings in `litestream.yml` read `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. On Fly, `fly storage create` sets all of these for you.
+The container entrypoint (`nexus_server/entrypoint.sh`) runs the server under [Litestream](https://litestream.io) when `BUCKET_NAME` or `LITESTREAM_BUCKET` is set. It restores the database from the bucket on boot and then streams every change to it. The replica settings in `litestream.yml` read `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. On Cloudflare these point at the R2 bucket; see [`cloudflare/README.md`](cloudflare/README.md).
 
 ### Optional integrations
 
@@ -273,22 +274,11 @@ For calls and streams to work across strict NATs you need a TURN server. There a
 
 Then set `PHAZE_TURN_URL=turn:<your-turn-host>:3478` and `PHAZE_TURN_SECRET` on the Nexus server.
 
-## Deploying to Fly.io
+## Deploying to Cloudflare
 
-The hosted instance runs on Fly.io from `fly.toml` at the repo root. The app is named `skype7-reborn` (an older name), with one shared-CPU machine, 512 MB of RAM, and a volume called `nexus_data` mounted at `/data`. Change `app` in `fly.toml` if you're deploying your own copy.
+The hosted instance runs as a Cloudflare Container behind a Worker (`cloudflare/`). The container's disk is wiped on restart, so the database replicates to an R2 bucket with Litestream and uploads and avatars are stored in the same bucket.
 
-First deploy:
-
-```bash
-fly volumes create nexus_data
-fly secrets set PHAZE_TRUST_PROXY_HEADER=Fly-Client-IP \
-  Phaze_ALLOWED_ORIGINS=https://your.domain
-fly deploy
-```
-
-`fly.toml` already sets `PORT`, `DB_PATH=/data/nexus.db` and `PHAZE_UPLOAD_DIR=/data/uploads`. Add TURN, email and push settings as secrets. For backups, `fly storage create` makes a Tigris bucket and sets the variables Litestream needs.
-
-After that, `.github/workflows/fly-deploy.yml` redeploys on every push to `master` that touches `nexus_server/`, `web/` or `fly.toml`. It needs a `FLY_API_TOKEN` repository secret.
+`.github/workflows/cloudflare-deploy.yml` deploys on every push to `master`. Account setup, the secrets it needs and the one-time import of the old Fly data are in [`cloudflare/README.md`](cloudflare/README.md).
 
 ## Releases
 

@@ -184,7 +184,7 @@ footer a{color:#a677ff;text-decoration:none}
 </div>
 
 <footer>
-  Backend: Fly.io (iad) · Backups: Tigris S3 / Litestream<br>
+  Backend: Cloudflare Containers · Backups: Cloudflare R2 / Litestream<br>
   <a href="/">← Back to Phaze</a>
 </footer>
 </body></html>`,
