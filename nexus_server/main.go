@@ -20,6 +20,7 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -2353,7 +2354,7 @@ func (s *NexusServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 
 	v := os.Getenv("Phaze_LATEST_VERSION")
 	if v == "" {
-		v = "1.0.0-Phaze"
+		v = Version
 	}
 
 	turnOK := TurnSecret != "" && TurnURL != ""
@@ -4152,7 +4153,7 @@ func main() {
 	http.HandleFunc("/twiml/outbound", rateLimit(server.twimlHandler))
 
 	fs := http.FileServer(http.Dir("public"))
-	http.Handle("/public/", http.StripPrefix("/public/", fs))
+	http.Handle("/public/", publicFilesHandler(fs))
 	http.Handle("/.well-known/", http.StripPrefix("/.well-known/", http.FileServer(http.Dir("public/.well-known"))))
 	http.HandleFunc("/downloads/", server.fileDownloadHandler)
 
@@ -4318,7 +4319,7 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 		json.NewEncoder(w).Encode(map[string]string{
 			"bmc_url":       bmc,
 			"support_email": os.Getenv("PHAZE_SUPPORT_EMAIL"),
-			"version":       "1.0.0-Phaze",
+			"version":       Version,
 		})
 	}))
 	// Warn loudly if we're not configured to trust the real-client-IP header.
@@ -4597,6 +4598,13 @@ func (s *NexusServer) uploadHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "file content does not match extension", http.StatusUnsupportedMediaType)
 			return
 		}
+	case ext == ".heic":
+		// HEIC is an ISO-BMFF file: "ftyp" at offset 4 and a HEIF brand.
+		if !isHEIC(headBuf[:n]) {
+			log.Printf("[upload] rejected %s: ext=%s not HEIF uploader=%s", hdr.Filename, ext, uploader)
+			http.Error(w, "file content does not match extension", http.StatusUnsupportedMediaType)
+			return
+		}
 	case ext == ".pdf":
 		if detected != "application/pdf" {
 			log.Printf("[upload] rejected %s: ext=%s detected=%s uploader=%s", hdr.Filename, ext, detected, uploader)
@@ -4635,18 +4643,95 @@ func (s *NexusServer) uploadsServeHandler(w http.ResponseWriter, r *http.Request
 		http.NotFound(w, r)
 		return
 	}
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	// Force download for non-image files — prevents a browser from executing
-	// HTML/SVG/JS if one somehow slips through the extension allowlist.
 	ext := strings.ToLower(filepath.Ext(name))
-	switch ext {
-	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".heic":
-		// Images inline fine; browsers treat them as media, not scripts.
-	default:
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+name+"\"")
+	ctype, inline := uploadContentType(ext)
+	if ctype == "" {
+		// Not a type the upload handler accepts: never serve it.
+		http.NotFound(w, r)
+		return
+	}
+	h := w.Header()
+	h.Set("Cache-Control", "public, max-age=86400")
+	// Always declare the type ourselves. Left unset, http.ServeContent sniffs
+	// the bytes and would serve an HTML payload as text/html on our origin.
+	h.Set("Content-Type", ctype)
+	h.Set("X-Content-Type-Options", "nosniff")
+	// Even if a browser rendered the file as a document, it gets no script,
+	// no same-origin access and no network.
+	h.Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox")
+	if !inline {
+		h.Set("Content-Disposition", "attachment; filename=\""+name+"\"")
 	}
 	serveBlob(w, r, "uploads/"+name)
+}
+
+// publicFilesHandler serves /public/ except the uploads directory. Uploads
+// live under public/uploads by default and must only be served by
+// uploadsServeHandler, which sets a safe Content-Type and CSP; the plain
+// file server would sniff them.
+func publicFilesHandler(fs http.Handler) http.Handler {
+	publicFS := http.StripPrefix("/public/", fs)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if p := path.Clean("/" + strings.TrimPrefix(r.URL.Path, "/public/")); p == "/uploads" || strings.HasPrefix(p, "/uploads/") {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		publicFS.ServeHTTP(w, r)
+	})
+}
+
+// uploadContentType maps each extension the upload handler accepts to the
+// Content-Type it is served with, and whether it may be shown inline
+// (media) or must download. An empty type means the extension isn't allowed.
+func uploadContentType(ext string) (ctype string, inline bool) {
+	switch ext {
+	case ".png":
+		return "image/png", true
+	case ".jpg", ".jpeg":
+		return "image/jpeg", true
+	case ".gif":
+		return "image/gif", true
+	case ".webp":
+		return "image/webp", true
+	case ".bmp":
+		return "image/bmp", true
+	case ".heic":
+		return "image/heic", true
+	case ".mp4":
+		return "video/mp4", true
+	case ".mov":
+		return "video/quicktime", true
+	case ".webm":
+		return "video/webm", true
+	case ".m4a":
+		return "audio/mp4", true
+	case ".mp3":
+		return "audio/mpeg", true
+	case ".ogg":
+		return "audio/ogg", true
+	case ".wav":
+		return "audio/wav", true
+	case ".pdf":
+		return "application/pdf", false
+	case ".txt", ".md", ".log", ".csv":
+		return "text/plain; charset=utf-8", false
+	case ".json":
+		return "application/json", false
+	}
+	return "", false
+}
+
+// isHEIC reports whether head starts like a HEIF/HEIC file.
+func isHEIC(head []byte) bool {
+	if len(head) < 12 || string(head[4:8]) != "ftyp" {
+		return false
+	}
+	switch string(head[8:12]) {
+	case "heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1":
+		return true
+	}
+	return false
 }
 
 func (s *NexusServer) handleBotMessage(client *Client, msg NexusMessage) {
@@ -4667,7 +4752,7 @@ func (s *NexusServer) handleBotMessage(client *Client, msg NexusMessage) {
 	case cmd == "/webrtc":
 		reply.Body = "Phaze voice/video uses WebRTC (Pion on desktop, browser APIs on web). Signaling goes over Nexus; media is peer-to-peer when possible, with TURN from your relay when NAT blocks direct paths."
 	case cmd == "/version":
-		reply.Body = "Nexus Server v1.0.0-Phaze"
+		reply.Body = "Nexus Server v" + Version
 	case cmd == "/pstn":
 		if pstnBridgeEnabled() {
 			reply.Body = "PSTN bridge is ON for this relay (Twilio). Link your phone in Settings for verified outbound. Otherwise use WebRTC calls in chat."

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	"image/png"
@@ -15,6 +16,9 @@ const maxAvatarBytes = 2 << 20 // 2 MB
 
 // validateAvatar checks size and sniffs the real content type — the file
 // extension is never trusted. Returns nil only for PNG/JPEG within the cap.
+// maxAvatarSide bounds avatar width and height (16 megapixels at most).
+const maxAvatarSide = 4096
+
 func validateAvatar(data []byte) error {
 	if len(data) == 0 {
 		return errors.New("empty upload")
@@ -55,6 +59,17 @@ func (s *NexusServer) avatarUploadHandler(w http.ResponseWriter, r *http.Request
 	}
 	if err := validateAvatar(data); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// Check the declared size before decoding: a 2 MB PNG can claim
+	// 50000x50000 pixels and make image.Decode allocate gigabytes.
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		http.Error(w, "could not read image", http.StatusBadRequest)
+		return
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width > maxAvatarSide || cfg.Height > maxAvatarSide {
+		http.Error(w, fmt.Sprintf("avatar must be at most %dx%d pixels", maxAvatarSide, maxAvatarSide), http.StatusBadRequest)
 		return
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
