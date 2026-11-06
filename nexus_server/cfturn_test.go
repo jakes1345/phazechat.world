@@ -184,3 +184,43 @@ func TestNewCFTURNFromEnv(t *testing.T) {
 		t.Fatal("expected client when both are set")
 	}
 }
+
+func TestTurnProviderReportsWhatCallsGet(t *testing.T) {
+	savedCF, savedURL, savedUser, savedPass, savedSecret := cloudflareTURN, TurnURL, TurnUsername, TurnPassword, TurnSecret
+	t.Cleanup(func() {
+		cloudflareTURN, TurnURL, TurnUsername, TurnPassword, TurnSecret = savedCF, savedURL, savedUser, savedPass, savedSecret
+	})
+	s := &NexusServer{}
+	ctx := context.Background()
+
+	cloudflareTURN, TurnURL, TurnUsername, TurnPassword, TurnSecret = nil, "", "", "", ""
+	if got := s.turnProvider(ctx); got != "" {
+		t.Fatalf("nothing set: provider = %q, want empty", got)
+	}
+
+	good, _ := newTestCFTURN(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(cfTURNResponse))
+	})
+	cloudflareTURN = good
+	if got := s.turnProvider(ctx); got != "cloudflare" {
+		t.Fatalf("working Cloudflare key: provider = %q, want cloudflare", got)
+	}
+
+	bad, _ := newTestCFTURN(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"bad token"}`, http.StatusUnauthorized)
+	})
+	cloudflareTURN = bad
+	if got := s.turnProvider(ctx); got != "" {
+		t.Fatalf("rejected Cloudflare key: provider = %q, want empty", got)
+	}
+
+	TurnURL, TurnSecret = "turn:example.org:3478", "shared"
+	if got := s.turnProvider(ctx); got != "coturn" {
+		t.Fatalf("rejected Cloudflare key with coturn set: provider = %q, want coturn", got)
+	}
+	TurnUsername, TurnPassword = "u", "p"
+	if got := s.turnProvider(ctx); got != "static" {
+		t.Fatalf("static credentials: provider = %q, want static", got)
+	}
+}
