@@ -72,6 +72,11 @@ android {
         jniLibs { useLegacyPackaging = false }
     }
 
+    // AGP 9 only makes unit-test tasks for the tested build type. Test the
+    // release variant, the one that ships (and the one CI can build: the
+    // Firebase config has no client for the .debug application id).
+    testBuildType = "release"
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
