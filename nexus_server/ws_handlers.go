@@ -673,6 +673,21 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "totp_result", Error: "Not authenticated"})
 				continue
 			}
+			// Re-enrolling over a live 2FA secret would let anyone holding
+			// just a session token (no password, no authenticator) swap in
+			// their own secret and take the account's second factor. With
+			// 2FA on, it has to be turned off first — and disable_totp asks
+			// for the password.
+			if _, enabled := s.totpStatus(username); enabled {
+				client.Send(NexusMessage{Type: "totp_result", Error: "Two-factor authentication is already on. Turn it off first (that needs your password), then set it up again."})
+				continue
+			}
+			// Current clients don't send a password here; newer ones may,
+			// and if they do it has to be right.
+			if msg.Body != "" && !s.authenticateUser(username, msg.Body) {
+				client.Send(NexusMessage{Type: "totp_result", Error: "Password incorrect"})
+				continue
+			}
 			uri, secret, err := s.generateTOTPURI(username)
 			if err != nil {
 				client.Send(NexusMessage{Type: "totp_result", Error: "Could not generate secret"})
