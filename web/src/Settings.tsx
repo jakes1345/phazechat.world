@@ -221,13 +221,24 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
     send({ type: 'revoke_session_by_token', body: fullToken })
   }
 
-  const exportData = () => {
-    if (!sessionToken) return
-    const url = `/api/v1/export?token=${encodeURIComponent(sessionToken)}`
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'phaze-data-export.json'
-    a.click()
+  // Fetches the export with the session cookie (or bearer token) and saves
+  // it; the token used to ride in the URL, where it lands in server logs.
+  const exportData = async () => {
+    try {
+      const r = await fetch('/api/v1/export', {
+        credentials: 'include',
+        headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {},
+      })
+      if (!r.ok) throw new Error(`Export failed (${r.status})`)
+      const url = URL.createObjectURL(await r.blob())
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'phaze-data-export.json'
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 30_000)
+    } catch (e) {
+      alert((e as Error).message || 'Export failed')
+    }
   }
 
   const deleteAccount = () => {
@@ -980,7 +991,7 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
 
               <h3 className="settings-section-title">Export your data</h3>
               <p className="settings-label" style={{ marginBottom: '0.5rem' }}>Download a copy of your profile, friends, and queued messages (GDPR Article 20).</p>
-              <button className="settings-btn" onClick={exportData}>Download my data</button>
+              <button className="settings-btn" onClick={() => void exportData()}>Download my data</button>
 
               <h3 className="settings-section-title danger-title">Delete account</h3>
               <p className="settings-label">This permanently erases your account, all messages, friends, and encryption keys. <strong>Cannot be undone.</strong></p>

@@ -1926,50 +1926,74 @@ func (s *NexusServer) listSessions(username string) []map[string]string {
 	return out
 }
 
-func (s *NexusServer) exportUserData(username string) map[string]interface{} {
-	out := map[string]interface{}{"username": username}
-	// Profile
-	var email, mood, displayName string
-	s.DB.QueryRow("SELECT email, mood, display_name FROM users WHERE username = ?", username).Scan(&email, &mood, &displayName)
-	out["email"] = email
-	out["mood"] = mood
-	out["display_name"] = displayName
-	// Friends. friends rows are directional (user_a = whoever sent the
-	// original request, regardless of who accepted), so this has to check
-	// both sides like getFriends does — otherwise a user who only ever
-	// accepted requests (never sent one) would export an empty list.
-	rows, _ := s.DB.Query(
-		`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END as friend
-		 FROM friends
-		 WHERE (user_a = ? OR user_b = ?) AND status = 'accepted'`,
-		username, username, username)
-	var friends []string
-	if rows != nil {
-		for rows.Next() {
-			var u string
-			if err := rows.Scan(&u); err != nil {
-				log.Printf("[db] exportUserData friends scan: %v", err)
-				continue
+// exportQuery runs one export query and returns each row as a column→value
+// map, so every table can be dumped without a struct per table.
+func (s *NexusServer) exportQuery(query string, args ...any) []map[string]any {
+	rows, err := s.DB.Query(query, args...)
+	if err != nil {
+		log.Printf("[export] %v", err)
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	cols, _ := rows.Columns()
+	out := []map[string]any{}
+	for rows.Next() {
+		vals := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		row := make(map[string]any, len(cols))
+		for i, c := range cols {
+			if b, ok := vals[i].([]byte); ok {
+				row[c] = string(b)
+			} else {
+				row[c] = vals[i]
 			}
-			friends = append(friends, u)
 		}
-		rows.Close()
+		out = append(out, row)
 	}
-	out["friends"] = friends
-	// Messages (offline store only — live messages are E2EE so server never sees plaintext)
-	msgRows, _ := s.DB.Query("SELECT sender, recipient, body, created_at FROM offline_messages WHERE sender = ? OR recipient = ? ORDER BY created_at ASC", username, username)
-	var msgs []map[string]string
-	if msgRows != nil {
-		for msgRows.Next() {
-			var sender, recipient, body, createdAt string
-			msgRows.Scan(&sender, &recipient, &body, &createdAt)
-			msgs = append(msgs, map[string]string{"from": sender, "to": recipient, "body": body, "at": createdAt})
-		}
-		msgRows.Close()
+	return out
+}
+
+// exportUserData collects everything the server stores about a user, for
+// the "Download my data" export. Secrets (password hash, 2FA secret,
+// session tokens, verification codes) are left out.
+func (s *NexusServer) exportUserData(username string) map[string]any {
+	out := map[string]any{"username": username}
+	profile := s.exportQuery(`SELECT username, email, display_name, mood, status, created_at,
+	        COALESCE(supporter, 0) AS supporter, COALESCE(role, 'user') AS role,
+	        COALESCE(totp_enabled, 0) AS two_factor_enabled, COALESCE(referred_by, '') AS referred_by,
+	        COALESCE(signup_ip, '') AS signup_ip, COALESCE(last_ip, '') AS last_ip
+	   FROM users WHERE username = ?`, username)
+	if len(profile) == 1 {
+		out["profile"] = profile[0]
 	}
-	out["messages"] = msgs
+	// friends rows are directional (user_a sent the request), so check both
+	// sides.
+	out["friends"] = s.exportQuery(`SELECT CASE WHEN user_a = ? THEN user_b ELSE user_a END AS username, status
+	   FROM friends WHERE user_a = ? OR user_b = ?`, username, username, username)
+	out["blocked"] = s.exportQuery(`SELECT blocked FROM blocks WHERE blocker = ?`, username)
+	out["contact_groups"] = s.exportQuery(`SELECT contact, group_name FROM contact_groups WHERE owner = ?`, username)
+	out["settings"] = s.exportQuery(`SELECT * FROM user_settings WHERE username = ?`, username)
+	// Direct messages exactly as stored: end-to-end encrypted DMs are
+	// ciphertext ("E2EE:…") that only your devices can open.
+	out["direct_messages"] = s.exportQuery(`SELECT * FROM dm_messages WHERE sender = ? OR recipient = ? ORDER BY created_at`, username, username)
+	out["queued_messages"] = s.exportQuery(`SELECT sender, recipient, body, msg_type, created_at FROM offline_messages WHERE sender = ? OR recipient = ? ORDER BY created_at`, username, username)
+	out["group_messages_sent"] = s.exportQuery(`SELECT convo_id, body, sent_at FROM convo_messages WHERE sender = ? ORDER BY sent_at`, username)
+	out["channel_messages_sent"] = s.exportQuery(`SELECT * FROM channel_messages WHERE sender = ?`, username)
+	out["stories"] = s.exportQuery(`SELECT media_url, media_kind, caption, created_at, expires_at FROM stories WHERE author = ?`, username)
+	out["calls"] = s.exportQuery(`SELECT caller, callee, kind, started_at, answered, duration_s FROM calls WHERE caller = ? OR callee = ? ORDER BY started_at`, username, username)
+	out["skype_import_contacts"] = s.exportQuery(`SELECT skype_id, display_name, email, phaze_username FROM skype_import_contacts WHERE username = ?`, username)
+	out["skype_import_messages"] = s.exportQuery(`SELECT conversation_id, conversation_display, sender_display, body, sent_at FROM skype_import_messages WHERE username = ?`, username)
+	out["devices"] = s.exportQuery(`SELECT device_id, label, first_seen, last_seen, last_ip FROM known_devices WHERE username = ?`, username)
+	out["sessions"] = s.exportQuery(`SELECT device_info, created_at, expires_at FROM session_tokens WHERE username = ? AND revoked = 0`, username)
+	out["reward_crates"] = s.exportQuery(`SELECT source, item, shards, created_at, opened_at FROM reward_crates WHERE owner = ?`, username)
 	out["exported_at"] = time.Now().UTC().Format(time.RFC3339)
-	out["note"] = "Live E2EE messages are not stored server-side. This export contains only metadata and queued offline messages."
+	out["note"] = "Everything Phaze's server stores about your account. End-to-end encrypted direct messages appear as ciphertext (E2EE:…), because the server can't read them. Your encryption keys live only on your devices."
 	return out
 }
 
@@ -4055,11 +4079,10 @@ func (s *NexusServer) vapidKeyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *NexusServer) exportHandler(w http.ResponseWriter, r *http.Request) {
-	// H5: prefer Authorization header; fall back to query param for backwards compat.
-	tok := ""
-	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
-		tok = strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
-	}
+	// Session cookie or Authorization header. The old ?token= query
+	// parameter is still read for existing clients, but it ends up in
+	// proxy and server logs, so the web client no longer uses it.
+	tok := tokenFromRequest(r)
 	if tok == "" {
 		tok = r.URL.Query().Get("token")
 	}
