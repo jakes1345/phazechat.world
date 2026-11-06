@@ -94,3 +94,6 @@ web/test-results/
 web/playwright-report/
 web/blob-report/
 web/.playwright/
+
+# Files uploaded while running the server locally
+nexus_server/public/uploads/

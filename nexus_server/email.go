@@ -22,15 +22,19 @@ import (
 // when the code only ever reached the server log. Callers that hold a user
 // out until they receive something must check this first.
 func mailConfigured() bool {
-	if os.Getenv("RESEND_API_KEY") != "" || os.Getenv("BREVO_API_KEY") != "" {
+	if mailRelayURL() != "" || os.Getenv("RESEND_API_KEY") != "" || os.Getenv("BREVO_API_KEY") != "" {
 		return true
 	}
 	return os.Getenv("SMTP_HOST") != "" && os.Getenv("SMTP_USER") != "" && os.Getenv("SMTP_PASS") != ""
 }
 
 func (s *NexusServer) sendEmail(to, subject, body string) error {
-	// Preference order: Resend (no IP allowlist) → Brevo → SMTP. Each one
-	// is opt-in via its env var; users can run with whichever they have.
+	// Preference order: the Cloudflare Worker's mail relay → Resend (no IP
+	// allowlist) → Brevo → SMTP. Each one is opt-in via its env var; users can
+	// run with whichever they have.
+	if relay := mailRelayURL(); relay != "" {
+		return sendEmailRelay(relay, to, subject, body)
+	}
 	if apiKey := os.Getenv("RESEND_API_KEY"); apiKey != "" {
 		return sendEmailResend(apiKey, to, subject, body)
 	}
@@ -38,6 +42,40 @@ func (s *NexusServer) sendEmail(to, subject, body string) error {
 		return sendEmailBrevo(apiKey, to, subject, body)
 	}
 	return sendEmailSMTP(to, subject, body)
+}
+
+// mailRelayURL is where the Cloudflare Worker accepts mail for its EMAIL
+// (send_email) binding. The Worker sets PHAZE_MAIL_RELAY itself when it has
+// that binding (cloudflare/src/mail.ts); the host only resolves from inside
+// the container, so nothing else can send through it.
+func mailRelayURL() string {
+	return strings.TrimSpace(os.Getenv("PHAZE_MAIL_RELAY"))
+}
+
+// sendEmailRelay hands a message to the Worker, which sends it with
+// Cloudflare Email Service from noreply@phazechat.world. No API key: the
+// Worker's binding is the credential.
+func sendEmailRelay(relay, to, subject, body string) error {
+	buf, err := json.Marshal(map[string]string{"to": to, "subject": subject, "html": body})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", relay, bytes.NewReader(buf))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 20 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+	return fmt.Errorf("mail relay %d: %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 }
 
 // sendEmailResend posts to Resend's HTTP API. No IP allowlist, no SMTP

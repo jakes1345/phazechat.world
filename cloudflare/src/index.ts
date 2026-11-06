@@ -6,6 +6,7 @@ import {
   sleepAfter,
   withClientIP,
 } from "./config";
+import { MAIL_HOST, type MailBinding, handleMail } from "./mail";
 import { S3_HOST, handleS3 } from "./s3";
 
 // Outbound interception (the container reaching R2 through the Worker)
@@ -15,6 +16,8 @@ export { ContainerProxy } from "@cloudflare/containers";
 export interface Env {
   NEXUS: DurableObjectNamespace<PhazeNexus>;
   BUCKET: R2Bucket;
+  // Cloudflare Email Service send_email binding (wrangler.jsonc).
+  EMAIL?: MailBinding;
   [binding: string]: unknown;
 }
 
@@ -26,7 +29,9 @@ export interface Env {
  *
  * The container reaches R2 at http://r2.phaze, which the Containers runtime
  * routes to handleS3 (s3.ts) on this machine; that answers with the BUCKET
- * binding, so there are no R2 API keys to create or rotate.
+ * binding, so there are no R2 API keys to create or rotate. Mail works the
+ * same way: http://mail.phaze goes to handleMail (mail.ts), which sends
+ * with the EMAIL binding.
  */
 export class PhazeNexus extends Container<Env> {
 
@@ -83,6 +88,7 @@ export class PhazeNexus extends Container<Env> {
 // registers the handler for this class.
 PhazeNexus.outboundByHost = {
   [S3_HOST]: (request: Request, env: Env, _ctx: OutboundHandlerContext) => handleS3(request, env.BUCKET),
+  [MAIL_HOST]: (request: Request, env: Env, _ctx: OutboundHandlerContext) => handleMail(request, env.EMAIL),
 };
 
 // One fixed name, so every request reaches the same instance.

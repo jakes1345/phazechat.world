@@ -2018,7 +2018,9 @@ export default function App() {
   }, [paletteQuery, send])
 
   const sendFile = useCallback(async (file: File) => {
-    if (!selected || !me || !sessionToken) {
+    // Signed-in web sessions use the HttpOnly cookie, which the upload sends
+    // itself; there is no token in JS memory to check.
+    if (!selected || !me) {
       setErr('Sign in to send files')
       return
     }
@@ -2049,7 +2051,7 @@ export default function App() {
     } catch (e) {
       setErr(`Upload error: ${(e as Error).message}`)
     }
-  }, [selected, me, sessionToken, send, appendLog])
+  }, [selected, me, send, appendLog])
 
   const stopRecording = useCallback((cancel = false) => {
     const r = recorderRef.current
@@ -2068,7 +2070,7 @@ export default function App() {
   }, [])
 
   const startRecording = useCallback(async () => {
-    if (!selected || !sessionToken) {
+    if (!selected || !me) {
       setErr('Sign in and open a chat to record voice')
       return
     }
@@ -2108,7 +2110,7 @@ export default function App() {
     // Auto-stop at 2 minutes to keep uploads reasonable
     rec.start()
     setTimeout(() => { if (recorderRef.current === rec) stopRecording(false) }, 2 * 60 * 1000)
-  }, [selected, sessionToken, recording, stopRecording, sendFile])
+  }, [selected, me, recording, stopRecording, sendFile])
 
   const reactTo = useCallback((line: ChatLine, emoji: string) => {
     if (!selected || !me) return
@@ -2508,11 +2510,10 @@ export default function App() {
 
 
       {/* ── Onboarding (first sign-in only) ─────────────────────── */}
-      {me && sessionToken && onboardingOpen && (
+      {me && onboardingOpen && (
         <Suspense fallback={null}>
           <Onboarding
             me={me}
-            sessionToken={sessionToken}
             onAddFriend={(name) => sendFriendRequest(name)}
             onJump={(v) => setView(v)}
             onClose={() => setOnboardingOpen(false)}
@@ -2885,7 +2886,7 @@ export default function App() {
         )}
 
         {/* ── Hub view (logged in, DMs) ───────────────────────────── */}
-        {me && sessionToken && hasFeature(theme, 'stories') && <Suspense fallback={null}><Stories me={me} sessionToken={sessionToken} /></Suspense>}
+        {me && hasFeature(theme, 'stories') && <Suspense fallback={null}><Stories me={me} /></Suspense>}
         {me && (
           <main className="grid">
             <div className={`hub-content ${selected ? 'chat-open' : ''}`}>
