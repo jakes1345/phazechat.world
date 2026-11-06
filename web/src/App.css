@@ -3270,6 +3270,19 @@ button.link-btn:hover,
   flex-shrink: 0;
 }
 .pending-accept:hover { background: #02B800; }
+.pending-decline {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  padding: 3px 9px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pending-decline:hover { color: var(--text); border-color: var(--muted); }
 
 /* ── Friends empty state with CTA ────────────────────────────── */
 .app.theme-skype7 .friends-empty { text-align: center; padding: 32px 16px 24px; }

@@ -861,6 +861,16 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         _friends.value = _friends.value.toMutableMap().apply { put(from, FriendInfo(from, "Online")) }
     }
 
+    fun declineFriend(from: String) {
+        nexus.send(NexusMessage(type = "friend_reject", recipient = from))
+        _pending.value = _pending.value.filter { it != from }
+    }
+
+    /** The server answers with friend_removed on every session, which drops them from the list. */
+    fun removeContact(who: String) {
+        nexus.send(NexusMessage(type = "friend_remove", recipient = who))
+    }
+
     fun updateProfile(displayName: String, mood: String) {
         val me = _me.value ?: return
         prefs.edit().putString("last_acked_mood", _myMood.value).apply()
@@ -1444,7 +1454,12 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
             "friend_removed" -> {
                 msg.sender?.let { s ->
                     _friends.value = _friends.value.toMutableMap().apply { remove(s) }
+                    if (_selectedChat.value == s) selectChat("")
                 }
+            }
+
+            "friend_request_declined" -> {
+                msg.sender?.let { s -> _pending.value = _pending.value.filter { it != s } }
             }
 
             "pending_requests" -> { _pending.value = msg.results ?: emptyList() }

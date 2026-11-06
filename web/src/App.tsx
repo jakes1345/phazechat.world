@@ -1211,8 +1211,15 @@ export default function App() {
 
         case 'friend_removed':
           if (msg.sender) {
-            setFriends((f) => { const n = { ...f }; delete n[msg.sender!]; return n })
+            const gone = msg.sender
+            setFriends((f) => { const n = { ...f }; delete n[gone]; return n })
+            if (selectedRef.current === gone) { setSelected(null); setLog([]) }
           }
+          break
+
+        case 'friend_request_declined':
+          // Sent to every session of the person who declined.
+          if (msg.sender) setPending((p) => p.filter((x) => x !== msg.sender))
           break
 
         // Contact groups ("Groups panel" — see docs/skype-eras/skype3.md).
@@ -1900,6 +1907,16 @@ export default function App() {
   const acceptFriend = (from: string) => {
     send({ type: 'friend_accept', recipient: from })
     setPending((p) => p.filter((x) => x !== from))
+  }
+
+  const declineFriend = (from: string) => {
+    send({ type: 'friend_reject', recipient: from })
+    setPending((p) => p.filter((x) => x !== from))
+  }
+
+  const removeContact = (who: string) => {
+    if (!confirm(`Remove ${who} from your contacts? You can add each other again later.`)) return
+    send({ type: 'friend_remove', recipient: who })
   }
 
   const ingestDMHistory = useCallback((peer: string, rows: import('./nexusTypes').DMMessage[]) => {
@@ -3134,6 +3151,7 @@ export default function App() {
                             <span className="pending-label">wants to connect</span>
                           </span>
                           <button type="button" className="pending-accept" onClick={() => acceptFriend(u)}>Accept</button>
+                          <button type="button" className="pending-decline" onClick={() => declineFriend(u)} title={`Decline ${u}'s request`}>Decline</button>
                         </div>
                       ))}
                     </div>
@@ -3379,6 +3397,15 @@ export default function App() {
                             }}
                             disabled={!me}
                           >👥</button>
+                          {friends[selected] !== undefined && (
+                            <button
+                              type="button"
+                              className="chat-call-btn"
+                              title={`Remove ${selected} from contacts`}
+                              aria-label={`Remove ${selected} from contacts`}
+                              onClick={() => { if (selected) removeContact(selected) }}
+                            >✕</button>
+                          )}
                           <button
                             type="button"
                             className="chat-call-btn"
