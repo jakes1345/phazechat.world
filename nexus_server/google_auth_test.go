@@ -124,10 +124,23 @@ type googleHarness struct {
 	client *http.Client
 }
 
+// newGoogleHarness runs the web flow as production does, with no client
+// secret (form_post). newGoogleCodeFlowHarness sets one (code + PKCE).
 func newGoogleHarness(t *testing.T) *googleHarness {
 	t.Helper()
-	t.Setenv("PHAZE_GOOGLE_CLIENT_ID", testGoogleClientID)
+	t.Setenv("PHAZE_GOOGLE_CLIENT_SECRET", "")
+	return startGoogleHarness(t)
+}
+
+func newGoogleCodeFlowHarness(t *testing.T) *googleHarness {
+	t.Helper()
 	t.Setenv("PHAZE_GOOGLE_CLIENT_SECRET", "test-secret")
+	return startGoogleHarness(t)
+}
+
+func startGoogleHarness(t *testing.T) *googleHarness {
+	t.Helper()
+	t.Setenv("PHAZE_GOOGLE_CLIENT_ID", testGoogleClientID)
 	t.Setenv("PHAZE_PUBLIC_URL", "https://phazechat.example")
 
 	// Fresh throttles: the tracker is process-wide and these tests sign
@@ -184,11 +197,27 @@ func (h *googleHarness) webSignIn(t *testing.T, startQuery string, claims map[st
 	loc, _ := url.Parse(resp.Header.Get("Location"))
 	q := loc.Query()
 	if !strings.HasPrefix(loc.String(), h.g.srv.URL+"/auth") || q.Get("client_id") != testGoogleClientID ||
-		q.Get("code_challenge_method") != "S256" || q.Get("scope") != "openid email profile" ||
+		q.Get("scope") != "openid email profile" || q.Get("nonce") == "" ||
 		q.Get("redirect_uri") != "https://phazechat.example/api/v1/auth/google/callback" {
 		t.Fatalf("unexpected Google URL %s", loc)
 	}
 	claims["nonce"] = q.Get("nonce")
+
+	if !googleUseCodeFlow() {
+		// form_post: Google posts the signed ID token back to the callback.
+		if q.Get("response_type") != "id_token" || q.Get("response_mode") != "form_post" || q.Get("code_challenge") != "" {
+			t.Fatalf("unexpected form_post Google URL %s", loc)
+		}
+		resp, err = h.client.PostForm(h.hs.URL+"/api/v1/auth/google/callback", url.Values{"state": {q.Get("state")}, "id_token": {h.g.sign(claims)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return backToAppFragment(t, resp)
+	}
+
+	if q.Get("response_type") != "code" || q.Get("code_challenge_method") != "S256" {
+		t.Fatalf("unexpected code-flow Google URL %s", loc)
+	}
 	code := "code-" + q.Get("state")[:8]
 	h.g.mu.Lock()
 	h.g.codes[code] = fakeCode{claims: claims, challenge: q.Get("code_challenge")}
@@ -266,8 +295,14 @@ func (h *googleHarness) makeUser(t *testing.T, username, email, password string)
 }
 
 func TestGoogleWeb_NewAccountThenSignInAgain(t *testing.T) {
-	h := newGoogleHarness(t)
+	newAccountThenSignInAgain(t, newGoogleHarness(t))
+}
 
+func TestGoogleWebCodeFlow_NewAccountThenSignInAgain(t *testing.T) {
+	newAccountThenSignInAgain(t, newGoogleCodeFlowHarness(t))
+}
+
+func newAccountThenSignInAgain(t *testing.T, h *googleHarness) {
 	frag := h.webSignIn(t, "?ref=", googleClaimsFor("g-111", "Jane.Doe@Gmail.com"))
 	if frag.Get("google") != "username" || frag.Get("ticket") == "" {
 		t.Fatalf("fragment = %v, want username step", frag)
@@ -425,8 +460,90 @@ func TestGoogleWeb_BannedAccount(t *testing.T) {
 	}
 }
 
-func TestGoogleWeb_CallbackChecks(t *testing.T) {
+func TestGoogleWeb_FormPostCallbackChecks(t *testing.T) {
 	h := newGoogleHarness(t)
+	start := func() url.Values {
+		resp, err := h.client.Get(h.hs.URL + "/api/v1/auth/google/start")
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		for _, c := range resp.Cookies() {
+			if c.Name == googleStateCookie && c.SameSite != http.SameSiteNoneMode {
+				t.Fatalf("state cookie SameSite = %v, want None for Google's cross-site POST", c.SameSite)
+			}
+		}
+		loc, _ := url.Parse(resp.Header.Get("Location"))
+		return loc.Query()
+	}
+	post := func(form url.Values) url.Values {
+		resp, err := h.client.PostForm(h.hs.URL+"/api/v1/auth/google/callback", form)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return backToAppFragment(t, resp)
+	}
+	claims := func(nonce string) map[string]any {
+		c := googleClaimsFor("g-fp", "fp@gmail.com")
+		c["nonce"] = nonce
+		return c
+	}
+
+	// No state cookie: another browser, or a forged post.
+	h.signOut()
+	if frag := post(url.Values{"state": {"abc"}, "id_token": {h.g.sign(claims("x"))}}); frag.Get("google") != "error" {
+		t.Fatalf("no cookie: %v", frag)
+	}
+
+	// A token for another nonce is refused, and the state is spent.
+	q := start()
+	if frag := post(url.Values{"state": {q.Get("state")}, "id_token": {h.g.sign(claims("not-the-nonce"))}}); frag.Get("google") != "error" {
+		t.Fatalf("nonce mismatch: %v", frag)
+	}
+	if frag := post(url.Values{"state": {q.Get("state")}, "id_token": {h.g.sign(claims(q.Get("nonce")))}}); frag.Get("google") != "error" {
+		t.Fatalf("state reused: %v", frag)
+	}
+
+	// A token issued to another app is refused.
+	q = start()
+	other := claims(q.Get("nonce"))
+	other["aud"] = "someone-else.apps.googleusercontent.com"
+	if frag := post(url.Values{"state": {q.Get("state")}, "id_token": {h.g.sign(other)}}); frag.Get("google") != "error" {
+		t.Fatalf("wrong audience: %v", frag)
+	}
+
+	// A form_post request takes no code, and no answer by GET.
+	q = start()
+	if frag := post(url.Values{"state": {q.Get("state")}, "code": {"c1"}}); frag.Get("google") != "error" {
+		t.Fatalf("code on a form_post request: %v", frag)
+	}
+	q = start()
+	resp, _ := h.client.Get(h.hs.URL + "/api/v1/auth/google/callback?" + url.Values{"state": {q.Get("state")}, "id_token": {h.g.sign(claims(q.Get("nonce")))}}.Encode())
+	if frag := backToAppFragment(t, resp); frag.Get("google") != "error" {
+		t.Fatalf("id_token by GET: %v", frag)
+	}
+
+	// Cancel on Google's screen goes quietly back.
+	if frag := post(url.Values{"error": {"access_denied"}}); len(frag) != 0 {
+		t.Fatalf("cancel: %v", frag)
+	}
+
+	// None of that signed anyone in, and every request is spent.
+	if h.me(t) != "" {
+		t.Fatal("signed in by a refused callback")
+	}
+	var n int
+	h.srv.DB.QueryRow("SELECT COUNT(*) FROM google_auth_requests").Scan(&n)
+	if n != 0 {
+		t.Fatalf("%d requests left over", n)
+	}
+	if h.g.tokens != 0 {
+		t.Fatalf("form_post called Google's token endpoint %d times", h.g.tokens)
+	}
+}
+
+func TestGoogleWebCodeFlow_CallbackChecks(t *testing.T) {
+	h := newGoogleCodeFlowHarness(t)
 
 	// Callback with no state cookie (another browser, or a forged link).
 	resp, err := h.client.Get(h.hs.URL + "/api/v1/auth/google/callback?state=abc&code=xyz")
