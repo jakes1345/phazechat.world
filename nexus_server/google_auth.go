@@ -5,10 +5,19 @@ package main
 // Username and password stay the main way in; Google is an extra door into
 // the same accounts.
 //
-// Web: authorization code flow with PKCE, run by the server, so the browser
-// never holds a Google token and the client secret never leaves the server.
+// Web: the server runs the flow and the browser only carries Google's answer
+// from accounts.google.com to the callback. Two ways, picked by settings:
+//
+//   - No client secret (the default): OpenID Connect with response_type
+//     id_token and response_mode form_post. Google posts the signed ID token
+//     straight to the callback, which checks its signature, audience, expiry
+//     and the one-time nonce. Nothing secret is needed, so there's no key to
+//     store anywhere: the client ID is public.
+//   - Client secret set: authorization code flow with PKCE. The server trades
+//     the code for the ID token at Google's token endpoint.
 //
 //	GET  /api/v1/auth/google/start     -> redirect to Google's consent screen
+//	POST /api/v1/auth/google/callback  -> ID token check, sign-in (form_post)
 //	GET  /api/v1/auth/google/callback  -> code exchange, ID token check, sign-in
 //
 // Android: Credential Manager hands the app a Google ID token, which it posts
@@ -38,10 +47,10 @@ package main
 //	GET  /api/v1/auth/google/start?intent=link     (web)
 //	POST /api/v1/auth/google/idtoken intent=link   (Android, with its bearer token)
 //
-// Settings come from the environment (Worker secrets in production):
+// Settings come from the environment (cloudflare/wrangler.jsonc in production):
 //
 //	PHAZE_GOOGLE_CLIENT_ID      OAuth client ID of type "Web application"
-//	PHAZE_GOOGLE_CLIENT_SECRET  its secret (web flow only)
+//	PHAZE_GOOGLE_CLIENT_SECRET  optional; switches the web flow to code + PKCE
 //	PHAZE_PUBLIC_URL            origin Google sends people back to
 //	                            (default https://phazechat.world)
 
@@ -96,8 +105,12 @@ var errGoogleToken = errors.New("google sign-in could not be verified")
 func googleClientID() string     { return strings.TrimSpace(os.Getenv("PHAZE_GOOGLE_CLIENT_ID")) }
 func googleClientSecret() string { return strings.TrimSpace(os.Getenv("PHAZE_GOOGLE_CLIENT_SECRET")) }
 
-// googleWebEnabled: the browser flow needs both halves of the web client.
-func googleWebEnabled() bool { return googleClientID() != "" && googleClientSecret() != "" }
+// googleWebEnabled: the browser flow only needs the client ID; with no
+// secret it uses form_post, which needs none.
+func googleWebEnabled() bool { return googleClientID() != "" }
+
+// googleUseCodeFlow: a client secret switches the web flow to code + PKCE.
+func googleUseCodeFlow() bool { return googleClientSecret() != "" }
 
 // googleAppEnabled: Android only needs the client ID the tokens are issued to.
 func googleAppEnabled() bool { return googleClientID() != "" }
@@ -685,9 +698,15 @@ func (s *NexusServer) googleStartHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	s.pruneGoogleAuth()
+	codeFlow := googleUseCodeFlow()
 	state, err1 := randHex(32)
 	nonce, err2 := randHex(32)
-	verifier, err3 := randHex(googleVerifierBytes)
+	// An empty verifier marks a form_post request: the callback then only
+	// takes an ID token posted to it, never a code.
+	verifier, err3 := "", error(nil)
+	if codeFlow {
+		verifier, err3 = randHex(googleVerifierBytes)
+	}
 	if err1 != nil || err2 != nil || err3 != nil {
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
@@ -698,28 +717,39 @@ func (s *NexusServer) googleStartHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
 	}
-	// Ties the callback to this browser. Lax, because the callback arrives
-	// as a top-level navigation from accounts.google.com and a Strict
-	// cookie wouldn't be sent with it.
+	// Ties the callback to this browser. The callback arrives from
+	// accounts.google.com, so a Strict cookie wouldn't be sent with it: Lax
+	// covers the code flow's top-level GET, and form_post's cross-site POST
+	// needs None. The value is random and also held server-side, and the
+	// cookie is limited to the Google paths, so None gives a forger nothing.
+	sameSite := http.SameSiteNoneMode
+	if codeFlow {
+		sameSite = http.SameSiteLaxMode
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     googleStateCookie,
 		Value:    state,
 		Path:     googleCookiePath,
 		HttpOnly: true,
 		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		MaxAge:   int(googleRequestTTL.Seconds()),
 	})
 	q := url.Values{
-		"client_id":             {googleClientID()},
-		"redirect_uri":          {googleRedirectURI()},
-		"response_type":         {"code"},
-		"scope":                 {"openid email profile"},
-		"state":                 {state},
-		"nonce":                 {nonce},
-		"code_challenge":        {pkceChallenge(verifier)},
-		"code_challenge_method": {"S256"},
-		"prompt":                {"select_account"},
+		"client_id":    {googleClientID()},
+		"redirect_uri": {googleRedirectURI()},
+		"scope":        {"openid email profile"},
+		"state":        {state},
+		"nonce":        {nonce},
+		"prompt":       {"select_account"},
+	}
+	if codeFlow {
+		q.Set("response_type", "code")
+		q.Set("code_challenge", pkceChallenge(verifier))
+		q.Set("code_challenge_method", "S256")
+	} else {
+		q.Set("response_type", "id_token")
+		q.Set("response_mode", "form_post")
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	http.Redirect(w, r, googleAuthEndpoint+"?"+q.Encode(), http.StatusFound)
@@ -753,7 +783,7 @@ func googleBackToApp(w http.ResponseWriter, frag url.Values) {
 func clearGoogleStateCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name: googleStateCookie, Value: "", Path: googleCookiePath,
-		HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		HttpOnly: true, Secure: true, SameSite: http.SameSiteNoneMode, MaxAge: -1,
 	})
 }
 
@@ -786,9 +816,24 @@ func (s *NexusServer) takeGoogleRequest(id, kind string) (*googleRequest, bool) 
 	return gr, true
 }
 
-// googleCallbackHandler is where Google sends the browser back.
+// googleCallbackHandler is where Google sends the browser back: a POST
+// carrying the ID token (form_post), or a GET carrying a code (code flow).
 func (s *NexusServer) googleCallbackHandler(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
+	var q url.Values
+	switch r.Method {
+	case http.MethodGet:
+		q = r.URL.Query()
+	case http.MethodPost:
+		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		q = r.PostForm
+	default:
+		http.Error(w, "GET or POST required", http.StatusMethodNotAllowed)
+		return
+	}
 	clearGoogleStateCookie(w)
 	if e := q.Get("error"); e != "" {
 		// "access_denied" is the person pressing Cancel: just go back.
@@ -810,16 +855,27 @@ func (s *NexusServer) googleCallbackHandler(w http.ResponseWriter, r *http.Reque
 		googleBackToApp(w, url.Values{"google": {"error"}, "msg": {"That sign-in expired. Try again."}})
 		return
 	}
-	code := q.Get("code")
-	if code == "" {
-		googleBackToApp(w, url.Values{"google": {"error"}, "msg": {"Google didn't complete the sign-in. Try again."}})
-		return
-	}
-	rawID, err := exchangeGoogleCode(code, gr.verifier)
-	if err != nil {
-		log.Printf("[google] code exchange: %v", err)
-		googleBackToApp(w, url.Values{"google": {"error"}, "msg": {"Couldn't reach Google to finish signing in. Try again."}})
-		return
+	// Each request only takes the answer it asked Google for.
+	var rawID string
+	if gr.verifier == "" {
+		rawID = q.Get("id_token")
+		if r.Method != http.MethodPost || rawID == "" || q.Get("code") != "" {
+			googleBackToApp(w, url.Values{"google": {"error"}, "msg": {"Google didn't complete the sign-in. Try again."}})
+			return
+		}
+	} else {
+		code := q.Get("code")
+		if r.Method != http.MethodGet || code == "" || q.Get("id_token") != "" {
+			googleBackToApp(w, url.Values{"google": {"error"}, "msg": {"Google didn't complete the sign-in. Try again."}})
+			return
+		}
+		var err error
+		rawID, err = exchangeGoogleCode(code, gr.verifier)
+		if err != nil {
+			log.Printf("[google] code exchange: %v", err)
+			googleBackToApp(w, url.Values{"google": {"error"}, "msg": {"Couldn't reach Google to finish signing in. Try again."}})
+			return
+		}
 	}
 	claims, err := verifyGoogleIDToken(rawID, googleClientID())
 	if err != nil || subtle.ConstantTimeCompare([]byte(claims.Nonce), []byte(gr.nonce)) != 1 {

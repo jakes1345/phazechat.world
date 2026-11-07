@@ -32,6 +32,10 @@
   "vars": {
     // How long the container stays up with no requests or socket traffic.
     // Cold starts restore the database from R2, which takes a few seconds.
-    "SLEEP_AFTER": "30m"
+    "SLEEP_AFTER": "30m",
+    // Sign in with Google: the OAuth web client in the Google Cloud project
+    // "Phaze" (phazechat-world). A client ID is public, not a secret; the
+    // web flow uses form_post, so no client secret is needed anywhere.
+    "PHAZE_GOOGLE_CLIENT_ID": "58601666124-6cngjmmjm65qjgqptlofvb43l7f1nhnk.apps.googleusercontent.com"
   }
 }

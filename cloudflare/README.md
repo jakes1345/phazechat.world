@@ -68,9 +68,9 @@ it sleeps. Set `SLEEP_AFTER` to e.g. `720h` to keep it effectively always on.
 
    Then the app's own settings, as needed: `PHAZE_ALLOWED_ORIGINS`,
    `PHAZE_ADMIN_USERS`, `BREVO_API_KEY`, `VAPID_PUBLIC_KEY`,
-   `VAPID_PRIVATE_KEY`, `GEMINI_API_KEY`, `NOVA_PASSWORD`, `SENTRY_DSN`,
-   and `PHAZE_GOOGLE_CLIENT_ID` / `PHAZE_GOOGLE_CLIENT_SECRET` for Sign in
-   with Google (see `docs/google-sign-in.md`).
+   `VAPID_PRIVATE_KEY`, `GEMINI_API_KEY`, `NOVA_PASSWORD`, `SENTRY_DSN`.
+   Sign in with Google needs no secret: its public client ID is in
+   `wrangler.jsonc` (see `docs/google-sign-in.md`).
    Every string secret is passed to the server as an environment variable.
    Don't set `PHAZE_TRUST_PROXY_HEADER`; the Worker sets it.
 5. **GitHub secrets** (repo Settings > Secrets and variables > Actions):

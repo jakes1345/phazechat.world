@@ -7,13 +7,22 @@ show the button and the step that can follow it.
 ## How it works
 
 **Web.** The button is a link to `/api/v1/auth/google/start`. The server
-sends the browser to Google with the authorization code flow, PKCE (S256), a
-random `state` held in a short-lived cookie and a `nonce`. Google sends the
-browser back to `/api/v1/auth/google/callback`; the server swaps the code for
-an ID token with the client secret, checks the token (below) and either signs
-the person in (session cookie, as with a password) or sends them to `/web/`
-with the one step still needed in the URL fragment. The web app reads the
-fragment and clears it.
+sends the browser to Google with OpenID Connect, `response_type=id_token`
+and `response_mode=form_post`, a random `state` held server-side and in a
+short-lived cookie, and a `nonce`. Google posts the signed ID token back to
+`/api/v1/auth/google/callback`; the server checks the state, then the token
+(below), and either signs the person in (session cookie, as with a password)
+or sends them to `/web/` with the one step still needed in the URL fragment.
+The web app reads the fragment and clears it.
+
+This needs no client secret: the ID token is signed by Google and bound to
+this sign-in by the nonce. The state cookie is `SameSite=None` because
+Google's post back is cross-site; it is random, also stored server-side, used
+once and limited to `/api/v1/auth/google`.
+
+If `PHAZE_GOOGLE_CLIENT_SECRET` is set, the web flow uses the authorization
+code flow with PKCE (S256) instead, and the server trades the code for the ID
+token at Google's token endpoint. Production doesn't set it.
 
 **Android.** The app gets a one-time nonce from `/api/v1/auth/google/nonce`,
 opens Google's account sheet with Credential Manager
@@ -48,28 +57,29 @@ disposable-email check), and bans apply as they do to password sign-in.
 Until `PHAZE_GOOGLE_CLIENT_ID` is set the server reports Google as off and
 neither app shows the button.
 
+phazechat.world is set up in the Google Cloud project **Phaze**
+(`phazechat-world`). To set it up somewhere else:
+
 1. In [Google Cloud console](https://console.cloud.google.com/), make or pick
    a project, then open **Google Auth Platform**.
-2. **Branding:** app name `Phaze`, support email, the app's home page
-   `https://phazechat.world`, and `phazechat.world` as an authorized domain.
-3. **Audience:** External, then **Publish app**. The scopes used (`openid`,
+2. **Branding:** app name, support email, the home page
+   `https://phazechat.world`, the privacy policy
+   `https://phazechat.world/privacy`, the terms `https://phazechat.world/terms`,
+   and `phazechat.world` as an authorized domain.
+3. **Audience:** External, then **Publish app**. Until it's published only
+   the test users listed there can sign in. The scopes used (`openid`,
    `email`, `profile`) don't need Google's verification review.
 4. **Clients > Create client > Web application.** Authorized redirect URI:
-   `https://phazechat.world/api/v1/auth/google/callback`. Keep the client ID
-   and client secret.
+   `https://phazechat.world/api/v1/auth/google/callback`. Only the client ID
+   is needed; the client secret isn't used.
 5. **Clients > Create client > Android.** Package name `world.phazechat.app`
    and the SHA-1 of the release signing certificate. Run the
    *Android signing fingerprint* workflow (Actions tab > Run workflow) to get
    it. If the app is also on Google Play with Play App Signing, add a second
    Android client with the SHA-1 from Play Console > App integrity.
-6. Worker secrets, from `cloudflare/`:
-
-   ```
-   npx wrangler secret put PHAZE_GOOGLE_CLIENT_ID
-   npx wrangler secret put PHAZE_GOOGLE_CLIENT_SECRET
-   ```
-
-   They reach the server on the container's next start.
+6. Put the web client ID in `PHAZE_GOOGLE_CLIENT_ID` under `vars` in
+   `cloudflare/wrangler.jsonc`. It's public, so it lives in the repo; the
+   next deploy passes it to the server.
 
 `PHAZE_PUBLIC_URL` sets the origin Google sends people back to; it defaults to
 `https://phazechat.world` and only needs setting for another domain (its
