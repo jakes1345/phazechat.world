@@ -4,6 +4,7 @@ import type { NexusMessage } from './nexusTypes'
 import { bumpAvatarVersion } from './avatarVersions'
 import { SELECTABLE_THEMES, type ThemeId } from './themes'
 import RewardsPanel from './RewardsPanel'
+import { GoogleAccountSettings } from './GoogleSignIn'
 import './settings.css'
 
 type Tab = 'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite' | 'import' | 'appearance'
@@ -566,6 +567,7 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
           {/* ── Security ─────────────────────────────────────── */}
           {tab === 'security' && (
             <div className="settings-section">
+              <GoogleAccountSettings />
               <h3 className="settings-section-title">Change password</h3>
               <input className="settings-input" type="password" placeholder="Current password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} autoComplete="current-password" />
               <input className="settings-input" type="password" placeholder="New password (8+ chars)" value={newPw} onChange={(e) => setNewPw(e.target.value)} autoComplete="new-password" />
