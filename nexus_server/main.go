@@ -310,6 +310,9 @@ type NexusServer struct {
 	// channel_id -> set of usernames.
 	VoiceRooms   map[string]map[string]struct{}
 	VoiceRoomsMu sync.RWMutex
+	// CallRoomGuests is the guest list of each ad-hoc group call room
+	// (see voicerooms.go). Guarded by VoiceRoomsMu.
+	CallRoomGuests map[string]*callRoomGuests
 	// Streams maps broadcaster username -> active livestream metadata.
 	// Guarded by VoiceRoomsMu (shared mutex — both are room-style state).
 	Streams map[string]*liveStream
@@ -2269,17 +2272,6 @@ func (s *NexusServer) autoJoinPublicSpaces(botUsername string) {
 		count++
 	}
 	log.Printf("[bot] %s joined %d public spaces", botUsername, count)
-}
-
-func (s *NexusServer) voiceRoomJoin(channelID, username string) {
-	s.VoiceRoomsMu.Lock()
-	room, ok := s.VoiceRooms[channelID]
-	if !ok {
-		room = make(map[string]struct{})
-		s.VoiceRooms[channelID] = room
-	}
-	room[username] = struct{}{}
-	s.VoiceRoomsMu.Unlock()
 }
 
 func (s *NexusServer) voiceRoomLeave(channelID, username string) {
