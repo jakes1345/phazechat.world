@@ -1776,6 +1776,36 @@ button.link-btn:hover,
   align-items: center;
 }
 
+/* Report dialog: one reason, then optional details. */
+.report-reasons {
+  border: 0;
+  padding: 0;
+  margin: 0.25rem 0 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.report-reasons legend {
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+.restore-card .report-reason {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.restore-card .report-reason input {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--brand);
+}
+.restore-card .error {
+  color: var(--danger);
+  margin: 0.5rem 0;
+}
+
 /* ── Scroll-to highlight flash ───────────────────────────────── */
 .highlight-flash .bubble {
   animation: pulseHi 1.5s ease-out;
@@ -3270,6 +3300,19 @@ button.link-btn:hover,
   flex-shrink: 0;
 }
 .pending-accept:hover { background: #02B800; }
+.pending-decline {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  padding: 3px 9px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.pending-decline:hover { color: var(--text); border-color: var(--muted); }
 
 /* ── Friends empty state with CTA ────────────────────────────── */
 .app.theme-skype7 .friends-empty { text-align: center; padding: 32px 16px 24px; }

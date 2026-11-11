@@ -44,6 +44,7 @@ fun ChatScreen(
     typing: Boolean = false,
     onTyping: () -> Unit = {},
     onBlock: () -> Unit = {},
+    onRemoveContact: (() -> Unit)? = null,
     onReport: (String, String) -> Unit = { _, _ -> },
     onEdit: (String, String) -> Unit = { _, _ -> },
     onDelete: (String) -> Unit = {},
@@ -59,6 +60,7 @@ fun ChatScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var reportOpen by remember { mutableStateOf(false) }
     var blockConfirm by remember { mutableStateOf(false) }
+    var removeConfirm by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<ChatLine?>(null) }
 
     LaunchedEffect(messages.size) {
@@ -77,6 +79,15 @@ fun ChatScreen(
             text = { Text("They won't be able to message you, and this chat will be removed.") },
             confirmButton = { Button(onClick = { onBlock(); blockConfirm = false }) { Text("Block") } },
             dismissButton = { TextButton(onClick = { blockConfirm = false }) { Text("Cancel") } },
+        )
+    }
+    if (removeConfirm && onRemoveContact != null) {
+        AlertDialog(
+            onDismissRequest = { removeConfirm = false },
+            title = { Text("Remove $peer?") },
+            text = { Text("$peer will be removed from your contacts. You can add each other again later.") },
+            confirmButton = { Button(onClick = { onRemoveContact(); removeConfirm = false }) { Text("Remove") } },
+            dismissButton = { TextButton(onClick = { removeConfirm = false }) { Text("Cancel") } },
         )
     }
     editing?.let { line ->
@@ -123,6 +134,12 @@ fun ChatScreen(
                         Icon(Icons.Default.MoreVert, "More", tint = Color.White)
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        if (onRemoveContact != null) {
+                            DropdownMenuItem(
+                                text = { Text("Remove from contacts") },
+                                onClick = { menuOpen = false; removeConfirm = true },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Report $peer") },
                             onClick = { menuOpen = false; reportOpen = true },
