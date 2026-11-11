@@ -2805,22 +2805,17 @@ export default function App() {
         <div className="call-overlay" style={{ flexDirection: 'column', gap: '1rem', padding: '2rem' }}>
           <Suspense fallback={null}>
           <VoiceRoom
+            key={groupCallRoom}
             me={me}
             channelId={groupCallRoom}
-            channelName="Group Call"
+            channelName="Group call"
             send={send}
             subscribe={subscribe}
-            turn={null}
+            turn={turn}
+            autoJoin
+            onLeave={() => setGroupCallRoom(null)}
           />
           </Suspense>
-          <button
-            type="button"
-            className="call-btn-end"
-            onClick={() => {
-              send({ type: 'voice_leave', channel_id: groupCallRoom })
-              setGroupCallRoom(null)
-            }}
-          >Leave group call</button>
         </div>
       )}
 

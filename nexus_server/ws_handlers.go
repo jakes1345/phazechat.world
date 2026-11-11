@@ -2034,8 +2034,11 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "call_error", Error: "You can only invite friends"})
 				continue
 			}
-			msg.Sender = username
-			s.sendTo(msg.Recipient, msg)
+			if err := s.callRoomInvite(msg.ChannelID, username, msg.Recipient); err != nil {
+				client.Send(NexusMessage{Type: "call_error", Error: "Couldn't invite to that call: " + err.Error()})
+				continue
+			}
+			s.sendTo(msg.Recipient, NexusMessage{Type: "call_invite", Sender: username, Recipient: msg.Recipient, ChannelID: msg.ChannelID})
 
 		case "remote_register":
 			if username == "" {
@@ -2637,27 +2640,34 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			if username == "" || msg.ChannelID == "" {
 				continue
 			}
-			// Ad-hoc call rooms (prefixed "call_") skip Spaces channel checks.
+			// Ad-hoc call rooms (prefixed "call_") have no Spaces channel; their
+			// guest list decides who may join (see voicerooms.go).
 			if strings.HasPrefix(msg.ChannelID, "call_") {
-				s.voiceRoomJoin(msg.ChannelID, username)
+				if err := s.voiceRoomTryJoin(msg.ChannelID, username); err != nil {
+					client.Send(NexusMessage{Type: "voice_peers", ChannelID: msg.ChannelID, Error: err.Error()})
+					continue
+				}
 				s.voiceRoomBroadcastPeers(msg.ChannelID)
 				continue
 			}
 			// Verify the channel exists and the user belongs to its server.
 			var serverID, kind string
 			if err := s.DB.QueryRow(`SELECT server_id, kind FROM channels WHERE id = ?`, msg.ChannelID).Scan(&serverID, &kind); err != nil {
-				client.Send(NexusMessage{Type: "voice_peers", Error: "channel not found"})
+				client.Send(NexusMessage{Type: "voice_peers", ChannelID: msg.ChannelID, Error: "channel not found"})
 				continue
 			}
 			if kind != "voice" {
-				client.Send(NexusMessage{Type: "voice_peers", Error: "not a voice channel"})
+				client.Send(NexusMessage{Type: "voice_peers", ChannelID: msg.ChannelID, Error: "not a voice channel"})
 				continue
 			}
 			if !s.isServerMember(serverID, username) {
-				client.Send(NexusMessage{Type: "voice_peers", Error: "not a member"})
+				client.Send(NexusMessage{Type: "voice_peers", ChannelID: msg.ChannelID, Error: "not a member"})
 				continue
 			}
-			s.voiceRoomJoin(msg.ChannelID, username)
+			if err := s.voiceRoomTryJoin(msg.ChannelID, username); err != nil {
+				client.Send(NexusMessage{Type: "voice_peers", ChannelID: msg.ChannelID, Error: err.Error()})
+				continue
+			}
 			s.voiceRoomBroadcastPeers(msg.ChannelID)
 
 		case "voice_leave":
