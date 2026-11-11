@@ -54,6 +54,7 @@ fun ChatsScreen(
     onSelectChat: (String) -> Unit,
     onAddFriend: (String) -> Unit,
     onAcceptFriend: (String) -> Unit,
+    onDeclineFriend: (String) -> Unit = {},
     onViewStory: (String) -> Unit = {},
     onAddStory: () -> Unit = {},
     searchResults: List<String> = emptyList(),
@@ -129,6 +130,12 @@ fun ChatsScreen(
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary),
                     ) {
                         Text("Accept", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    TextButton(
+                        onClick = { onDeclineFriend(from) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                    ) {
+                        Text("Decline", fontSize = 13.sp)
                     }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
