@@ -1,0 +1,44 @@
+name: Android signing fingerprint
+
+# Prints the SHA-1 and SHA-256 fingerprints of the certificate the release
+# APK is signed with. Google Cloud asks for the SHA-1 when you register the
+# Android app for Sign in with Google (docs/google-sign-in.md). A fingerprint
+# is public (anyone can read it off the APK); the keystore and its passwords
+# stay in the repo secrets and are never printed.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Read the release certificate
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::The ANDROID_KEYSTORE_B64 secret isn't set."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          keytool -list -v -keystore "$RUNNER_TEMP/release.keystore" \
+            -storepass "$KEYSTORE_PASS" -alias "${KEY_ALIAS:-phaze}" > "$RUNNER_TEMP/cert.txt"
+          rm -f "$RUNNER_TEMP/release.keystore"
+          {
+            echo "## Release signing certificate"
+            echo
+            echo "Package name: \`world.phazechat.app\`"
+            echo
+            grep -E '^[[:space:]]*SHA(1|256):' "$RUNNER_TEMP/cert.txt" | sed -E 's/^[[:space:]]*/- /'
+          } | tee -a "$GITHUB_STEP_SUMMARY"

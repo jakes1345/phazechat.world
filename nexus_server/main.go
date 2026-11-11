@@ -913,6 +913,7 @@ func (s *NexusServer) initDB() {
 	if _, err := s.DB.Exec(`UPDATE users SET role = 'admin' WHERE is_admin = 1 AND (role = '' OR role = 'user')`); err != nil {
 		log.Printf("[role] backfill: %v", err)
 	}
+	s.initGoogleAuthDB()
 	s.initRewardsDB()
 }
 
@@ -1048,6 +1049,8 @@ func (s *NexusServer) deleteAccount(username string) error {
 		{`DELETE FROM session_tokens WHERE username = ?`, []any{username}},
 		{`DELETE FROM password_resets WHERE username = ?`, []any{username}},
 		{`DELETE FROM qr_login_tokens WHERE username = ?`, []any{username}},
+		{`DELETE FROM google_auth_tickets WHERE username = ?`, []any{username}},
+		{`DELETE FROM google_auth_requests WHERE link_user = ?`, []any{username}},
 		// Drop the user last — every other row referencing the username is
 		// already gone, so a foreign-key constraint (if added later) would still
 		// pass.
@@ -1106,7 +1109,7 @@ func (s *NexusServer) consumePasswordReset(token, newPassword string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := tx.Exec("UPDATE users SET password_hash = ? WHERE username = ?", string(hash), username); err != nil {
+	if _, err := tx.Exec("UPDATE users SET password_hash = ?, password_set = 1 WHERE username = ?", string(hash), username); err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -4416,6 +4419,8 @@ h1{color:#fca5a5;margin:0 0 12px}p{color:#a1a1aa}</style></head>
 	http.HandleFunc("/api/v1/auth/verify-device", rateLimit(server.httpVerifyDeviceHandler))
 	http.HandleFunc("/api/v1/auth/logout", rateLimit(server.httpLogoutHandler))
 	http.HandleFunc("/api/v1/auth/me", rateLimit(server.httpMeHandler))
+	// Sign in with Google (google_auth.go).
+	server.registerGoogleRoutes(http.HandleFunc, rateLimit)
 
 	http.HandleFunc("/api/v1/stats", rateLimit(server.statsHandler))
 	http.HandleFunc("/api/v1/export", rateLimit(server.exportHandler))

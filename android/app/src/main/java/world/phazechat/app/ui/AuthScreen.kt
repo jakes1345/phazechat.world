@@ -35,6 +35,7 @@ fun AuthScreen(
     scannedLinkCode: String = "",
     onScanQR: (() -> Unit)? = null,
     onScanGallery: (() -> Unit)? = null,
+    google: GoogleAuthUi? = null,
 ) {
     var mode by remember { mutableStateOf("login") } // login, register, link
     var username by remember { mutableStateOf("") }
@@ -98,7 +99,12 @@ fun AuthScreen(
         Text("Encrypted chat for everyone", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         Spacer(Modifier.height(32.dp))
 
-        if (totpRequired) {
+        val googleStep = google?.step
+        if (google != null && googleStep != null) {
+            // ── The step after Sign in with Google ────────────────────
+            GoogleStepForm(google, googleStep)
+
+        } else if (totpRequired) {
             // ── 2FA / TOTP step ───────────────────────────────────────
             Text(
                 "Two-factor authentication is enabled. Enter the 6-digit code from your authenticator app, or a backup code (e.g. abcde-f0123).",
@@ -307,6 +313,18 @@ fun AuthScreen(
                     },
                     fontWeight = FontWeight.Bold
                 )
+            }
+            if (google != null && google.available) {
+                AuthOrDivider()
+                GoogleSignInButton(
+                    label = if (mode == "register") "Sign up with Google" else "Sign in with Google",
+                    busy = google.busy,
+                    onClick = { focus.clearFocus(); google.onSignIn() },
+                )
+                if (google.error != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(google.error, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center)
+                }
             }
             Spacer(Modifier.height(12.dp))
 

@@ -750,7 +750,7 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				client.Send(NexusMessage{Type: "change_password_result", Error: "Internal error"})
 				continue
 			}
-			if _, err := s.DB.Exec("UPDATE users SET password_hash = ? WHERE username = ?", string(hash), username); err != nil {
+			if _, err := s.DB.Exec("UPDATE users SET password_hash = ?, password_set = 1 WHERE username = ?", string(hash), username); err != nil {
 				client.Send(NexusMessage{Type: "change_password_result", Error: "Database error"})
 				continue
 			}
