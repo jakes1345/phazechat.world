@@ -41,12 +41,13 @@ Messaging
 
 Spaces
 - Community servers with text channels, pinned messages, reactions and edits.
-- Voice channels and a shared whiteboard on the web.
+- Voice channels (up to 8 people, with camera and screen sharing) and a shared whiteboard on the web.
 - Channel messages are deleted after 30 days by default.
 
 Calls and media
 - Voice and video calls between friends. Calls ring every device you're signed in on.
-- On the web, calls and voice channels open a room on the public Jitsi Meet service (`meet.jit.si`). Screen sharing inside a call uses Jitsi's own controls.
+- Group calls from a chat (web): invite a friend into a voice room; the friends you invite can bring in their friends, up to 8 people.
+- Calls, voice channels and group calls run over WebRTC directly between the people in them, through Cloudflare's TURN relay when a direct path is blocked. Voice rooms are a mesh: everyone sends their stream to everyone else, which is why they're capped at 8. Media never passes through the Phaze server.
 - Live streams (web only): broadcast your camera or screen to viewers over direct WebRTC connections.
 - Remote screen sessions (web only): share your screen with someone using a 6-digit code, with a pointer overlay and file transfer over a WebRTC data channel.
 
@@ -60,8 +61,8 @@ Other
 
 These are the things I know are broken or partial right now.
 
-- Android calls now go through Jitsi like the web ones: the call rings over the socket, then the app opens the room the server picks in the Jitsi Meet SDK's own call screen (`android/.../data/JitsiCalls.kt`). The `meet.jit.si` caveat below applies to them too, and they haven't been tested end to end on a device yet.
-- Web calls go through `meet.jit.si`, so call audio and video are not covered by Phaze's encryption. The privacy policy at `/privacy` explains this.
+- Android has no voice channels or group calls yet: a voice channel opens as a text channel there.
+- If one side of a 1:1 call runs an old app from before built-in calls, the server still hands both sides a `meet.jit.si` room. The privacy policy at `/privacy` explains this.
 - The Android app is hardwired to `phazechat.world` (`NexusClient.kt` and `PhazeViewModel.kt`). There is no server setting.
 - There is no macOS build. CI builds Windows and Linux desktop binaries only.
 
@@ -180,7 +181,7 @@ Some variable names start with `Phaze_` in mixed case rather than `PHAZE_`. That
 
 ### TURN
 
-The server hands TURN credentials to clients when they sign in. They're used by the WebRTC features that don't go through Jitsi: live streams and remote screen sessions on the web. Calls on both web and Android go through Jitsi. There are three ways to set it up.
+The server hands TURN credentials to clients when they sign in. They're used by every WebRTC feature: calls, voice channels, group calls, live streams and remote screen sessions. There are three ways to set it up.
 
 Cloudflare Realtime TURN, which the hosted instance uses. The server fetches short-lived `turn.cloudflare.com` credentials and refreshes them in the background:
 
