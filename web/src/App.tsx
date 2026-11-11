@@ -2059,6 +2059,7 @@ export default function App() {
     }
   }
 
+
   const togglePin = useCallback((line: ChatLine) => {
     if (!selected || !me) return
     setPinnedIds((prev) => {
@@ -2345,6 +2346,44 @@ export default function App() {
     if (!/^\d{6}$/.test(regCode.trim())) { setErr('Enter the 6-digit code from your email'); return }
     send({ type: 'verify_email', sender: regUser, body: regCode.trim() })
   }
+
+  // A tapped notification says where to go: in the URL when it opened a new
+  // window, or as a message to a window that was already open. Wait until
+  // signed in, then go there once.
+  const [notifTarget, setNotifTarget] = useState<{ chat?: string; space?: string } | null>(() => {
+    const p = new URLSearchParams(window.location.search)
+    const chat = p.get('open_chat') || undefined
+    const space = p.get('open_space') || undefined
+    return chat || space ? { chat, space } : null
+  })
+  useEffect(() => {
+    const sw = navigator.serviceWorker
+    if (!sw) return
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as { type?: string; chat?: string; space?: string } | null
+      if (d?.type === 'phaze-open') setNotifTarget({ chat: d.chat, space: d.space })
+    }
+    sw.addEventListener('message', onMsg)
+    return () => sw.removeEventListener('message', onMsg)
+  }, [])
+  useEffect(() => {
+    if (!me || !notifTarget) return
+    const t = notifTarget
+    setNotifTarget(null)
+    const url = new URL(window.location.href)
+    url.searchParams.delete('open_chat')
+    url.searchParams.delete('open_space')
+    window.history.replaceState(null, '', url.toString())
+    if (t.chat) {
+      setView('dms')
+      setSelectedConvo(null)
+      openChat(t.chat)
+    } else if (t.space) {
+      setView('spaces')
+    }
+    // openChat is a plain function redefined each render; only the target matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, notifTarget])
 
   const totalUnread = useMemo(() => Object.values(unread).reduce((a, b) => a + b, 0), [unread])
   useEffect(() => {

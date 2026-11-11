@@ -30,7 +30,6 @@ import (
 
 	firebase "firebase.google.com/go/v4"
 	"firebase.google.com/go/v4/messaging"
-	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/bcrypt"
@@ -885,6 +884,16 @@ func (s *NexusServer) initDB() {
 		`CREATE INDEX IF NOT EXISTS idx_skype_contacts_user ON skype_import_contacts(username)`,
 		`ALTER TABLE users ADD COLUMN referred_by TEXT DEFAULT ''`,
 		`CREATE INDEX IF NOT EXISTS idx_users_referred_by ON users(referred_by)`,
+		// One row per Android install, so a person with two phones gets
+		// pushes on both. Tokens that were kept on users move over once.
+		`CREATE TABLE IF NOT EXISTS fcm_tokens (
+			token TEXT PRIMARY KEY,
+			username TEXT NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_fcm_tokens_user ON fcm_tokens(username)`,
+		`INSERT OR IGNORE INTO fcm_tokens (token, username) SELECT fcm_token, username FROM users WHERE COALESCE(fcm_token, '') != ''`,
+		`UPDATE users SET fcm_token = '' WHERE COALESCE(fcm_token, '') != ''`,
 	}
 	for _, q := range migrations {
 		if _, err := s.DB.Exec(q); err != nil && !strings.Contains(err.Error(), "duplicate column") && !strings.Contains(err.Error(), "already exists") {
@@ -1044,6 +1053,7 @@ func (s *NexusServer) deleteAccount(username string) error {
 		{`DELETE FROM stories WHERE author = ?`, []any{username}},
 		{`DELETE FROM user_settings WHERE username = ?`, []any{username}},
 		{`DELETE FROM push_subscriptions WHERE username = ?`, []any{username}},
+		{`DELETE FROM fcm_tokens WHERE username = ?`, []any{username}},
 		{`DELETE FROM key_backups WHERE username = ?`, []any{username}},
 		{`DELETE FROM totp_backup_codes WHERE username = ?`, []any{username}},
 		{`DELETE FROM session_tokens WHERE username = ?`, []any{username}},
@@ -1461,10 +1471,21 @@ func (s *NexusServer) broadcastChannelMsg(serverID string, payload NexusMessage)
 		if s.sendTo(u, payload) {
 			continue
 		}
-		if u != payload.Sender {
-			go s.sendWebPush(u, pushTitle, payload.Body)
-			go s.sendFCMPush(u, pushTitle, payload.Body)
+		kind, ok := channelPushFor(serverID, payload, u)
+		if !ok {
+			continue
 		}
+		title := pushTitle
+		if kind == pushKindMention {
+			title = payload.Sender + " mentioned you in " + serverName
+			if channelName != "" {
+				title += " #" + channelName
+			}
+		}
+		s.notify(u, pushNote{
+			Title: title, Body: payload.Body, Kind: kind, Sender: payload.Sender,
+			ServerID: serverID, ChannelID: payload.ChannelID,
+		})
 	}
 }
 
@@ -1836,55 +1857,12 @@ func (s *NexusServer) storeOfflineMessage(sender, recipient, body, msgType, msgI
 		sender, recipient, body, msgType, msgID); err != nil {
 		log.Printf("[offline] store %s->%s (%s) failed: %v", sender, recipient, msgType, err)
 	}
-	go s.sendWebPush(recipient, sender, body)
-	go s.sendFCMPush(recipient, sender, body)
+	s.notify(recipient, pushNote{Title: sender, Body: body, Kind: pushKindDM, Sender: sender})
 }
 
-func (s *NexusServer) sendWebPush(recipient, sender, preview string) {
-	privKey := os.Getenv("VAPID_PRIVATE_KEY")
-	pubKey := os.Getenv("VAPID_PUBLIC_KEY")
-	if privKey == "" || pubKey == "" {
-		return
-	}
-	rows, err := s.DB.Query("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE username = ?", recipient)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-	msg := preview
-	if strings.HasPrefix(msg, "E2EE:") || strings.HasPrefix(msg, "phaze-file:") {
-		msg = "New encrypted message"
-	} else if len(msg) > 80 {
-		msg = msg[:80] + "…"
-	}
-	payload, _ := json.Marshal(map[string]string{
-		"title": sender,
-		"body":  msg,
-	})
-	for rows.Next() {
-		var endpoint, p256dh, auth string
-		if err := rows.Scan(&endpoint, &p256dh, &auth); err != nil {
-			continue
-		}
-		sub := &webpush.Subscription{
-			Endpoint: endpoint,
-			Keys: webpush.Keys{
-				P256dh: p256dh,
-				Auth:   auth,
-			},
-		}
-		resp, err := webpush.SendNotification(payload, sub, &webpush.Options{
-			VAPIDPublicKey:  pubKey,
-			VAPIDPrivateKey: privKey,
-			Subscriber:      "noreply@phazechat.world",
-			TTL:             86400,
-		})
-		if err != nil {
-			log.Printf("[push] send to %s: %v", recipient, err)
-		} else {
-			resp.Body.Close()
-		}
-	}
+// sendWebPush is the older entry point, kept for group chat fan-out.
+func (s *NexusServer) sendWebPush(recipient, title, preview string) {
+	s.sendWebNote(recipient, pushNote{Title: title, Body: pushPreview(preview), Kind: pushKindGroup})
 }
 
 func (s *NexusServer) listSessions(username string) []map[string]string {
@@ -3971,48 +3949,9 @@ func (s *NexusServer) initFCM() {
 	log.Println("[FCM] Firebase Cloud Messaging initialized")
 }
 
-func (s *NexusServer) sendFCMPush(recipient, sender, preview string) {
-	if s.fcmClient == nil {
-		return
-	}
-	rows, err := s.DB.Query("SELECT fcm_token FROM users WHERE username = ? AND fcm_token != ''", recipient)
-	if err != nil {
-		return
-	}
-	defer rows.Close()
-	body := preview
-	if strings.HasPrefix(body, "E2EE:") || strings.HasPrefix(body, "phaze-file:") {
-		body = "New encrypted message"
-	} else if len(body) > 100 {
-		body = body[:100] + "…"
-	}
-	for rows.Next() {
-		var token string
-		if err := rows.Scan(&token); err != nil || token == "" {
-			continue
-		}
-		_, err := s.fcmClient.Send(context.Background(), &messaging.Message{
-			Token: token,
-			Notification: &messaging.Notification{
-				Title: sender,
-				Body:  body,
-			},
-			Android: &messaging.AndroidConfig{
-				Priority: "high",
-				Notification: &messaging.AndroidNotification{
-					Sound:       "default",
-					ClickAction: "world.phazechat.app.OPEN",
-				},
-			},
-		})
-		if err != nil {
-			log.Printf("[FCM] send to %s: %v", recipient, err)
-			// Token invalid — clear it
-			if messaging.IsUnregistered(err) {
-				s.DB.Exec("UPDATE users SET fcm_token = '' WHERE username = ? AND fcm_token = ?", recipient, token)
-			}
-		}
-	}
+// sendFCMPush is the older entry point, kept for group chat fan-out.
+func (s *NexusServer) sendFCMPush(recipient, title, preview string) {
+	s.sendFCMNote(recipient, pushNote{Title: title, Body: pushPreview(preview), Kind: pushKindGroup})
 }
 
 func (s *NexusServer) vapidKeyHandler(w http.ResponseWriter, r *http.Request) {
