@@ -43,6 +43,7 @@ import DesktopTitleBar from './DesktopTitleBar'
 import { AvatarImg } from './AvatarImg'
 import GroupChat from './GroupChat'
 import { loadMutedConvos, saveMutedConvos } from './groupCommands'
+import { offlineSentAt, REPORT_REASONS } from './reportReasons'
 import './App.css'
 
 // Wails desktop bridge — only present when running inside the Wails desktop app.
@@ -745,7 +746,16 @@ export default function App() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'security' | 'devices' | 'privacy' | 'sessions' | 'danger' | 'notifications' | 'invite'>('profile')
   const [reportTarget, setReportTarget] = useState<string | null>(null)
   const [reportReason, setReportReason] = useState('')
+  const [reportKind, setReportKind] = useState('')
   const [reportSent, setReportSent] = useState(false)
+  const [reportPending, setReportPending] = useState(false)
+  const [reportError, setReportError] = useState('')
+  const closeReport = () => {
+    setReportTarget(null)
+    setReportSent(false)
+    setReportPending(false)
+    setReportError('')
+  }
   const [pinnedIds, setPinnedIds] = useState<string[]>([])
   const [pinsOpen, setPinsOpen] = useState(false)
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -897,6 +907,27 @@ export default function App() {
       setUnread(next)
       saveUnread(my, next)
     }
+  }, [])
+
+  /** Unread counts for group chats share the DM map under a "convo:" key. */
+  const bumpConvoUnread = useCallback((convoId: string) => {
+    const my = meRef.current
+    if (!my) return
+    const key = `convo:${convoId}`
+    const next = { ...unreadRef.current, [key]: (unreadRef.current[key] || 0) + 1 }
+    unreadRef.current = next
+    setUnread(next)
+    saveUnread(my, next)
+  }, [])
+
+  const clearConvoUnread = useCallback((convoId: string) => {
+    const my = meRef.current
+    const key = `convo:${convoId}`
+    if (!my || !unreadRef.current[key]) return
+    const next = { ...unreadRef.current, [key]: 0 }
+    unreadRef.current = next
+    setUnread(next)
+    saveUnread(my, next)
   }, [])
 
   const mutateMessage = useCallback((peer: string, msgId: string, fn: (l: ChatLine) => ChatLine) => {
@@ -1367,21 +1398,23 @@ export default function App() {
 
         case 'convo_msg':
           if (msg.convo_id && msg.sender && msg.body !== undefined) {
+            // Messages queued while we were offline carry when they were sent.
+            const sentAt = offlineSentAt(msg.status)
             const gline: ConvoLine = {
               id: `${msg.convo_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
               sender: msg.sender,
               body: msg.body,
-              ts: Date.now(),
+              ts: sentAt ?? Date.now(),
               me: msg.sender === meRef.current,
             }
             setConvoLogs((prev) => ({
               ...prev,
               [msg.convo_id!]: [...(prev[msg.convo_id!] ?? []), gline],
             }))
-            fireEffect(msg.sender, msg.body)
-            if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id && !dndRef.current
-                && !mutedConvosRef.current.has(msg.convo_id)) {
-              playPhazeSound('MessageReceived.wav')
+            if (sentAt === null) fireEffect(msg.sender, msg.body)
+            if (msg.sender !== meRef.current && selectedConvoRef.current !== msg.convo_id) {
+              bumpConvoUnread(msg.convo_id)
+              if (!dndRef.current && !mutedConvosRef.current.has(msg.convo_id)) playPhazeSound('MessageReceived.wav')
             }
           }
           break
@@ -1687,7 +1720,14 @@ export default function App() {
           break
 
         case 'report_result':
-          setReportSent(true)
+          // Only call it sent once the server has stored it.
+          setReportPending(false)
+          if (msg.status === 'received') {
+            setReportSent(true)
+            setReportError('')
+          } else {
+            setReportError(msg.error ? `Couldn't send the report: ${msg.error}` : "Couldn't send the report. Try again.")
+          }
           break
 
         case 'settings_result':
@@ -1713,7 +1753,7 @@ export default function App() {
         try { sub(msg) } catch { /* swallow */ }
       })
     }
-  }, [unwrap, appendLog, acceptPeerKey, tearDownCall])
+  }, [unwrap, appendLog, acceptPeerKey, tearDownCall, bumpConvoUnread])
 
   useEffect(() => {
     const w = new WebSocket(wsUrl)
@@ -2609,39 +2649,57 @@ export default function App() {
 
       {/* ── Report abuse dialog ──────────────────────────────────── */}
       {reportTarget && (
-        <div className="restore-overlay" onClick={(e) => { if (e.target === e.currentTarget) { setReportTarget(null); setReportSent(false) } }}>
+        <div className="restore-overlay" onClick={(e) => { if (e.target === e.currentTarget) closeReport() }}>
           <div className="restore-card">
             {reportSent ? (
               <>
                 <h2>Report sent</h2>
                 <p className="muted small">Thanks for letting us know. Our team will review this report.</p>
-                <button type="button" onClick={() => { setReportTarget(null); setReportSent(false) }}>Close</button>
+                <button type="button" onClick={closeReport}>Close</button>
               </>
             ) : (
-              <>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!me || !reportKind || reportPending) return
+                  setReportError('')
+                  setReportPending(true)
+                  send({ type: 'report_abuse', sender: me, recipient: reportTarget!, status: reportKind, body: reportReason.trim() })
+                }}
+              >
                 <h2>Report {reportTarget}</h2>
-                <p className="muted small">Describe what's happening so our team can review it.</p>
+                <fieldset className="report-reasons" disabled={reportPending}>
+                  <legend className="muted small">What's going on?</legend>
+                  {REPORT_REASONS.map((r) => (
+                    <label key={r.id} className="report-reason">
+                      <input
+                        type="radio"
+                        name="report-reason"
+                        value={r.id}
+                        checked={reportKind === r.id}
+                        onChange={() => setReportKind(r.id)}
+                      />
+                      {r.label}
+                    </label>
+                  ))}
+                </fieldset>
                 <textarea
-                  autoFocus
-                  placeholder="Reason for report (e.g. harassment, spam…)"
+                  placeholder="Anything else our team should know (optional)"
                   value={reportReason}
                   onChange={(e) => setReportReason(e.target.value)}
-                  rows={4}
+                  maxLength={2000}
+                  rows={3}
+                  disabled={reportPending}
                   style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical' }}
                 />
+                {reportError && <p className="error small" role="alert">{reportError}</p>}
                 <div className="row">
-                  <button
-                    type="button"
-                    disabled={!reportReason.trim()}
-                    onClick={() => {
-                      if (!me || !reportReason.trim()) return
-                      send({ type: 'report_abuse', sender: me, recipient: reportTarget!, body: reportReason.trim() })
-                      setReportSent(true)
-                    }}
-                  >Submit report</button>
-                  <button type="button" className="link-btn" onClick={() => { setReportTarget(null); setReportSent(false) }}>Cancel</button>
+                  <button type="submit" disabled={!reportKind || reportPending}>
+                    {reportPending ? 'Sending…' : 'Submit report'}
+                  </button>
+                  <button type="button" className="link-btn" onClick={closeReport}>Cancel</button>
                 </div>
-              </>
+              </form>
             )}
           </div>
         </div>
@@ -3228,7 +3286,7 @@ export default function App() {
                         <button
                           type="button"
                           className={`friend-row ${selectedConvo === c.id ? 'sel' : ''}`}
-                          onClick={() => { setSelectedConvo(c.id); setSelected(null) }}
+                          onClick={() => { setSelectedConvo(c.id); setSelected(null); clearConvoUnread(c.id) }}
                         >
                           <span className="avatar group-avatar">
                             {c.name[0]?.toUpperCase()}
@@ -3236,6 +3294,9 @@ export default function App() {
                           <span className="friend-meta">
                             <span className="friend-line">
                               <span className="friend-name">{c.name}</span>
+                              {(unread[`convo:${c.id}`] ?? 0) > 0 && selectedConvo !== c.id && (
+                                <span className="unread-badge">{unread[`convo:${c.id}`] > 99 ? '99+' : unread[`convo:${c.id}`]}</span>
+                              )}
                             </span>
                             <span className="friend-line">
                               <span className="friend-preview">{c.members.length} people</span>
@@ -3415,7 +3476,7 @@ export default function App() {
                             type="button"
                             className="chat-call-btn"
                             title={`Report ${selected}`}
-                            onClick={() => { setReportTarget(selected); setReportReason(''); setReportSent(false) }}
+                            onClick={() => { setReportTarget(selected); setReportReason(''); setReportKind(''); setReportSent(false); setReportPending(false); setReportError('') }}
                           >⚑</button>
                         </div>
                       </>
