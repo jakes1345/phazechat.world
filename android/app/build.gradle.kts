@@ -128,6 +128,12 @@ dependencies {
     // JSON
     implementation("org.json:json:20260814")
 
+    // Sign in with Google: Credential Manager shows Google's account sheet and
+    // returns an ID token the server verifies (data/GoogleSignIn.kt).
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
     // Crypto (NaCl via Lazysodium)
     implementation("com.goterl:lazysodium-android:5.2.0@aar")
     implementation("net.java.dev.jna:jna:5.19.1@aar")

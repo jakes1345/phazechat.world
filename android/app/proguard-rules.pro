@@ -13,3 +13,11 @@
 # Native code calls back into these classes by name.
 -keep class org.webrtc.** { *; }
 -dontwarn org.webrtc.**
+
+# ── Sign in with Google (Credential Manager) ─────────────────────────────────
+# Credential Manager finds its Play services provider by class name at run
+# time, so R8 can't see that it's used (rule from the Credential Manager docs).
+-if class androidx.credentials.CredentialManager
+-keep class androidx.credentials.playservices.** {
+  *;
+}

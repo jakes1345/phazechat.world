@@ -29,6 +29,8 @@ import { CallScreen, CallMedia, CallControls, type CallMediaState } from './Call
 import { PeerCall, iceServersFor, callPhaseText, type CallKind, type CallRole, type SignalKind } from './peerCall'
 import { SELECTABLE_THEMES, type ThemeId, isThemeId, resolveTheme, nextTheme, themeIcon, themeLabel, hasFeature, isClassicSkype, isSkypeEra } from './themes'
 import OSChrome from './OSChrome'
+import { GoogleButton, GoogleFollowUp } from './GoogleSignIn'
+import { takeGoogleReturn, useGoogleConfig, type GoogleReturn } from './googleAuth'
 const Spaces = lazy(() => import('./Spaces'))
 const LivePage = lazy(() => import('./LivePage'))
 const VoiceRoom = lazy(() => import('./VoiceRoom'))
@@ -534,6 +536,10 @@ export default function App() {
     return (p.get('invite') || p.get('ref')) ? 'register' : 'login'
   })
   const [forgotEmail, setForgotEmail] = useState('')
+  // Where Sign in with Google left off, read once from the URL fragment
+  // the server sends the browser back with (see GoogleSignIn.tsx).
+  const [googleFlow, setGoogleFlow] = useState<GoogleReturn | null>(() => takeGoogleReturn())
+  const googleCfg = useGoogleConfig()
   const [linkInput, setLinkInput] = useState('')
   const [linkBusy, setLinkBusy] = useState(false)
   const [cameraActive, setCameraActive] = useState(false)
@@ -2868,6 +2874,18 @@ export default function App() {
 
       {activeFx && <ScreenEffect key={activeFx.seed} kind={activeFx.kind} seed={activeFx.seed} onDone={endFx} />}
 
+      {/* ── Google account connected (or not) from Settings ───── */}
+      {me && googleFlow && (googleFlow.kind === 'linked' || googleFlow.kind === 'error') && (
+        <div className="banner">
+          <span>
+            {googleFlow.kind === 'linked'
+              ? <>Google connected{googleFlow.email ? <> as <strong>{googleFlow.email}</strong></> : null}. You can now sign in with Google.</>
+              : googleFlow.msg}
+          </span>
+          <button type="button" onClick={() => setGoogleFlow(null)} aria-label="Dismiss">×</button>
+        </div>
+      )}
+
       {/* ── Referral news: a friend joined from your invite ───── */}
       {crateNews && (
         <div className="banner referral-banner">
@@ -2953,7 +2971,15 @@ export default function App() {
                 <p className="auth-hero-sub">Chat, calls, and spaces. End-to-end encrypted.</p>
               </div>
               <section className="panel">
-                {deviceVerify ? (
+                {googleFlow && googleFlow.kind !== 'linked' ? (
+                  <GoogleFollowUp
+                    flow={googleFlow}
+                    // The session cookie is set now, so reconnect and let
+                    // the server sign the socket in from it.
+                    onSignedIn={() => { setGoogleFlow(null); setErr(''); setWsRetry((n) => n + 1) }}
+                    onDone={() => { setGoogleFlow(null); setErr('') }}
+                  />
+                ) : deviceVerify ? (
                   <>
                     <h2>Approve this device</h2>
                     <p className="device-verify-copy">
@@ -2992,6 +3018,12 @@ export default function App() {
                     <input type="password" placeholder="Password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} autoComplete="current-password" />
                     {needsTotp && <input placeholder="TOTP code or backup code (e.g. abcde-f0123)" value={loginTotp} onChange={(e) => setLoginTotp(e.target.value)} autoFocus />}
                     <button type="submit">Sign in</button>
+                    {googleCfg?.web && (
+                      <>
+                        <div className="auth-or">or</div>
+                        <GoogleButton />
+                      </>
+                    )}
                     <button type="button" className="link-btn" onClick={() => { setMode('register'); setErr(''); setNeedsTotp(false); setRegStep('form') }}>Create an account</button>
                     <button type="button" className="link-btn" onClick={() => { setMode('forgot'); setErr(''); setNeedsTotp(false) }}>Forgot password?</button>
                     <button type="button" className="link-btn" onClick={() => { setMode('link'); setErr(''); setNeedsTotp(false) }}>Sign in with a link code from another device</button>
@@ -3045,6 +3077,12 @@ export default function App() {
                     <input type="email" placeholder="Email" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} autoComplete="email" required />
                     <input type="password" placeholder="Password (8+ chars)" value={regPass} onChange={(e) => setRegPass(e.target.value)} autoComplete="new-password" />
                     <button type="submit">Create account</button>
+                    {googleCfg?.web && (
+                      <>
+                        <div className="auth-or">or</div>
+                        <GoogleButton refBy={refBy} label="Sign up with Google" />
+                      </>
+                    )}
                     <button type="button" className="link-btn" onClick={() => { setMode('login'); setErr('') }}>Back to sign in</button>
                   </form>
                 ) : (

@@ -505,6 +505,19 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
 
     private var linkPollJob: Job? = null
 
+    // Sign in with Google. Its token is an ordinary Phaze session token, so it
+    // takes the same path as a saved session: session_auth on the socket,
+    // and auth_result does the rest.
+    val google = GoogleSignInController(viewModelScope) { token, username ->
+        _authError.value = null
+        _totpRequired.value = false
+        _sessionToken.value = token
+        prefs.edit().putString("session_token", token).putString("username", username).apply()
+        if (nexus.state.value == ConnState.CONNECTED) {
+            nexus.send(NexusMessage(type = "session_auth", qrToken = token, deviceInfo = "android/${Build.MODEL}"))
+        }
+    }
+
     private val _totpRequired = MutableStateFlow(false)
     val totpRequired = _totpRequired.asStateFlow()
     private var pendingTotpUsername: String = ""

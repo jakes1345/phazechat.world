@@ -377,7 +377,28 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
     }
 
     if (me == null) {
+        val googleAvailable by vm.google.available.collectAsState()
+        val googleBusy by vm.google.busy.collectAsState()
+        val googleStep by vm.google.step.collectAsState()
+        val googleError by vm.google.error.collectAsState()
+        LaunchedEffect(Unit) { vm.google.refreshAvailable() }
         AuthScreen(
+            google = GoogleAuthUi(
+                available = googleAvailable,
+                busy = googleBusy,
+                step = googleStep,
+                error = googleError,
+                onSignIn = {
+                    // Google's account sheet needs the Activity itself.
+                    var c: android.content.Context? = context
+                    while (c is android.content.ContextWrapper && c !is android.app.Activity) c = c.baseContext
+                    (c as? android.app.Activity)?.let { act -> coroutineScope.launch { vm.google.signIn(act) } }
+                },
+                onRegister = { vm.google.register(it) },
+                onLink = { pw, code, user -> vm.google.link(pw, code, user) },
+                onTotp = { vm.google.totp(it) },
+                onCancel = { vm.google.cancel() },
+            ),
             error = authError,
             onLogin = { u, p -> vm.login(u, p) },
             onRegister = { u, e, p -> vm.register(u, e, p) },
