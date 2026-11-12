@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	firebase.google.com/go/v4 v4.21.0
 	github.com/SherClockHolmes/webpush-go v1.4.0
-	github.com/getsentry/sentry-go v0.49.0
+	github.com/getsentry/sentry-go v0.50.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/johannesboyne/gofakes3 v1.2.0
 	github.com/minio/minio-go/v7 v7.4.1
