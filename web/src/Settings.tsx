@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import QRCode from 'qrcode'
 import type { NexusMessage } from './nexusTypes'
 import { bumpAvatarVersion } from './avatarVersions'
-import { SELECTABLE_THEMES, type ThemeId } from './themes'
+import { SELECTABLE_THEMES, FEATURE_LABELS, newInEra, advertisedFeatures, themeLabel, type ThemeId } from './themes'
+import './eraFeatures.css'
 import RewardsPanel from './RewardsPanel'
 import { GoogleAccountSettings } from './GoogleSignIn'
 import './settings.css'
@@ -752,9 +753,19 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
                     <span className="settings-theme-icon">{t.icon}</span>
                     <span className="settings-theme-label">{t.label}</span>
                     {t.hint && <span className="settings-theme-hint">{t.hint}</span>}
+                    <span className="era-new-list">
+                      {t.id === SELECTABLE_THEMES[0].id ? 'Has: ' : 'Adds: '}
+                      {newInEra(t.id).map((f) => FEATURE_LABELS[f]).join(', ')}
+                    </span>
                     {t.id === theme && <span className="settings-theme-check">✓</span>}
                   </button>
                 ))}
+              </div>
+              <div className="era-feature-summary">
+                <h4>Everything in {themeLabel(theme)}</h4>
+                <ul>
+                  {advertisedFeatures(theme).map((f) => <li key={f}>{FEATURE_LABELS[f]}</li>)}
+                </ul>
               </div>
             </div>
           )}
