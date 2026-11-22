@@ -108,7 +108,10 @@ export function CallScreen({ state, media, seconds, avatarBg, onAnswer, onHangUp
   const showVideo = !ringing && state.type === 'video' && !!media?.remote?.getVideoTracks().length
   const phaseText = callPhaseText(media?.phase)
   return (
-    <div className="call7">
+    <div className="call7" data-status={state.status}>
+      <div className="call7-title" aria-hidden="true">
+        <span>{state.type === 'video' ? 'Video call' : 'Call'} with {state.peer}</span>
+      </div>
       <span className="call7-mark">phaze</span>
       {media && !ringing && <CallMedia kind={state.type} media={media} className="call7-media" />}
       {!showVideo && (
