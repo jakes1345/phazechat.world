@@ -13,6 +13,8 @@ import org.json.JSONObject
 import world.phazechat.app.call.CallAudio
 import world.phazechat.app.call.CallService
 import world.phazechat.app.call.PeerCall
+import world.phazechat.app.call.VoiceMesh
+import world.phazechat.app.call.VoicePeerView
 import world.phazechat.app.call.ProxyVideoSink
 import world.phazechat.app.crypto.*
 
@@ -453,6 +455,18 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     private val callAudio = CallAudio(app)
     // TURN relay credentials from the last auth_result.
     private var turnConfig: TurnConfig? = null
+
+    // Voice channels: the room this phone is in, if any (audio only).
+    data class VoiceRoomState(
+        val channelId: String,
+        val name: String,
+        val peers: List<VoicePeerView> = emptyList(),
+        val muted: Boolean = false,
+    )
+    private val _voiceRoom = MutableStateFlow<VoiceRoomState?>(null)
+    val voiceRoom = _voiceRoom.asStateFlow()
+    private var voiceMesh: VoiceMesh? = null
+    @Volatile private var voiceGen = 0
 
     // Stories
     private val _stories = MutableStateFlow<List<world.phazechat.app.ui.Story>>(emptyList())
@@ -1072,6 +1086,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
     fun startCall(peer: String, withVideo: Boolean = false) {
         val me = _me.value ?: return
         if (_callState.value != null) return
+        leaveVoice()
         _callState.value = CallState(peer = peer, status = "ringing", isVideo = withVideo)
         // Started here, while Phaze is on screen: Android won't let it start later from the background.
         CallService.start(getApplication(), peer, withVideo && canUseCamera())
@@ -1083,6 +1098,7 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         val cs = _callState.value ?: return
         val me = _me.value ?: return
         if (!cs.isIncoming || cs.status != "ringing") return
+        leaveVoice()
         _callState.value = cs.copy(status = "connecting")
         CallService.start(getApplication(), cs.peer, cs.isVideo && canUseCamera())
         // The server then sends call_accepted to both sides.
@@ -1185,7 +1201,69 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
         CallService.stop(getApplication())
     }
 
+    /** Joins a Spaces voice channel. The caller has already checked microphone permission. */
+    fun joinVoice(channelId: String, name: String) {
+        val me = _me.value ?: return
+        if (_voiceRoom.value?.channelId == channelId) return
+        if (_callState.value != null) {
+            _actionStatus.value = "Finish your call before joining a voice channel."
+            return
+        }
+        leaveVoice()
+        val gen = ++voiceGen
+        val events = object : VoiceMesh.Events {
+            override fun signal(to: String, body: String, sdp: String?, candidate: String?) {
+                if (gen != voiceGen) return
+                nexus.send(NexusMessage(type = "voice_signal", sender = me, recipient = to, channelId = channelId, body = body, sdp = sdp, candidate = candidate))
+            }
+            override fun onPeers(peers: List<VoicePeerView>) {
+                if (gen != voiceGen) return
+                _voiceRoom.update { r -> r?.copy(peers = peers) }
+            }
+            override fun onMediaError(message: String) {
+                viewModelScope.launch(Dispatchers.Main) {
+                    if (gen != voiceGen) return@launch
+                    leaveVoice()
+                    _actionStatus.value = message
+                }
+            }
+        }
+        val mesh = VoiceMesh(getApplication(), me, iceServersFor(turnConfig), events)
+        voiceMesh = mesh
+        _voiceRoom.value = VoiceRoomState(channelId = channelId, name = name)
+        // Voice channels start on the loudspeaker: you're listening to several people.
+        callAudio.start(speaker = true)
+        // Android only lets the microphone run in the background under a foreground service.
+        CallService.start(getApplication(), name, false)
+        CallService.onHangUp = { viewModelScope.launch(Dispatchers.Main) { leaveVoice() } }
+        mesh.start()
+        nexus.send(NexusMessage(type = "voice_join", sender = me, channelId = channelId))
+    }
+
+    fun leaveVoice() {
+        val room = _voiceRoom.value ?: return
+        voiceGen++
+        _voiceRoom.value = null
+        voiceMesh?.close()
+        voiceMesh = null
+        nexus.send(NexusMessage(type = "voice_leave", sender = _me.value, channelId = room.channelId))
+        // A 1:1 call may have taken over the speaker and the service; leave those to it.
+        if (_callState.value == null) {
+            callAudio.stop()
+            CallService.onHangUp = null
+            CallService.stop(getApplication())
+        }
+    }
+
+    fun toggleVoiceMute() {
+        val room = _voiceRoom.value ?: return
+        val muted = !room.muted
+        voiceMesh?.setMuted(muted)
+        _voiceRoom.value = room.copy(muted = muted)
+    }
+
     override fun onCleared() {
+        leaveVoice()
         clearCall()
         super.onCleared()
     }
@@ -1658,6 +1736,21 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                 val video = when (msg.body) { "video" -> true; "audio" -> false; else -> cs.isVideo }
                 _callState.value = cs.copy(status = "active", isVideo = video)
                 beginPeerCall(peer, video, isCaller = msg.status == "caller")
+            }
+            "voice_peers" -> {
+                val room = _voiceRoom.value ?: return
+                if (msg.channelId != room.channelId) return
+                if (!msg.error.isNullOrBlank()) {
+                    _actionStatus.value = msg.error
+                    leaveVoice()
+                    return
+                }
+                voiceMesh?.setPeers(msg.results ?: emptyList())
+            }
+            "voice_signal" -> {
+                val room = _voiceRoom.value ?: return
+                if (msg.channelId != room.channelId) return
+                voiceMesh?.handle(msg.sender, msg.body, msg.sdp, msg.candidate)
             }
             "call_signal" -> {
                 val cs = _callState.value ?: return

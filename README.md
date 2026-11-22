@@ -62,7 +62,7 @@ Other
 
 These are the things I know are broken or partial right now.
 
-- Android has no voice channels or group calls yet: a voice channel opens as a text channel there.
+- Android can join voice channels, but audio only: no camera or screen sharing, and it never shows other members' video. It can't start or join group calls from a chat yet.
 - If one side of a 1:1 call runs an old app from before built-in calls, the server still hands both sides a `meet.jit.si` room. The privacy policy at `/privacy` explains this.
 - The Android app is hardwired to `phazechat.world` (`NexusClient.kt` and `PhazeViewModel.kt`). There is no server setting.
 - There is no macOS build. CI builds Windows and Linux desktop binaries only.

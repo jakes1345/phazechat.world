@@ -295,6 +295,25 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
         }
     }
 
+    var pendingVoice by remember { mutableStateOf<world.phazechat.app.data.ChannelInfo?>(null) }
+    val voicePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val ch = pendingVoice
+        pendingVoice = null
+        if (granted && ch != null) {
+            vm.joinVoice(ch.id, ch.name)
+        } else {
+            android.widget.Toast.makeText(context, "Voice channels need microphone access", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    fun joinVoiceWithPermission(ch: world.phazechat.app.data.ChannelInfo) {
+        if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
+            vm.joinVoice(ch.id, ch.name)
+        } else {
+            pendingVoice = ch
+            voicePermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted && !recording) {
             // OGG/OPUS only exist on API 29+. On 26–28 fall back to MPEG-4/AAC
@@ -524,6 +543,7 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                 "contacts" -> ContactsTab(friends = friends, onOpen = { vm.selectChat(it) })
                 "spaces" -> {
                     val discoverList by vm.discoverSpaces.collectAsState()
+                    val voiceRoom by vm.voiceRoom.collectAsState()
                     SpacesScreen(
                         spaces = spaces, activeSpace = activeSpace, channels = channels,
                         activeChannel = activeChannel, channelMessages = channelMessages, me = me!!,
@@ -537,6 +557,10 @@ fun PhazeRoot(vm: PhazeViewModel = viewModel()) {
                         discoverList = discoverList,
                         onDiscover = { vm.discoverSpaces() },
                         onJoinPublic = { vm.joinPublicSpace(it) },
+                        voiceRoom = voiceRoom,
+                        onJoinVoice = { joinVoiceWithPermission(it) },
+                        onLeaveVoice = { vm.leaveVoice() },
+                        onToggleVoiceMute = { vm.toggleVoiceMute() },
                     )
                 }
                 "settings" -> {
