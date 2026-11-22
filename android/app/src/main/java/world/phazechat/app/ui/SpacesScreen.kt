@@ -21,7 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import world.phazechat.app.data.ChannelInfo
+import world.phazechat.app.data.CallPhase
 import world.phazechat.app.data.ChannelMsg
+import world.phazechat.app.data.PhazeViewModel
 import world.phazechat.app.data.SpaceInfo
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +45,10 @@ fun SpacesScreen(
     discoverList: List<SpaceInfo> = emptyList(),
     onDiscover: () -> Unit = {},
     onJoinPublic: (String) -> Unit = {},
+    voiceRoom: PhazeViewModel.VoiceRoomState? = null,
+    onJoinVoice: (ChannelInfo) -> Unit = {},
+    onLeaveVoice: () -> Unit = {},
+    onToggleVoiceMute: () -> Unit = {},
 ) {
     var createOpen by remember { mutableStateOf(false) }
     var joinOpen by remember { mutableStateOf(false) }
@@ -64,6 +70,10 @@ fun SpacesScreen(
             me = me,
             onSend = onSendMessage,
             onBack = { onSelectChannel("") },
+            voiceRoom = voiceRoom,
+            onJoinVoice = { onJoinVoice(activeChannelInfo) },
+            onLeaveVoice = onLeaveVoice,
+            onToggleVoiceMute = onToggleVoiceMute,
         )
         return
     }
@@ -83,6 +93,20 @@ fun SpacesScreen(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
                 )
+            },
+            bottomBar = {
+                if (voiceRoom != null) {
+                    Surface(tonalElevation = 3.dp) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("🎙 In ${voiceRoom.name}", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            TextButton(onClick = onToggleVoiceMute) { Text(if (voiceRoom.muted) "Unmute" else "Mute") }
+                            TextButton(onClick = onLeaveVoice) { Text("Leave") }
+                        }
+                    }
+                }
             },
         ) { padding ->
             if (chList.isEmpty()) {
@@ -292,6 +316,10 @@ fun ChannelChatScreen(
     me: String,
     onSend: (String) -> Unit,
     onBack: () -> Unit,
+    voiceRoom: PhazeViewModel.VoiceRoomState? = null,
+    onJoinVoice: () -> Unit = {},
+    onLeaveVoice: () -> Unit = {},
+    onToggleVoiceMute: () -> Unit = {},
 ) {
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -335,9 +363,20 @@ fun ChannelChatScreen(
             }
         },
     ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+        if (channel.kind == "voice") {
+            VoicePanel(
+                inThisRoom = voiceRoom?.channelId == channel.id,
+                room = voiceRoom,
+                me = me,
+                onJoin = onJoinVoice,
+                onLeave = onLeaveVoice,
+                onToggleMute = onToggleVoiceMute,
+            )
+        }
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
             contentPadding = PaddingValues(vertical = 8.dp),
         ) {
@@ -363,6 +402,68 @@ fun ChannelChatScreen(
                     }
                 }
             }
+        }
+        }
+    }
+}
+
+/** Join / leave controls and the member list for a voice channel (audio only on Android). */
+@Composable
+private fun VoicePanel(
+    inThisRoom: Boolean,
+    room: PhazeViewModel.VoiceRoomState?,
+    me: String,
+    onJoin: () -> Unit,
+    onLeave: () -> Unit,
+    onToggleMute: () -> Unit,
+) {
+    Surface(tonalElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            if (!inThisRoom) {
+                if (room != null) {
+                    Text("You're in ${room.name}. Joining here moves you.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(6.dp))
+                }
+                Button(onClick = onJoin) { Text("🎙 Join voice") }
+            } else if (room != null) {
+                Text("Voice · audio only on this phone", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(6.dp))
+                VoiceMemberRow(me, room.muted.not(), "You")
+                room.peers.forEach { p ->
+                    VoiceMemberRow(
+                        p.name, p.micOn,
+                        when (p.phase) {
+                            CallPhase.CONNECTED -> ""
+                            CallPhase.FAILED -> "couldn't connect"
+                            CallPhase.RECONNECTING -> "reconnecting…"
+                            else -> "connecting…"
+                        },
+                    )
+                }
+                if (room.peers.isEmpty()) {
+                    Text("Nobody else is here yet.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onToggleMute) { Text(if (room.muted) "Unmute" else "Mute") }
+                    Button(
+                        onClick = onLeave,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    ) { Text("Leave") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceMemberRow(name: String, micOn: Boolean, note: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(if (micOn) "🎙" else "🔇", modifier = Modifier.width(28.dp))
+        Text(name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+        if (note.isNotEmpty()) {
+            Spacer(Modifier.width(8.dp))
+            Text(note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
