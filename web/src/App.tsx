@@ -800,6 +800,8 @@ export default function App() {
   const [slashIdx, setSlashIdx] = useState(0)
   const [recording, setRecording] = useState(false)
   const [recDuration, setRecDuration] = useState(0)
+  const [uploadPct, setUploadPct] = useState<number | null>(null)
+  const [dragOver, setDragOver] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const recStartRef = useRef<number>(0)
   const recTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -2351,16 +2353,23 @@ export default function App() {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const resp = await fetch('/api/v1/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: fd,
-      })
-      if (!resp.ok) {
-        setErr(`Upload failed: ${resp.status}`)
+      const { status, text } = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', '/api/v1/upload')
+        xhr.withCredentials = true
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setUploadPct(Math.round((e.loaded / e.total) * 100))
+        }
+        xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText })
+        xhr.onerror = () => reject(new Error('network failure'))
+        setUploadPct(0)
+        xhr.send(fd)
+      }).finally(() => setUploadPct(null))
+      if (status < 200 || status >= 300) {
+        setErr(`Upload failed: ${status}`)
         return
       }
-      const uploaded = await resp.json() as FileAttachment
+      const uploaded = JSON.parse(text) as FileAttachment
       const att: FileAttachment = { ...uploaded }
       if (opts?.kind) att.kind = opts.kind
       if (opts?.duration) att.duration = opts.duration
@@ -3737,7 +3746,18 @@ export default function App() {
                     }}
                   />
                 ) : (
-                <section className="panel grow">
+                <section
+                  className={`panel grow${dragOver ? ' drag-over' : ''}`}
+                  onDragOver={(e) => { if (selected && e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragOver(true) } }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false) }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragOver(false)
+                    const f = e.dataTransfer.files?.[0]
+                    if (f && selected) void sendFile(f)
+                  }}
+                >
+                  {dragOver && <div className="drag-drop-overlay">Drop to send</div>}
                   <div className="chat-header-bar">
                     {selected ? (
                       <>
@@ -4087,6 +4107,10 @@ export default function App() {
                     <div className="edit-banner rec-banner">
                       <span><span className="rec-dot" /> Recording {fmtDuration(recDuration)} — press ⏹ to send, ✕ to cancel</span>
                     </div>
+                  )}
+
+                  {selected && uploadPct !== null && (
+                    <div className="upload-progress"><div className="upload-progress-bar" style={{ width: `${uploadPct}%` }} /></div>
                   )}
 
                   {selected && (

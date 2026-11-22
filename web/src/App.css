@@ -6185,3 +6185,30 @@ button.link-btn:hover,
   100% { opacity: 0; transform: translateX(12%) skewX(8deg); }
 }
 @media (prefers-reduced-motion: reduce) { .screen-fx { display: none; } }
+
+/* Drag-and-drop file send + upload progress. */
+.panel.grow { position: relative; }
+.panel.drag-over { outline: 2px dashed var(--brand, #00aff0); outline-offset: -2px; }
+.drag-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-soft, rgba(0, 175, 240, 0.12));
+  color: var(--brand, #00aff0);
+  font-weight: 600;
+  font-size: 15px;
+  pointer-events: none;
+}
+.upload-progress {
+  height: 3px;
+  background: var(--separator, #e4ecef);
+  overflow: hidden;
+}
+.upload-progress-bar {
+  height: 100%;
+  background: var(--brand, #00aff0);
+  transition: width 0.15s ease;
+}
