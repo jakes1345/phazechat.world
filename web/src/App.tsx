@@ -2350,6 +2350,7 @@ export default function App() {
       setErr('File exceeds 25 MB')
       return
     }
+    setErr('')
     try {
       const fd = new FormData()
       fd.append('file', file)
