@@ -1313,7 +1313,11 @@ class PhazeViewModel(app: Application) : AndroidViewModel(app) {
                         nexus.send(NexusMessage(type = "register_fcm_token", body = fcmToken))
                     }
                     loadSpaces()
-                } else if (msg.error != null) {
+                } else if (msg.status == "approved" && _me.value != null) {
+                    // A code this account made was just used on a new device.
+                    _linkStatus.value = "New device linked."
+                    _activeLinkCode.value = null
+                } else if (msg.error != null && linkPollJob?.isActive == true) {
                     linkPollJob?.cancel()
                     _authError.value = msg.error
                 }

@@ -369,13 +369,10 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
         setQrMsg('Show this code to the device you want to sign in, or enter it in the "Sign in with link code" field.')
       }
       if (m.type === 'link_result' && m.status === 'ok' && m.token) {
+        // The server tells this account's devices when the code is used
+        // (link_check approved, below), so there is nothing to poll.
         setLinkCode(m.token)
-        // Begin polling so we can show "approved" status.
-        const poll = setInterval(() => {
-          send({ type: 'link_check', token: m.token })
-        }, 2500)
         setLinkPollBusy(true)
-        ;(window as unknown as { __phazeLinkPoll?: ReturnType<typeof setInterval> }).__phazeLinkPoll = poll
       }
       if (m.type === 'link_result' && m.status !== 'ok' && m.status !== 'approved') {
         // If it's a link_result response for link_approve, handle it:
@@ -391,19 +388,13 @@ export default function Settings({ me, sessionToken, send, subscribe, onClose, o
         setApproveCodeInput('')
       }
       if (m.type === 'link_check' && m.status === 'approved') {
-        const poll = (window as unknown as { __phazeLinkPoll?: ReturnType<typeof setInterval> }).__phazeLinkPoll
-        if (poll) clearInterval(poll)
         setLinkPollBusy(false)
         setLinkMsg('✓ New device linked successfully.')
         setLinkCode('')
       }
     })
-    return () => {
-      unsub()
-      const poll = (window as unknown as { __phazeLinkPoll?: ReturnType<typeof setInterval> }).__phazeLinkPoll
-      if (poll) clearInterval(poll)
-    }
-  }, [tab, subscribe, send])
+    return unsub
+  }, [tab, subscribe])
 
   return (
     <div className="settings-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>

@@ -763,7 +763,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 			client.Send(NexusMessage{Type: "change_password_result", Status: "ok"})
 
 		case "qr_login_create":
-			tok, err := s.createQRLogin()
+			// From a signed-in account the code belongs to it (one sign-in,
+			// five minutes); signed out, it waits for qr_login_approve.
+			var tok string
+			var err error
+			if username != "" {
+				tok, err = s.createOwnedLinkCode(username)
+			} else {
+				tok, err = s.createQRLogin()
+			}
 			if err != nil {
 				client.Send(NexusMessage{Type: "qr_login_result", Error: "Could not create QR token"})
 				continue
@@ -797,15 +805,20 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			u, sess, approved, exists := s.checkQRLogin(msg.QRToken)
-			if !approved {
-				if !exists {
+			u, sess, res := s.redeemLinkCode(msg.QRToken, username, msg.DeviceInfo)
+			if res == linkInvalid {
+				if username == "" {
 					metrics.authFailure.Add(1)
 					authTracker.recordFail(client.IP, "")
 				}
+				client.Send(NexusMessage{Type: "qr_login_result", Error: errLinkCodeGone})
+				continue
+			}
+			if res == linkPending {
 				client.Send(NexusMessage{Type: "qr_login_result", Status: "pending", QRToken: msg.QRToken})
 				continue
 			}
+			s.sendTo(u, NexusMessage{Type: "link_check", Status: "approved", Sender: u})
 			authTracker.recordSuccess(client.IP, u)
 			// Promote this socket onto the approved session.
 			username = u
@@ -1322,7 +1335,15 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 		// to authorize a session for the new one. Reuses the qr_login_* DB
 		// table — qr_login was already the same pattern for QR sign-in.
 		case "link_create":
-			tok, err := s.createQRLogin()
+			// Signed in: the code is this account's own one-time sign-in
+			// code. Signed out: the older code a signed-in device approves.
+			var tok string
+			var err error
+			if username != "" {
+				tok, err = s.createOwnedLinkCode(username)
+			} else {
+				tok, err = s.createQRLogin()
+			}
 			if err != nil {
 				client.Send(NexusMessage{Type: "link_result", Error: err.Error()})
 				continue
@@ -1357,20 +1378,22 @@ func (s *NexusServer) handleConnections(w http.ResponseWriter, r *http.Request) 
 				time.Sleep(2 * time.Second)
 				continue
 			}
-			u, sess, approved, exists := s.checkQRLogin(msg.Token)
-			if !approved {
-				if !exists {
+			u, sess, res := s.redeemLinkCode(msg.Token, username, msg.DeviceInfo)
+			switch res {
+			case linkInvalid:
+				if username == "" {
 					metrics.authFailure.Add(1)
 					authTracker.recordFail(client.IP, "")
 				}
+				client.Send(NexusMessage{Type: "link_check", Status: "expired", Error: errLinkCodeGone})
+			case linkPending:
 				client.Send(NexusMessage{Type: "link_check", Status: "pending"})
-				continue
-			}
-			authTracker.recordSuccess(client.IP, u)
-			if approved {
+			case linkApproved:
+				authTracker.recordSuccess(client.IP, u)
+				// Tell the owner's other devices the code was used, so the
+				// screen showing it can say so (no session in this one).
+				s.sendToOthers(u, client, NexusMessage{Type: "link_check", Status: "approved", Sender: u})
 				client.Send(NexusMessage{Type: "link_check", Status: "approved", Sender: u, QRToken: sess})
-			} else {
-				client.Send(NexusMessage{Type: "link_check", Status: "pending"})
 			}
 
 		case "presence":

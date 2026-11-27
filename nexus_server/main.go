@@ -822,6 +822,11 @@ func (s *NexusServer) initDB() {
 		// Presence: the status the user picked (Online/Away/Do Not Disturb/
 		// Invisible). Friends only ever see it through publicStatus().
 		`ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'Online'`,
+		// Link codes made from a signed-in device belong to that account:
+		// whoever enters the code within five minutes is signed in as the
+		// owner, once. Empty owner = the older code that waits for an
+		// explicit link_approve from a signed-in device.
+		`ALTER TABLE qr_login_tokens ADD COLUMN owner TEXT DEFAULT ''`,
 		// Call history: one row per call attempt. answered=0 + duration_s=0
 		// means missed/declined/unanswered; a real call has both set.
 		`CREATE TABLE IF NOT EXISTS calls (
@@ -1149,13 +1154,92 @@ func (s *NexusServer) createQRLogin() (string, error) {
 	return tok, err
 }
 
+// createOwnedLinkCode makes a one-time sign-in code for an account that is
+// already signed in, from that account's own "Generate link code" button.
+// Entering it on another device within five minutes signs that device in as
+// the owner (see redeemLinkCode); no second approval step is needed because
+// the owner made the code themselves.
+func (s *NexusServer) createOwnedLinkCode(owner string) (string, error) {
+	tok, err := randHex(16)
+	if err != nil {
+		return "", err
+	}
+	expires := time.Now().Add(5 * time.Minute)
+	_, err = s.DB.Exec(
+		"INSERT INTO qr_login_tokens (token, owner, expires_at) VALUES (?, ?, ?)",
+		tok, owner, expires,
+	)
+	return tok, err
+}
+
+// linkRedeem is the outcome of a device entering a link or QR code.
+type linkRedeem int
+
+const (
+	linkPending  linkRedeem = iota // valid, waiting for approval (or asked by its own owner)
+	linkApproved                   // signed in; username and session returned
+	linkInvalid                    // unknown, expired or already used
+)
+
+// redeemLinkCode is what a device that entered a link or QR code polls.
+//
+// A code is good for one sign-in: the row is deleted in the same statement
+// that hands out the session, so two devices racing on one code can't both
+// get in. requester is the account polling, if any: the owner's own device
+// polling its own code never redeems it.
+func (s *NexusServer) redeemLinkCode(token, requester, device string) (string, string, linkRedeem) {
+	var username, sess, owner string
+	var approved int
+	var expires time.Time
+	err := s.DB.QueryRow(
+		"SELECT username, session_token, approved, expires_at, COALESCE(owner, '') FROM qr_login_tokens WHERE token = ?",
+		token,
+	).Scan(&username, &sess, &approved, &expires, &owner)
+	if err != nil || time.Now().After(expires) {
+		return "", "", linkInvalid
+	}
+	switch {
+	case approved == 1:
+		// Older flow: a signed-in device already approved it with link_approve.
+		res, err := s.DB.Exec("DELETE FROM qr_login_tokens WHERE token = ? AND approved = 1", token)
+		if err != nil {
+			return "", "", linkPending
+		}
+		if n, _ := res.RowsAffected(); n != 1 {
+			return "", "", linkInvalid
+		}
+		return username, sess, linkApproved
+	case owner != "":
+		if requester == owner {
+			return "", "", linkPending
+		}
+		res, err := s.DB.Exec("DELETE FROM qr_login_tokens WHERE token = ? AND approved = 0 AND owner = ?", token, owner)
+		if err != nil {
+			return "", "", linkPending
+		}
+		if n, _ := res.RowsAffected(); n != 1 {
+			return "", "", linkInvalid
+		}
+		if device == "" {
+			device = "linked-device"
+		}
+		sess, err := s.issueSessionToken(owner, device)
+		if err != nil {
+			return "", "", linkInvalid
+		}
+		return owner, sess, linkApproved
+	default:
+		return "", "", linkPending
+	}
+}
+
 func (s *NexusServer) approveQRLogin(token, username, device string) error {
 	sess, err := s.issueSessionToken(username, device)
 	if err != nil {
 		return err
 	}
 	res, err := s.DB.Exec(
-		"UPDATE qr_login_tokens SET username = ?, session_token = ?, device_info = ?, approved = 1 WHERE token = ? AND approved = 0 AND expires_at > CURRENT_TIMESTAMP",
+		"UPDATE qr_login_tokens SET username = ?, session_token = ?, device_info = ?, approved = 1 WHERE token = ? AND approved = 0 AND COALESCE(owner, '') = '' AND expires_at > CURRENT_TIMESTAMP",
 		username, sess, device, token,
 	)
 	if err != nil {
@@ -1166,23 +1250,6 @@ func (s *NexusServer) approveQRLogin(token, username, device string) error {
 		return errQRInvalid
 	}
 	return nil
-}
-
-func (s *NexusServer) checkQRLogin(token string) (string, string, bool, bool) {
-	var username, sess string
-	var approved int
-	var expires time.Time
-	err := s.DB.QueryRow(
-		"SELECT username, session_token, approved, expires_at FROM qr_login_tokens WHERE token = ?",
-		token,
-	).Scan(&username, &sess, &approved, &expires)
-	if err == sql.ErrNoRows {
-		return "", "", false, false
-	}
-	if err != nil || time.Now().After(expires) {
-		return "", "", false, true
-	}
-	return username, sess, approved == 1, true
 }
 
 func (s *NexusServer) verifyUser(username, code string) bool {
@@ -1494,6 +1561,10 @@ var errBadUsername = &strErr{"invalid username (3-32 chars, a-z A-Z 0-9 . _ -)"}
 var errBadEmail = &strErr{"invalid email address"}
 var errResetInvalid = &strErr{"password reset token invalid or expired"}
 var errQRInvalid = &strErr{"qr login token invalid or expired"}
+
+// errLinkCodeGone is what a device entering a link or QR code is told when the
+// code is unknown, past its five minutes, or already used.
+const errLinkCodeGone = "This link code has expired or was already used. Generate a new one."
 
 type strErr struct{ msg string }
 
