@@ -487,6 +487,17 @@ type Convo = {
   creator: string
 }
 
+type LinkPoll = { poll: ReturnType<typeof setInterval>; stop: ReturnType<typeof setTimeout> }
+
+function clearLinkPoll(ref: { current: LinkPoll | null }) {
+  const p = ref.current
+  if (p) {
+    clearInterval(p.poll)
+    clearTimeout(p.stop)
+    ref.current = null
+  }
+}
+
 function defaultWsUrl(): string {
   const u = import.meta.env.VITE_NEXUS_WS as string | undefined
   if (u) return u
@@ -597,6 +608,9 @@ export default function App() {
   const googleCfg = useGoogleConfig()
   const [linkInput, setLinkInput] = useState('')
   const [linkBusy, setLinkBusy] = useState(false)
+  // One poll at a time for a typed or scanned link code; cleared on sign-in,
+  // on a refused code, on Back, and after the code's five minutes.
+  const linkPollRef = useRef<LinkPoll | null>(null)
   const [cameraActive, setCameraActive] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -676,10 +690,32 @@ export default function App() {
     setLinkInput(tok)
     stopCamera()
     setErr('✓ Token scanned: ' + tok)
+    startLinkPoll(tok)
+  }
+
+  const stopLinkPoll = () => clearLinkPoll(linkPollRef)
+
+  // Polls the server with a link code until it signs this device in or is
+  // refused. Sends quietly while the socket is still connecting, so a code
+  // entered right after the page loads isn't lost to a "Not connected".
+  const startLinkPoll = (tok: string) => {
+    stopLinkPoll()
     setLinkBusy(true)
-    const poll = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
-    sendRef.current({ type: 'link_check', token: tok })
-    setTimeout(() => clearInterval(poll), 5 * 60 * 1000)
+    const check = () => {
+      const w = wsRef.current
+      if (w && w.readyState === WebSocket.OPEN) {
+        w.send(JSON.stringify({ type: 'link_check', token: tok, device_info: `web/${window.location.hostname}` }))
+      }
+    }
+    check()
+    linkPollRef.current = {
+      poll: setInterval(check, 2500),
+      stop: setTimeout(() => {
+        stopLinkPoll()
+        setLinkBusy(false)
+        setErr('That link code has expired. Generate a new one.')
+      }, 5 * 60 * 1000),
+    }
   }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1571,7 +1607,15 @@ export default function App() {
           break
 
         case 'link_check':
+          if (!linkPollRef.current) break
+          if (msg.error) {
+            clearLinkPoll(linkPollRef)
+            setLinkBusy(false)
+            setErr(msg.error)
+            break
+          }
           if (msg.status === 'approved' && msg.qr_token) {
+            clearLinkPoll(linkPollRef)
             // Server returned a fresh session token for the linked device.
             localStorage.setItem(SESSION_KEY, msg.qr_token)
             setSessionToken(msg.qr_token)
@@ -3352,14 +3396,12 @@ export default function App() {
 
                     <input placeholder="Link code / Scanned token" value={linkInput} onChange={(e) => setLinkInput(e.target.value.trim())} autoFocus maxLength={200} />
                     <button type="button" disabled={linkBusy || linkInput.length < 8} onClick={() => {
-                      setLinkBusy(true)
-                      setErr('Waiting for approval on your other device…')
-                      const tok = linkInput
-                      const poll = setInterval(() => sendRef.current({ type: 'link_check', token: tok }), 2500)
-                      sendRef.current({ type: 'link_check', token: tok })
-                      setTimeout(() => clearInterval(poll), 5 * 60 * 1000)
-                    }}>{linkBusy ? 'Waiting…' : 'Sign in with code'}</button>
-                    <button type="button" className="link-btn" onClick={() => { stopCamera(); setMode('login'); setLinkInput(''); setLinkBusy(false); setErr('') }}>Back to sign in</button>
+                      setErr(conn === 'open' ? 'Signing in…' : 'Connecting to Phaze…')
+                      let tok = linkInput
+                      if (tok.includes('token=')) tok = tok.split('token=')[1].split('&')[0]
+                      startLinkPoll(tok)
+                    }}>{linkBusy ? 'Signing in…' : 'Sign in with code'}</button>
+                    <button type="button" className="link-btn" onClick={() => { stopCamera(); stopLinkPoll(); setMode('login'); setLinkInput(''); setLinkBusy(false); setErr('') }}>Back to sign in</button>
                   </div>
                 ) : regStep === 'form' ? (
                   <form className="form" onSubmit={(e) => { e.preventDefault(); doRegister() }}>
